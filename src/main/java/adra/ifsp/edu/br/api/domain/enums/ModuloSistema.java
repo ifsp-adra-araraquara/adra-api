@@ -1,0 +1,23 @@
+package adra.ifsp.edu.br.api.domain.enums;
+
+public enum ModuloSistema {
+    USUARIOS,
+    ASSISTIDOS,
+    RESPONSAVEIS,
+    PROJETOS,
+    TURMAS,
+    OFICINAS,
+    AULAS,
+    SEMANARIOS,
+    PLANOS_AULA,
+    MATERIAIS_DIDATICOS,
+    CHAMADA,
+    PRONTUARIOS,
+    DISCIPLINA,
+    DOCUMENTOS,
+    COMUNICADOS,
+    RELATORIOS,
+    EXPORTACOES_FINANCEIRAS,
+    DASHBOARD,
+    DISPONIBILIDADE_OFICINEIRO
+}
