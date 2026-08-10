@@ -34,9 +34,13 @@ public class LogAuditoria {
     @Column(name = "usuario_id")
     private Long usuarioId;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "modulo", nullable = false)
-    private ModuloSistema modulo;
+//    @Enumerated(EnumType.STRING)
+//    @Column(name = "modulo", nullable = false)
+//    private ModuloSistema modulo;
+@Enumerated(EnumType.STRING)
+@JdbcTypeCode(SqlTypes.NAMED_ENUM)
+@Column(name = "modulo", nullable = false)
+private ModuloSistema modulo;
 
     @Column(name = "entidade_afetada", length = 100, nullable = false)
     private String entidadeAfetada;
@@ -44,9 +48,13 @@ public class LogAuditoria {
     @Column(name = "entidade_id")
     private Long entidadeId;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "acao", nullable = false)
-    private AcaoSistema acao;
+//    @Enumerated(EnumType.STRING)
+//    @Column(name = "acao", nullable = false)
+//    private AcaoSistema acao;
+@Enumerated(EnumType.STRING)
+@JdbcTypeCode(SqlTypes.NAMED_ENUM)
+@Column(name = "acao", nullable = false)
+private AcaoSistema acao;
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "valor_anterior", columnDefinition = "jsonb")

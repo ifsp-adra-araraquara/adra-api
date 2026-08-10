@@ -1,9 +1,11 @@
 package adra.ifsp.edu.br.api.domain.service;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import adra.ifsp.edu.br.api.domain.dto.login.LoginRequestDTO;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -163,5 +165,25 @@ public class UsuarioService {
             throw new RegraNegocioException(
                     "Especialidade so' deve ser informada para usuarios com nivel PROFISSIONAL_SAUDE.");
         }
+    }
+
+
+    public UsuarioResponseDTO autenticar(LoginRequestDTO dto) {
+        Usuario usuario = usuarioRepository.findByEmail(dto.email())
+                .orElseThrow(null);
+
+        if (!usuario.isAtivo()) {
+            return null;
+        }
+
+        if (!passwordEncoder.matches(dto.senha(), usuario.getSenhaHash())) {
+            return null;
+        }
+
+        usuario.setUltimoLogin(OffsetDateTime.now());
+        usuarioRepository.save(usuario);
+
+        return usuarioMapper.paraDTO(usuario);
+
     }
 }
