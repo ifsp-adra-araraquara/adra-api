@@ -1,5 +1,8 @@
 package adra.ifsp.edu.br.api.domain.service;
 
+import adra.ifsp.edu.br.api.domain.dto.responsavel.ResponsavelRequestDTO;
+import adra.ifsp.edu.br.api.domain.dto.responsavel.ResponsavelResponseDTO;
+import adra.ifsp.edu.br.api.domain.dto.vinculo.VinculoFamiliarComResponsavelRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.vinculo.VinculoFamiliarRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.vinculo.VinculoFamiliarResponseDTO;
 import adra.ifsp.edu.br.api.domain.enums.AcaoSistema;
@@ -77,6 +80,35 @@ public class VinculoFamiliarService {
 
         return vinculoMapper.paraDTO(vinculo);
     }
+
+    @Transactional
+    public VinculoFamiliarResponseDTO cadastrarResponsavelEVincular(
+            Long assistidoId,
+            VinculoFamiliarComResponsavelRequestDTO dto) {
+        ResponsavelRequestDTO responsavelDto = new ResponsavelRequestDTO(
+                dto.nomeCompleto(),
+                dto.dataNascimento(),
+                dto.cpf(),
+                dto.telefone(),
+                dto.email(),
+                dto.endereco(),
+                dto.observacoes()
+        );
+
+        ResponsavelResponseDTO responsavelCriado = responsavelService.cadastrar(responsavelDto);
+
+        VinculoFamiliarRequestDTO vinculoDto = new VinculoFamiliarRequestDTO(
+                responsavelCriado.responsavelId(),
+                dto.parentesco(),
+                dto.responsavelPrincipal(),
+                dto.contatoEmergencia(),
+                dto.autorizadoRetirada(),
+                dto.observacoes()
+        );
+
+        return vincular(assistidoId, vinculoDto);
+    }
+
 
     @Transactional(readOnly = true)
     public List<VinculoFamiliarResponseDTO> listarPorAssistido(Long assistidoId) {

@@ -1,5 +1,6 @@
 package adra.ifsp.edu.br.api.web.controller;
 
+import adra.ifsp.edu.br.api.domain.dto.vinculo.VinculoFamiliarComResponsavelRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.vinculo.VinculoFamiliarRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.vinculo.VinculoFamiliarResponseDTO;
 import adra.ifsp.edu.br.api.domain.service.VinculoFamiliarService;
@@ -23,6 +24,20 @@ public class VinculoFamiliarController {
                                                                  @Valid @RequestBody VinculoFamiliarRequestDTO dto) {
         VinculoFamiliarResponseDTO criado = vinculoFamiliarService.vincular(assistidoId, dto);
         URI local = URI.create("/api/assistidos/" + assistidoId + "/responsaveis/" + dto.responsavelId());
+        return ResponseEntity.created(local).body(criado);
+    }
+
+    @PostMapping("/cadastrar-vincular")
+    public ResponseEntity<VinculoFamiliarResponseDTO> cadastrarVincular(
+            @PathVariable Long assistidoId,
+            @Valid @RequestBody VinculoFamiliarComResponsavelRequestDTO dto
+            ) {
+        VinculoFamiliarResponseDTO criado = vinculoFamiliarService.cadastrarResponsavelEVincular(assistidoId, dto);
+
+        URI local = URI.create(
+                "/api/assistidos/" + assistidoId + "/responsaveis/" + criado.responsavelId()
+        );
+
         return ResponseEntity.created(local).body(criado);
     }
 
