@@ -1,10 +1,13 @@
 package adra.ifsp.edu.br.api.domain.mapper;
 
+import adra.ifsp.edu.br.api.domain.dto.modulo.ModuloDTO;
 import adra.ifsp.edu.br.api.domain.dto.usuario.UsuarioRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.usuario.UsuarioResponseDTO;
 import adra.ifsp.edu.br.api.domain.model.NivelPermissao;
 import adra.ifsp.edu.br.api.domain.model.Usuario;
 import org.springframework.stereotype.Component;
+
+import java.util.List;
 
 @Component
 public class UsuarioMapper {
@@ -33,6 +36,10 @@ public class UsuarioMapper {
     }
 
     public UsuarioResponseDTO paraDTO(Usuario entidade) {
+        return paraDTO(entidade, List.of());
+    }
+
+    public UsuarioResponseDTO paraDTO(Usuario entidade, List<ModuloDTO> listamodulos) {
         return new UsuarioResponseDTO(
                 entidade.getUsuarioId(),
                 entidade.getNomeCompleto(),
@@ -44,7 +51,8 @@ public class UsuarioMapper {
                 entidade.isAtivo(),
                 entidade.getUltimoLogin(),
                 entidade.getCriadoEm(),
-                entidade.getAtualizadoEm()
+                entidade.getAtualizadoEm(),
+                listamodulos
         );
     }
 }
