@@ -22,6 +22,12 @@ public class GlobalExceptionHandler {
                 ErroRespostaDTO.de(404, "Nao encontrado", ex.getMessage(), request.getRequestURI()));
     }
 
+    @ExceptionHandler(AutenticacaoException.class)
+    public ResponseEntity<ErroRespostaDTO> tratarAutenticacao(AutenticacaoException ex, HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
+                ErroRespostaDTO.de(401, "Nao autenticado", ex.getMessage(), request.getRequestURI()));
+    }
+
     @ExceptionHandler(RegraNegocioException.class)
     public ResponseEntity<ErroRespostaDTO> tratarRegraNegocio(RegraNegocioException ex, HttpServletRequest request) {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(

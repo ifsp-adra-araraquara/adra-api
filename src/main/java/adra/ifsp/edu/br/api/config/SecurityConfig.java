@@ -1,45 +1,102 @@
 package adra.ifsp.edu.br.api.config;
 
+import java.util.List;
+
+import javax.crypto.spec.SecretKeySpec;
+
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
+import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.JwtEncoder;
+import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
+import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+import com.nimbusds.jose.jwk.source.ImmutableSecret;
 
 /**
- * ATENCAO - TEMPORARIO: sem RBAC ainda. Combinado no card de organizacao do
- * projeto: entregar os CRUDs base primeiro, JWT + middleware de papeis entra
- * depois (era pre-requisito critico das outras features, mas decidimos
- * destravar o cadastro basico primeiro).
- *
- * O starter-security ja esta no classpath (build.gradle), entao sem este
- * bean o Spring Boot ligaria a autenticacao basica automatica e bloquearia
- * TODOS os endpoints com 401. Este config libera tudo por enquanto.
- *
- * Quando o JWT entrar, trocar por:
- *  - authorizeHttpRequests com regras por role (hasRole(...))
- *  - addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
- * A sessionCreationPolicy STATELESS ja fica correta desde ja.
+ * Duas cadeias de seguranca porque sao dois emissores de token diferentes:
+ * o login recebe o token do Supabase, o resto da API recebe o token que a
+ * propria aplicacao emitiu no login.
  */
 @Configuration
 public class SecurityConfig {
 
+    private static final String ROTA_LOGIN = "/api/auth/login";
+    private static final MacAlgorithm ALGORITMO = MacAlgorithm.HS256;
+
+    @Value("${adra.jwt.segredo}")
+    private String segredo;
+
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-        http
+    @Order(1)
+    public SecurityFilterChain chainLogin(HttpSecurity http, JwtDecoder decoderSupabase) throws Exception {
+        return http
+                .securityMatcher(ROTA_LOGIN)
+                .cors(cors -> {})
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
-
-        return http.build();
+                .authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
+                .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.decoder(decoderSupabase)))
+                .build();
     }
 
-    // Usado pelo UsuarioService para gerar o hash da senha (senha_hash em
-    // adra.usuario) e, futuramente, pelo login/JWT para validar credenciais.
     @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
+    @Order(2)
+    public SecurityFilterChain chainApi(HttpSecurity http) throws Exception {
+        return http
+                .cors(cors -> {})
+                .csrf(csrf -> csrf.disable())
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/actuator/health").permitAll()
+                        .anyRequest().authenticated())
+                .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.decoder(decoderAplicacao())))
+                .build();
+    }
+
+    // O Supabase assina com ES256; o padrao do Nimbus e' RS256.
+    @Bean
+    public JwtDecoder decoderSupabase(@Value("${adra.supabase.jwks-uri}") String jwksUri) {
+        return NimbusJwtDecoder.withJwkSetUri(jwksUri)
+                .jwsAlgorithm(SignatureAlgorithm.ES256)
+                .build();
+    }
+
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource(
+            @Value("${adra.cors.origens}") List<String> origens) {
+        CorsConfiguration config = new CorsConfiguration();
+        config.setAllowedOrigins(origens);
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+        config.setAllowedHeaders(List.of("*"));
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", config);
+        return source;
+    }
+
+    @Bean
+    public JwtEncoder jwtEncoder() {
+        return new NimbusJwtEncoder(new ImmutableSecret<>(chaveSimetrica()));
+    }
+
+    private JwtDecoder decoderAplicacao() {
+        return NimbusJwtDecoder.withSecretKey(chaveSimetrica())
+                .macAlgorithm(ALGORITMO)
+                .build();
+    }
+
+    private SecretKeySpec chaveSimetrica() {
+        return new SecretKeySpec(segredo.getBytes(), ALGORITMO.getName());
     }
 }
