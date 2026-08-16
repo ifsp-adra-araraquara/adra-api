@@ -4,8 +4,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,13 +32,6 @@ public class UsuarioService {
     private final NivelPermissaoRepository nivelPermissaoRepository;
     private final UsuarioMapper usuarioMapper;
     private final AuditoriaService auditoriaService;
-    private final PasswordEncoder passwordEncoder;
-
-    // Placeholder combinado com voce: refinar politica de senha (aleatoria /
-    // convite por e-mail / forcar troca no 1o login) em card futuro.
-    // todo: mover para variavel de ambiente antes de ir pra producao.
-    @Value("${adra.usuario.senha-inicial-placeholder:MudarNoPrimeiroAcesso@2026}")
-    private String senhaInicialPlaceholder;
 
     public UsuarioResponseDTO cadastrar(UsuarioRequestDTO dto) {
         if (usuarioRepository.existsByEmailIgnoreCase(dto.email())) {
@@ -50,8 +41,7 @@ public class UsuarioService {
         NivelPermissao nivelPermissao = buscarNivelPermissao(dto.nivelPermissao());
         validarEspecialidade(dto.nivelPermissao(), dto.especialidade());
 
-        String senhaHash = passwordEncoder.encode(senhaInicialPlaceholder);
-        Usuario usuario = usuarioMapper.paraNovaEntidade(dto, nivelPermissao, senhaHash);
+        Usuario usuario = usuarioMapper.paraNovaEntidade(dto, nivelPermissao);
         usuario = usuarioRepository.save(usuario);
 
         auditoriaService.registrar(

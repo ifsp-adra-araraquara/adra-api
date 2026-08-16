@@ -9,12 +9,11 @@ import org.springframework.stereotype.Component;
 @Component
 public class UsuarioMapper {
 
-    public Usuario paraNovaEntidade(UsuarioRequestDTO dto, NivelPermissao nivelPermissao, String senhaHash) {
+    public Usuario paraNovaEntidade(UsuarioRequestDTO dto, NivelPermissao nivelPermissao) {
         return Usuario.builder()
                 .nivelPermissao(nivelPermissao)
                 .nomeCompleto(dto.nomeCompleto())
                 .email(dto.email())
-                .senhaHash(senhaHash)
                 .cargoFuncao(dto.cargoFuncao())
                 .telefone(dto.telefone())
                 .especialidade(dto.especialidade())
@@ -22,7 +21,6 @@ public class UsuarioMapper {
                 .build();
     }
 
-    /** Nao mexe em senha nem em ativo - fluxos separados (ver UsuarioService). */
     public void atualizarEntidade(Usuario entidade, UsuarioRequestDTO dto, NivelPermissao nivelPermissao) {
         entidade.setNivelPermissao(nivelPermissao);
         entidade.setNomeCompleto(dto.nomeCompleto());
