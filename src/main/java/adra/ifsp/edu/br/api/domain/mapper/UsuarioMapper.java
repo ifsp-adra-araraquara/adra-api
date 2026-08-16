@@ -6,14 +6,17 @@ import adra.ifsp.edu.br.api.domain.model.NivelPermissao;
 import adra.ifsp.edu.br.api.domain.model.Usuario;
 import org.springframework.stereotype.Component;
 
+import java.util.UUID;
+
 @Component
 public class UsuarioMapper {
 
-    public Usuario paraNovaEntidade(UsuarioRequestDTO dto, NivelPermissao nivelPermissao) {
+    public Usuario paraNovaEntidade(UsuarioRequestDTO dto, NivelPermissao nivelPermissao, UUID authUid) {
         return Usuario.builder()
                 .nivelPermissao(nivelPermissao)
                 .nomeCompleto(dto.nomeCompleto())
                 .email(dto.email())
+                .authUid(authUid)
                 .cargoFuncao(dto.cargoFuncao())
                 .telefone(dto.telefone())
                 .especialidade(dto.especialidade())

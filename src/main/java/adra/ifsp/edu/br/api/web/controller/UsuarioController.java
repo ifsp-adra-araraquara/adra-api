@@ -13,35 +13,33 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import adra.ifsp.edu.br.api.domain.dto.usuario.DefinirSenhaRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.usuario.UsuarioRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.usuario.UsuarioResponseDTO;
 import adra.ifsp.edu.br.api.domain.dto.usuario.UsuarioStatusRequestDTO;
+import adra.ifsp.edu.br.api.domain.service.UsuarioAdminService;
 import adra.ifsp.edu.br.api.domain.service.UsuarioService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
-/**
- * ATENCAO - GAP DE SEGURANCA TEMPORARIO: o criterio do card diz "somente
- * Administrador cadastra", mas isso so' pode ser aplicado de verdade quando
- * o JWT + @PreAuthorize entrarem (decisao consciente de adiar). Ate' la', QUALQUER requisicao sem
- * autenticacao consegue criar um usuario ADMINISTRADOR por este endpoint.
- * Nao expor esta API fora da rede/ambiente de desenvolvimento enquanto
- * isso nao for resolvido.
- *
- * Quando o JWT entrar, a anotacao correta em cadastrar/atualizar/alterarStatus e':
- *   @PreAuthorize("hasRole('ADMINISTRADOR')")
- */
 @RestController
 @RequestMapping("/api/usuarios")
 @RequiredArgsConstructor
 public class UsuarioController {
 
     private final UsuarioService usuarioService;
+    private final UsuarioAdminService usuarioAdminService;
 
     @PostMapping
     public ResponseEntity<UsuarioResponseDTO> cadastrar(@Valid @RequestBody UsuarioRequestDTO dto) {
-        UsuarioResponseDTO criado = usuarioService.cadastrar(dto);
+        UsuarioResponseDTO criado = usuarioAdminService.cadastrar(dto);
         return ResponseEntity.created(URI.create("/api/usuarios/" + criado.usuarioId())).body(criado);
+    }
+
+    @PutMapping("/senha")
+    public ResponseEntity<Void> definirSenha(@Valid @RequestBody DefinirSenhaRequestDTO dto) {
+        usuarioAdminService.definirSenha(dto);
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping
