@@ -4,6 +4,7 @@ import adra.ifsp.edu.br.api.domain.model.Usuario;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Optional;
+import java.util.UUID;
 
 public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
 
@@ -13,6 +14,7 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
 
     boolean existsByEmailIgnoreCaseAndUsuarioIdNot(String email, Long usuarioId);
 
-    // Usado futuramente pelo CustomUserDetailsService (login/JWT).
     Optional<Usuario> findByEmailIgnoreCase(String email);
+
+    Optional<Usuario> findByAuthUid(UUID authUid);
 }

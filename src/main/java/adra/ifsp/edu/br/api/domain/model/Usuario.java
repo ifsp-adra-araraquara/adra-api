@@ -11,6 +11,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.OffsetDateTime;
+import java.util.UUID;
 
 /**
  * IMPORTANTE: nunca deletar fisicamente (comentario original do schema:
@@ -41,9 +42,8 @@ public class Usuario {
     @Column(name = "email", length = 255, nullable = false)
     private String email;
 
-    // Nunca exposto em DTO de resposta - so' o mapper/service tocam nisso.
-    @Column(name = "senha_hash", nullable = false)
-    private String senhaHash;
+    @Column(name = "auth_uid", unique = true)
+    private UUID authUid;
 
     @Column(name = "cargo_funcao", length = 120)
     private String cargoFuncao;
