@@ -7,6 +7,9 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import adra.ifsp.edu.br.api.domain.dto.login.LoginRequestDTO;
+import adra.ifsp.edu.br.api.domain.dto.modulo.ModuloDTO;
+import adra.ifsp.edu.br.api.exception.CredenciaisInvalidasException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,6 +21,8 @@ import adra.ifsp.edu.br.api.domain.enums.EspecialidadeSaude;
 import adra.ifsp.edu.br.api.domain.enums.ModuloSistema;
 import adra.ifsp.edu.br.api.domain.enums.NomeNivelPermissao;
 import adra.ifsp.edu.br.api.domain.mapper.UsuarioMapper;
+import adra.ifsp.edu.br.api.domain.model.NivelPermissao;
+import adra.ifsp.edu.br.api.domain.model.Usuario;
 import adra.ifsp.edu.br.api.domain.repository.NivelPermissaoRepository;
 import adra.ifsp.edu.br.api.domain.repository.UsuarioRepository;
 import adra.ifsp.edu.br.api.exception.EntidadeNaoEncontradaException;
@@ -186,21 +191,21 @@ public class UsuarioService {
     }
 
 
-    public UsuarioResponseDTO autenticar(LoginRequestDTO dto) {
-        Usuario usuario = usuarioRepository.findByEmail(dto.email())
-                .filter(Usuario::isAtivo)
-                .filter(u -> passwordEncoder.matches(dto.senha(), u.getSenhaHash()))
-                .orElseThrow(() -> new CredenciaisInvalidasException("Email ou senha invalidos"));
-
-        usuario.setUltimoLogin(OffsetDateTime.now());
-        usuarioRepository.save(usuario);
-
-        List<ModuloDTO> modulos = nivelPermissaoModuloRepository
-                .findComModuloById_NivelPermissaoIdOrderByOrdemAsc(usuario.getNivelPermissao().getNivelPermissaoId())
-                .stream()
-                .map(npm -> moduloMapper.paraDTO(npm.getModulo()))
-                .toList();
-
-        return usuarioMapper.paraDTO(usuario, modulos);
-    }
+//    public UsuarioResponseDTO autenticar(LoginRequestDTO dto) {
+//        Usuario usuario = usuarioRepository.findByEmail(dto.email())
+//                .filter(Usuario::isAtivo)
+//                .filter(u -> passwordEncoder.matches(dto.senha(), u.getSenhaHash()))
+//                .orElseThrow(() -> new CredenciaisInvalidasException("Email ou senha invalidos"));
+//
+//        usuario.setUltimoLogin(OffsetDateTime.now());
+//        usuarioRepository.save(usuario);
+//
+//        List<ModuloDTO> modulos = nivelPermissaoModuloRepository
+//                .findComModuloById_NivelPermissaoIdOrderByOrdemAsc(usuario.getNivelPermissao().getNivelPermissaoId())
+//                .stream()
+//                .map(npm -> moduloMapper.paraDTO(npm.getModulo()))
+//                .toList();
+//
+//        return usuarioMapper.paraDTO(usuario, modulos);
+//    }
 }

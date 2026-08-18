@@ -7,6 +7,7 @@ import adra.ifsp.edu.br.api.domain.model.NivelPermissao;
 import adra.ifsp.edu.br.api.domain.model.Usuario;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
 import java.util.UUID;
 
 @Component
