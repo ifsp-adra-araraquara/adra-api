@@ -6,15 +6,17 @@ import adra.ifsp.edu.br.api.domain.model.NivelPermissao;
 import adra.ifsp.edu.br.api.domain.model.Usuario;
 import org.springframework.stereotype.Component;
 
+import java.util.UUID;
+
 @Component
 public class UsuarioMapper {
 
-    public Usuario paraNovaEntidade(UsuarioRequestDTO dto, NivelPermissao nivelPermissao, String senhaHash) {
+    public Usuario paraNovaEntidade(UsuarioRequestDTO dto, NivelPermissao nivelPermissao, UUID authUid) {
         return Usuario.builder()
                 .nivelPermissao(nivelPermissao)
                 .nomeCompleto(dto.nomeCompleto())
                 .email(dto.email())
-                .senhaHash(senhaHash)
+                .authUid(authUid)
                 .cargoFuncao(dto.cargoFuncao())
                 .telefone(dto.telefone())
                 .especialidade(dto.especialidade())
@@ -22,7 +24,6 @@ public class UsuarioMapper {
                 .build();
     }
 
-    /** Nao mexe em senha nem em ativo - fluxos separados (ver UsuarioService). */
     public void atualizarEntidade(Usuario entidade, UsuarioRequestDTO dto, NivelPermissao nivelPermissao) {
         entidade.setNivelPermissao(nivelPermissao);
         entidade.setNomeCompleto(dto.nomeCompleto());
