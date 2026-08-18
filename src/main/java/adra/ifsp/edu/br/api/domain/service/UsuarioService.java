@@ -1,7 +1,10 @@
 package adra.ifsp.edu.br.api.domain.service;
 
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
@@ -28,20 +31,32 @@ import lombok.RequiredArgsConstructor;
 @Transactional
 public class UsuarioService {
 
+    private static final Set<NomeNivelPermissao> PERFIS_DO_MVP = EnumSet.of(
+            NomeNivelPermissao.ADMINISTRADOR,
+            NomeNivelPermissao.COORDENADOR,
+            NomeNivelPermissao.SOCIOPEDAGOGICO);
+
     private final UsuarioRepository usuarioRepository;
     private final NivelPermissaoRepository nivelPermissaoRepository;
     private final UsuarioMapper usuarioMapper;
     private final AuditoriaService auditoriaService;
 
-    public UsuarioResponseDTO cadastrar(UsuarioRequestDTO dto) {
+    @Transactional(readOnly = true)
+    public void validarNovoCadastro(UsuarioRequestDTO dto) {
+        if (!PERFIS_DO_MVP.contains(dto.nivelPermissao())) {
+            throw new RegraNegocioException(
+                    "Perfil fora do escopo do MVP: " + dto.nivelPermissao() + ".");
+        }
         if (usuarioRepository.existsByEmailIgnoreCase(dto.email())) {
             throw new RegraNegocioException("Ja existe um usuario cadastrado com este e-mail.");
         }
-
-        NivelPermissao nivelPermissao = buscarNivelPermissao(dto.nivelPermissao());
         validarEspecialidade(dto.nivelPermissao(), dto.especialidade());
+    }
 
-        Usuario usuario = usuarioMapper.paraNovaEntidade(dto, nivelPermissao);
+    public UsuarioResponseDTO cadastrar(UsuarioRequestDTO dto, UUID authUid) {
+        NivelPermissao nivelPermissao = buscarNivelPermissao(dto.nivelPermissao());
+
+        Usuario usuario = usuarioMapper.paraNovaEntidade(dto, nivelPermissao, authUid);
         usuario = usuarioRepository.save(usuario);
 
         auditoriaService.registrar(
@@ -127,6 +142,23 @@ public class UsuarioService {
         );
 
         return usuarioMapper.paraDTO(usuario);
+    }
+
+    @Transactional(readOnly = true)
+    public Usuario buscarPorEmail(String email) {
+        return usuarioRepository.findByEmailIgnoreCase(email)
+                .orElseThrow(() -> new EntidadeNaoEncontradaException("Usuario nao encontrado: " + email));
+    }
+
+    public void registrarSenhaDefinida(Usuario usuario) {
+        auditoriaService.registrar(
+                ModuloSistema.USUARIOS,
+                "usuario",
+                usuario.getUsuarioId(),
+                AcaoSistema.EDITAR,
+                null,
+                Map.of("senhaRedefinida", true),
+                "Senha definida pelo Administrador");
     }
 
     Usuario buscarEntidadePorId(Long id) {
