@@ -11,9 +11,9 @@ SET search_path TO adra, public;
 INSERT INTO adra.usuario (nivel_permissao_id, nome_completo, email, cargo_funcao, telefone, auth_uid)
 SELECT np.nivel_permissao_id, v.nome, v.email, v.cargo, v.telefone, v.auth_uid::uuid
 FROM (VALUES
-    ('Ana Administradora', 'admin@adra.local',  'Administracao',  '16999990001', 'ADMINISTRADOR',   '11111111-1111-1111-1111-111111111111'),
-    ('Carlos Coordenador', 'coord@adra.local',  'Coordenacao',    '16999990002', 'COORDENADOR',     '22222222-2222-2222-2222-222222222222'),
-    ('Sonia Sociopedagoga','socio@adra.local',  'Sociopedagogico','16999990003', 'SOCIOPEDAGOGICO', '33333333-3333-3333-3333-333333333333')
+    ('Ana Administradora', 'administrador@adra.com',   'Administracao',  '16999990001', 'ADMINISTRADOR',   '11111111-1111-1111-1111-111111111111'),
+    ('Carlos Coordenador', 'coordenador@adra.com',     'Coordenacao',    '16999990002', 'COORDENADOR',     '22222222-2222-2222-2222-222222222222'),
+    ('Sonia Sociopedagoga','sociopedagogico@adra.com', 'Sociopedagogico','16999990003', 'SOCIOPEDAGOGICO', '33333333-3333-3333-3333-333333333333')
 ) AS v(nome, email, cargo, telefone, perfil, auth_uid)
 JOIN adra.nivel_permissao np ON np.nome = v.perfil::nome_nivel_permissao
 ON CONFLICT DO NOTHING;
