@@ -1,3 +1,6 @@
+DOCKER_HOST ?= $(shell docker context inspect --format '{{.Endpoints.docker.Host}}')
+export DOCKER_HOST
+
 SUPABASE ?= supabase
 DB_CONTAINER ?= supabase_db_adra-api
 PSQL = docker exec -i $(DB_CONTAINER) psql -U postgres -d postgres -v ON_ERROR_STOP=1
