@@ -7,6 +7,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.JdbcTypeCode;
 
 import java.time.OffsetDateTime;
 
@@ -29,9 +30,13 @@ public class NivelPermissao {
     @Column(name = "nivel_permissao_id")
     private Long nivelPermissaoId;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "nome", nullable = false, unique = true)
-    private NomeNivelPermissao nome;
+//    @Enumerated(EnumType.STRING)
+//    @Column(name = "nome", nullable = false, unique = true)
+//    private NomeNivelPermissao nome;
+@Enumerated(EnumType.STRING)
+@JdbcTypeCode(org.hibernate.type.SqlTypes.NAMED_ENUM)
+@Column(name = "nome", nullable = false, unique = true)
+private NomeNivelPermissao nome;
 
     @Column(name = "descricao", columnDefinition = "text")
     private String descricao;
