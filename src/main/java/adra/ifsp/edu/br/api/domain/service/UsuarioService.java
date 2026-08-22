@@ -7,9 +7,6 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-import adra.ifsp.edu.br.api.domain.dto.login.LoginRequestDTO;
-import adra.ifsp.edu.br.api.domain.dto.modulo.ModuloDTO;
-import adra.ifsp.edu.br.api.exception.CredenciaisInvalidasException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
