@@ -186,4 +186,23 @@ public class UsuarioService {
                     "Especialidade so' deve ser informada para usuarios com nivel PROFISSIONAL_SAUDE.");
         }
     }
+
+
+//    public UsuarioResponseDTO autenticar(LoginRequestDTO dto) {
+//        Usuario usuario = usuarioRepository.findByEmail(dto.email())
+//                .filter(Usuario::isAtivo)
+//                .filter(u -> passwordEncoder.matches(dto.senha(), u.getSenhaHash()))
+//                .orElseThrow(() -> new CredenciaisInvalidasException("Email ou senha invalidos"));
+//
+//        usuario.setUltimoLogin(OffsetDateTime.now());
+//        usuarioRepository.save(usuario);
+//
+//        List<ModuloDTO> modulos = nivelPermissaoModuloRepository
+//                .findComModuloById_NivelPermissaoIdOrderByOrdemAsc(usuario.getNivelPermissao().getNivelPermissaoId())
+//                .stream()
+//                .map(npm -> moduloMapper.paraDTO(npm.getModulo()))
+//                .toList();
+//
+//        return usuarioMapper.paraDTO(usuario, modulos);
+//    }
 }
