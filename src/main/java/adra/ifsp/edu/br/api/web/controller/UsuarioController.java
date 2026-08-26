@@ -68,7 +68,7 @@ public class UsuarioController {
     @PatchMapping("/{id}/status")
     public ResponseEntity<UsuarioResponseDTO> alterarStatus(@PathVariable Long id,
                                                               @Valid @RequestBody UsuarioStatusRequestDTO dto) {
-        return ResponseEntity.ok(usuarioService.alterarStatus(id, dto));
+        return ResponseEntity.ok(usuarioAdminService.alterarStatus(id, dto));
     }
 
     // Propositalmente sem DELETE: usuario nunca e' removido fisicamente
