@@ -47,6 +47,15 @@ public class SupabaseAdminClient {
                 .toBodilessEntity();
     }
 
+    public void alterarStatus(UUID authUid, boolean ativo) {
+        String banDuration = ativo ? "none" : "876600h";
+        rest.put()
+                .uri("/users/{id}", authUid)
+                .body(Map.of("ban_duration", banDuration))
+                .retrieve()
+                .toBodilessEntity();
+    }
+
     private record Identidade(UUID id) {
     }
 }

@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import adra.ifsp.edu.br.api.domain.dto.usuario.DefinirSenhaRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.usuario.UsuarioRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.usuario.UsuarioResponseDTO;
+import adra.ifsp.edu.br.api.domain.dto.usuario.UsuarioStatusRequestDTO;
 import adra.ifsp.edu.br.api.domain.enums.NomeNivelPermissao;
 import adra.ifsp.edu.br.api.domain.model.Usuario;
 import adra.ifsp.edu.br.api.exception.AcessoNegadoException;
@@ -57,6 +58,23 @@ public class UsuarioAdminService {
 
         supabaseAdminClient.definirSenha(usuario.getAuthUid(), dto.novaSenha());
         usuarioService.registrarSenhaDefinida(usuario);
+    }
+
+    public UsuarioResponseDTO alterarStatus(Long id, UsuarioStatusRequestDTO dto) {
+        exigirAdministrador();
+
+        Usuario usuario = usuarioService.buscarEntidadePorId(id);
+        UsuarioResponseDTO resposta = usuarioService.alterarStatus(id, dto);
+
+        if (usuario.getAuthUid() != null) {
+            supabaseAdminClient.alterarStatus(usuario.getAuthUid(), dto.ativo());
+        } else {
+            log.warn("Usuario id={} email={} nao possui auth_uid associado no Supabase Auth.", id, usuario.getEmail());
+            throw new RegraNegocioException(
+                    "Usuario nao possui conta no provedor de autenticacao (Supabase Auth). Cadastre um novo usuario para testar a sincronizacao.");
+        }
+
+        return resposta;
     }
 
     private void desfazerIdentidade(UUID authUid) {
