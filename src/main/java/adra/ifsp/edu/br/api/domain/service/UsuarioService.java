@@ -1,18 +1,21 @@
 package adra.ifsp.edu.br.api.domain.service;
 
 import java.util.EnumSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import adra.ifsp.edu.br.api.domain.dto.PaginaDTO;
 import adra.ifsp.edu.br.api.domain.dto.usuario.UsuarioRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.usuario.UsuarioResponseDTO;
 import adra.ifsp.edu.br.api.domain.dto.usuario.UsuarioStatusRequestDTO;
+import adra.ifsp.edu.br.api.domain.repository.UsuarioSpecification;
 import adra.ifsp.edu.br.api.domain.enums.AcaoSistema;
 import adra.ifsp.edu.br.api.domain.enums.EspecialidadeSaude;
 import adra.ifsp.edu.br.api.domain.enums.ModuloSistema;
@@ -82,10 +85,15 @@ public class UsuarioService {
     }
 
     @Transactional(readOnly = true)
-    public List<UsuarioResponseDTO> listar() {
-        return usuarioRepository.findAll().stream()
-                .map(usuarioMapper::paraDTO)
-                .collect(Collectors.toList());
+    public PaginaDTO<UsuarioResponseDTO> listar(
+            String busca,
+            NomeNivelPermissao perfil,
+            Boolean ativo,
+            int pagina,
+            int tamanho) {
+        Specification<Usuario> spec = UsuarioSpecification.comFiltros(busca, perfil, ativo);
+        PageRequest pageRequest = PageRequest.of(pagina, tamanho, Sort.by("nomeCompleto").ascending());
+        return PaginaDTO.de(usuarioRepository.findAll(spec, pageRequest).map(usuarioMapper::paraDTO));
     }
 
     public UsuarioResponseDTO atualizar(Long id, UsuarioRequestDTO dto) {

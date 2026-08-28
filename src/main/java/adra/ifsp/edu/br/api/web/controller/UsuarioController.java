@@ -1,7 +1,6 @@
 package adra.ifsp.edu.br.api.web.controller;
 
 import java.net.URI;
-import java.util.List;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -12,12 +11,15 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import adra.ifsp.edu.br.api.domain.dto.PaginaDTO;
 import adra.ifsp.edu.br.api.domain.dto.usuario.DefinirSenhaRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.usuario.UsuarioRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.usuario.UsuarioResponseDTO;
 import adra.ifsp.edu.br.api.domain.dto.usuario.UsuarioStatusRequestDTO;
+import adra.ifsp.edu.br.api.domain.enums.NomeNivelPermissao;
 import adra.ifsp.edu.br.api.domain.service.UsuarioAdminService;
 import adra.ifsp.edu.br.api.domain.service.UsuarioService;
 import jakarta.validation.Valid;
@@ -47,8 +49,13 @@ public class UsuarioController {
 
     @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'COORDENADOR')")
     @GetMapping
-    public ResponseEntity<List<UsuarioResponseDTO>> listar() {
-        return ResponseEntity.ok(usuarioService.listar());
+    public ResponseEntity<PaginaDTO<UsuarioResponseDTO>> listar(
+            @RequestParam(required = false) String busca,
+            @RequestParam(required = false) NomeNivelPermissao perfil,
+            @RequestParam(required = false) Boolean ativo,
+            @RequestParam(defaultValue = "0") int pagina,
+            @RequestParam(defaultValue = "20") int tamanho) {
+        return ResponseEntity.ok(usuarioService.listar(busca, perfil, ativo, pagina, tamanho));
     }
 
     @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'COORDENADOR')")
