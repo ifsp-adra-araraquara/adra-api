@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Redefinição de senha — ADRA Araraquara</title>
+</head>
+
+<body style="margin:0; padding:0; background-color:#F4F5F5; font-family:Arial, Helvetica, sans-serif;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+        style="background-color:#F4F5F5; padding:32px 16px;">
+        <tr>
+            <td align="center">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+                    style="max-width:480px; background-color:#FFFFFF; border-radius:12px; overflow:hidden; box-shadow:0 2px 8px rgba(0,0,0,0.06);">
+
+                    <!-- Cabeçalho -->
+                    <tr>
+                        <td style="background-color:#007B5F; padding:28px 32px; text-align:center;">
+                            <span style="font-size:20px; font-weight:700; color:#FFFFFF; letter-spacing:0.5px;">ADRA
+                                ARARAQUARA</span>
+                        </td>
+                    </tr>
+
+                    <!-- Corpo -->
+                    <tr>
+                        <td style="padding:36px 32px 28px;">
+                            <h1 style="margin:0 0 16px; font-size:19px; color:#2D2F30; font-weight:700;">
+                                Redefinição de senha
+                            </h1>
+                            <p style="margin:0 0 20px; font-size:14px; line-height:1.6; color:#54585A;">
+                                Recebemos uma solicitação para redefinir a senha da sua conta no Sistema de Gestão da
+                                ADRA Araraquara.
+                                Se foi você, clique no botão abaixo para criar uma nova senha.
+                            </p>
+
+                            <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
+                                <tr>
+                                    <td style="border-radius:8px; background-color:#007B5F;">
+                                        <a href="{{ .ConfirmationURL }}"
+                                            style="display:inline-block; padding:13px 28px; font-size:14px; font-weight:700; color:#FFFFFF; text-decoration:none; border-radius:8px;">
+                                            Redefinir minha senha
+                                        </a>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <p style="margin:0 0 8px; font-size:13px; line-height:1.6; color:#8A8D8F;">
+                                Este link expira em breve e só pode ser usado uma vez. Se você não solicitou essa
+                                alteração, pode ignorar este e-mail com segurança — sua senha continuará a mesma.
+                            </p>
+
+                            <p style="margin:20px 0 0; font-size:12px; line-height:1.6; color:#8A8D8F;">
+                                Se o botão não funcionar, copie e cole este link no seu navegador:<br>
+                                <a href="{{ .ConfirmationURL }}" style="color:#007B5F; word-break:break-all;">{{
+                                    .ConfirmationURL }}</a>
+                            </p>
+                        </td>
+                    </tr>
+
+                    <!-- Rodapé -->
+                    <tr>
+                        <td style="background-color:#F4F5F5; padding:20px 32px; text-align:center;">
+                            <p style="margin:0; font-size:11px; color:#8A8D8F;">
+                                Este é um e-mail automático — não responda. Se você não solicitou essa ação, entre em
+                                contato com um Administrador do sistema.
+                            </p>
+                            <p style="margin:8px 0 0; font-size:11px; color:#8A8D8F;">
+                                ADRA Araraquara · Sistema de Gestão · Protótipo acadêmico — IFSP Campus Araraquara
+                            </p>
+                        </td>
+                    </tr>
+
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+
+</html>

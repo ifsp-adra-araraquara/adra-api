@@ -31,15 +31,19 @@ public class UsuarioAdminService {
 
     private final SupabaseAdminClient supabaseAdminClient;
     private final UsuarioService usuarioService;
+    private final InvitacaoService invitacaoService; 
 
     public UsuarioResponseDTO cadastrar(UsuarioRequestDTO dto) {
         exigirAdministrador();
         usuarioService.validarNovoCadastro(dto);
 
+
         UUID authUid = supabaseAdminClient.criarIdentidade(dto.email());
 
         try {
             return usuarioService.cadastrar(dto, authUid);
+            invitacaoService.emitirConvite(dto.email(), criado.usuarioId());
+            return criado;
         } catch (RuntimeException e) {
             desfazerIdentidade(authUid);
             throw e;

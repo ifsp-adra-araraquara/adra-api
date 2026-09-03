@@ -254,6 +254,14 @@ otp_expiry = 3600
 # subject = "Your password has been changed"
 # content_path = "./templates/password_changed_notification.html"
 
+[auth.email.template.recovery]
+subject = "Redefinição de senha — ADRA Araraquara"
+content_path = "./supabase/templates/recovery.html"
+
+[auth.email.template.invite]
+subject = "Você foi convidado — ADRA Araraquara"
+content_path = "./supabase/templates/invite.html"
+
 [auth.sms]
 # Allow/disallow new user signups via SMS to your project.
 enable_signup = false
