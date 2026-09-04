@@ -41,7 +41,7 @@ public class UsuarioAdminService {
         UUID authUid = supabaseAdminClient.criarIdentidade(dto.email());
 
         try {
-            return usuarioService.cadastrar(dto, authUid);
+            UsuarioResponseDTO criado = usuarioService.cadastrar(dto, authUid);
             invitacaoService.emitirConvite(dto.email(), criado.usuarioId());
             return criado;
         } catch (RuntimeException e) {
