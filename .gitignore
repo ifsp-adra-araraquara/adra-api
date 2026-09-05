@@ -8,6 +8,8 @@ build/
 ### Ambiente ###
 .env
 .env.*
+.env.stage
+.env.prod
 !.env.example
 
 ### STS ###
