@@ -8,6 +8,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -31,6 +32,15 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErroRespostaDTO> tratarAcessoNegado(AcessoNegadoException ex, HttpServletRequest request) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(
                 ErroRespostaDTO.de(403, "Acesso negado", ex.getMessage(), request.getRequestURI()));
+    }
+
+    /** @PreAuthorize nega lancando isso desde o Spring Security 6.3 (nao mais AccessDeniedException direto). */
+    @ExceptionHandler(AuthorizationDeniedException.class)
+    public ResponseEntity<ErroRespostaDTO> tratarAutorizacaoNegada(AuthorizationDeniedException ex,
+                                                                     HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(
+                ErroRespostaDTO.de(403, "Acesso negado", "Voce nao tem permissao para executar esta acao.",
+                        request.getRequestURI()));
     }
 
     @ExceptionHandler(AutenticacaoException.class)
