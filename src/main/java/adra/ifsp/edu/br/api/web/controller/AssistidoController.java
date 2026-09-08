@@ -19,6 +19,7 @@ import adra.ifsp.edu.br.api.domain.dto.assistido.AssistidoStatusRequestDTO;
 import adra.ifsp.edu.br.api.domain.service.AssistidoService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 @RestController
 @RequestMapping("/api/assistidos")
@@ -27,32 +28,33 @@ public class AssistidoController {
 
     private final AssistidoService assistidoService;
 
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'COORDENADOR')")
     @PostMapping
     public ResponseEntity<AssistidoResponseDTO> cadastrar(@Valid @RequestBody AssistidoRequestDTO dto) {
         AssistidoResponseDTO criado = assistidoService.cadastrar(dto);
         return ResponseEntity.created(URI.create("/api/assistidos/" + criado.assistidoId())).body(criado);
     }
 
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'COORDENADOR', 'SOCIOPEDAGOGICO')")
     @GetMapping
     public ResponseEntity<List<AssistidoResponseDTO>> listar() {
         return ResponseEntity.ok(assistidoService.listar());
     }
 
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'COORDENADOR', 'SOCIOPEDAGOGICO')")
     @GetMapping("/{id}")
     public ResponseEntity<AssistidoResponseDTO> buscarPorId(@PathVariable Long id) {
         return ResponseEntity.ok(assistidoService.buscarPorId(id));
     }
 
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'COORDENADOR')")
     @PutMapping("/{id}")
     public ResponseEntity<AssistidoResponseDTO> atualizar(@PathVariable Long id,
                                                             @Valid @RequestBody AssistidoRequestDTO dto) {
         return ResponseEntity.ok(assistidoService.atualizar(id, dto));
     }
 
-    /**
-     * Fluxo de encerramento/reativacao - separado do PUT cadastral de
-     * proposito (ver comentario no AssistidoStatusRequestDTO).
-     */
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'COORDENADOR')")
     @PatchMapping("/{id}/status")
     public ResponseEntity<AssistidoResponseDTO> alterarStatus(@PathVariable Long id,
                                                                 @Valid @RequestBody AssistidoStatusRequestDTO dto) {

@@ -12,6 +12,7 @@ public class VinculoFamiliarMapper {
                 vinculo.getId().getAssistidoId(),
                 vinculo.getId().getResponsavelId(),
                 vinculo.getResponsavel().getNomeCompleto(),
+                vinculo.getResponsavel().getCpf(),
                 vinculo.getResponsavel().getTelefone(),
                 vinculo.getResponsavel().getEmail(),
                 vinculo.getParentesco(),

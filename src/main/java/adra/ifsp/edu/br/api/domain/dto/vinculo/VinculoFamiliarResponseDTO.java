@@ -6,6 +6,7 @@ public record VinculoFamiliarResponseDTO(
         Long assistidoId,
         Long responsavelId,
         String nomeResponsavel,
+        String cpfResponsavel,
         String telefoneResponsavel,
         String emailResponsavel,
         String parentesco,
