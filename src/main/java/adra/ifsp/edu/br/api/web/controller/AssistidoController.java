@@ -13,13 +13,16 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import adra.ifsp.edu.br.api.domain.dto.PaginaDTO;
 import adra.ifsp.edu.br.api.domain.dto.assistido.AssistidoRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.assistido.AssistidoResponseDTO;
 import adra.ifsp.edu.br.api.domain.dto.assistido.AssistidoStatusRequestDTO;
+import adra.ifsp.edu.br.api.domain.enums.StatusGeral;
 import adra.ifsp.edu.br.api.domain.service.AssistidoService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.RequestParam;
 
 @RestController
 @RequestMapping("/api/assistidos")
@@ -37,8 +40,13 @@ public class AssistidoController {
 
     @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'COORDENADOR', 'SOCIOPEDAGOGICO')")
     @GetMapping
-    public ResponseEntity<List<AssistidoResponseDTO>> listar() {
-        return ResponseEntity.ok(assistidoService.listar());
+    public ResponseEntity<PaginaDTO<AssistidoResponseDTO>> listar(
+            @RequestParam(required = false) String busca,
+            @RequestParam(required = false) Long turmaId,
+            @RequestParam(required = false) StatusGeral status,
+            @RequestParam(defaultValue = "0") int pagina,
+            @RequestParam(defaultValue = "20") int tamanho) {
+        return ResponseEntity.ok(assistidoService.listarPaginado(busca, turmaId, status, pagina, tamanho));
     }
 
     @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'COORDENADOR', 'SOCIOPEDAGOGICO')")

@@ -58,6 +58,10 @@ public class Assistido {
     @Builder.Default
     private StatusGeral status = StatusGeral.ATIVO;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "turma_id")
+    private Turma turma;
+
     // Contadores geridos pelo trigger trg_progressao_disciplinar (modulo de
     // disciplina, fora do escopo deste card). Nunca escrever por aqui.
     @Column(name = "total_ocorrencias_ativas", insertable = false, updatable = false)

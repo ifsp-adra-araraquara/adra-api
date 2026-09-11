@@ -16,6 +16,8 @@ public record AssistidoResponseDTO(
         String necessidadesEspecificas,
         String observacoes,
         StatusGeral status,
+        Long turmaId,
+        String nomeTurma,
         Integer totalOcorrenciasAtivas,
         Integer totalAdvertenciasAtivas,
         Integer totalSuspensoes,
