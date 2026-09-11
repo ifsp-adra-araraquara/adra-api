@@ -1,0 +1,214 @@
+<!--
+  ADRA Araraquara — Template de E-mail: Convite de Acesso
+  Onde usar: backend (adra-api) — arquivo carregado pelo BrevoEmailService.java
+             Caminho sugerido: src/main/resources/templates/invite.html
+  Variável: {{LINK_CONVITE}} — mantida EXATAMENTE assim, é substituída via String.replace no Java.
+  Assunto sugerido: Você foi convidado(a) — ADRA Araraquara
+-->
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml"
+    xmlns:o="urn:schemas-microsoft-com:office:office">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <title>Convite — ADRA Araraquara</title>
+    <!--[if mso]>
+<noscript>
+<xml>
+<o:OfficeDocumentSettings>
+<o:PixelsPerInch>96</o:PixelsPerInch>
+</o:OfficeDocumentSettings>
+</xml>
+</noscript>
+<![endif]-->
+    <style>
+        body,
+        table,
+        td {
+            -webkit-text-size-adjust: 100%;
+            -ms-text-size-adjust: 100%;
+        }
+
+        table,
+        td {
+            mso-table-lspace: 0pt;
+            mso-table-rspace: 0pt;
+        }
+
+        img {
+            -ms-interpolation-mode: bicubic;
+            border: 0;
+            outline: none;
+            text-decoration: none;
+            display: block;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            width: 100% !important;
+            height: 100% !important;
+            background-color: #EEF1F0;
+        }
+
+        @media only screen and (max-width: 600px) {
+            .email-container {
+                width: 100% !important;
+            }
+
+            .fluid-padding {
+                padding-left: 24px !important;
+                padding-right: 24px !important;
+            }
+
+            .stack-heading {
+                font-size: 22px !important;
+            }
+        }
+
+        a.cta-button:hover {
+            background-color: #00694F !important;
+        }
+    </style>
+</head>
+
+<body style="margin:0; padding:0; background-color:#EEF1F0;">
+
+    <!-- Preheader (hidden preview text) -->
+    <div
+        style="display:none; max-height:0; overflow:hidden; mso-hide:all; font-size:1px; line-height:1px; color:#EEF1F0;">
+        Você foi convidado(a) para acessar o sistema de gestão social do ADRA Araraquara.
+    </div>
+
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+        style="background-color:#EEF1F0;">
+        <tr>
+            <td align="center" style="padding: 40px 16px;">
+
+                <table role="presentation" class="email-container" width="560" cellpadding="0" cellspacing="0"
+                    border="0"
+                    style="width:560px; max-width:560px; background-color:#FFFFFF; border-radius:16px; overflow:hidden; box-shadow:0 4px 24px rgba(44,47,51,0.08);">
+
+                    <!-- Gradient accent bar -->
+                    <tr>
+                        <td
+                            style="height:6px; line-height:6px; font-size:0; background-color:#007B5F; background-image:linear-gradient(90deg, #2C2F33 0%, #007B5F 50%, #00A67E 100%);">
+                            &nbsp;</td>
+                    </tr>
+
+                    <!-- Header / Logo -->
+                    <tr>
+                        <td align="center" style="padding: 40px 40px 8px 40px;">
+                            <img src="https://moorxvcnxesniwaaaksm.supabase.co/storage/v1/object/public/branding/adra-logo-green.svg"
+                                width="120" alt="ADRA Araraquara" style="display:block; width:120px; height:auto;" />
+                        </td>
+                    </tr>
+
+                    <!-- Icon badge -->
+                    <tr>
+                        <td align="center" style="padding: 24px 40px 0 40px;">
+                            <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                                <tr>
+                                    <td width="56" height="56" align="center" valign="middle"
+                                        style="width:56px; height:56px; border-radius:50%; background-color:#EAF6F2; background-image:linear-gradient(135deg, #EAF6F2 0%, #DCEFE9 100%);">
+                                        <span style="font-size:22px; line-height:56px;">&#10024;</span>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <!-- Body -->
+                    <tr>
+                        <td class="fluid-padding" style="padding: 24px 48px 8px 48px;" align="center">
+                            <h1 class="stack-heading"
+                                style="margin:0; font-family:'Montserrat', 'Segoe UI', Helvetica, Arial, sans-serif; font-weight:700; font-size:24px; line-height:1.3; color:#2C2F33; text-align:center;">
+                                Bem-vindo(a) à equipe
+                            </h1>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td class="fluid-padding" style="padding: 12px 48px 0 48px;" align="center">
+                            <p
+                                style="margin:0; font-family:'Zilla Slab', Georgia, 'Times New Roman', serif; font-size:16px; line-height:1.6; color:#54585A; text-align:center;">
+                                Você foi convidado(a) para acessar o sistema de gestão social do <strong>ADRA
+                                    Araraquara</strong>. Defina sua senha para ativar sua conta e começar a usar a
+                                plataforma.
+                            </p>
+                        </td>
+                    </tr>
+
+                    <!-- CTA Button (bulletproof) -->
+                    <tr>
+                        <td align="center" style="padding: 32px 48px 8px 48px;">
+                            <!--[if mso]>
+              <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="{{LINK_CONVITE}}" style="height:50px;v-text-anchor:middle;width:280px;" arcsize="16%" strokecolor="#007B5F" fillcolor="#007B5F">
+              <w:anchorlock/>
+              <center style="color:#ffffff;font-family:Arial,sans-serif;font-size:16px;font-weight:bold;">Aceitar convite</center>
+              </v:roundrect>
+              <![endif]-->
+                            <!--[if !mso]><!-->
+                            <a href="{{LINK_CONVITE}}" class="cta-button" target="_blank"
+                                style="display:inline-block; background-color:#007B5F; color:#FFFFFF; font-family:'Montserrat', 'Segoe UI', Helvetica, Arial, sans-serif; font-weight:600; font-size:16px; text-decoration:none; text-align:center; padding:15px 40px; border-radius:10px; mso-hide:all;">
+                                Aceitar convite e criar senha
+                            </a>
+                            <!--<![endif]-->
+                        </td>
+                    </tr>
+
+                    <!-- Fallback link -->
+                    <tr>
+                        <td class="fluid-padding" style="padding: 16px 48px 0 48px;" align="center">
+                            <p
+                                style="margin:0; font-family:'Zilla Slab', Georgia, serif; font-size:13px; line-height:1.6; color:#9A9EA1; text-align:center; word-break:break-all;">
+                                Se o botão não funcionar, copie e cole este link no navegador:<br />
+                                <a href="{{LINK_CONVITE}}"
+                                    style="color:#007B5F; text-decoration:underline;">{{LINK_CONVITE}}</a>
+                            </p>
+                        </td>
+                    </tr>
+
+                    <!-- Info note -->
+                    <tr>
+                        <td class="fluid-padding" style="padding: 28px 48px 40px 48px;" align="center">
+                            <p
+                                style="margin:0; font-family:'Zilla Slab', Georgia, serif; font-size:14px; line-height:1.6; color:#9A9EA1; text-align:center;">
+                                Este convite foi enviado por um administrador do ADRA Araraquara. Se você não esperava
+                                este e-mail, pode ignorá-lo com segurança.
+                            </p>
+                        </td>
+                    </tr>
+
+                    <!-- Divider -->
+                    <tr>
+                        <td style="padding: 0 48px;">
+                            <div style="border-top:1px solid #EAEBEC; line-height:0; font-size:0;">&nbsp;</div>
+                        </td>
+                    </tr>
+
+                    <!-- Footer -->
+                    <tr>
+                        <td align="center" style="padding: 24px 40px 32px 40px; background-color:#FAFBFB;">
+                            <p
+                                style="margin:0 0 4px 0; font-family:'Montserrat', 'Segoe UI', Helvetica, Arial, sans-serif; font-size:12px; font-weight:600; letter-spacing:0.5px; color:#54585A; text-transform:uppercase;">
+                                ADRA Araraquara
+                            </p>
+                            <p
+                                style="margin:0; font-family:'Zilla Slab', Georgia, serif; font-size:12px; line-height:1.5; color:#9A9EA1;">
+                                Protótipo acadêmico — IFSP Campus Araraquara
+                            </p>
+                        </td>
+                    </tr>
+
+                </table>
+
+            </td>
+        </tr>
+    </table>
+
+</body>
+
+</html>
