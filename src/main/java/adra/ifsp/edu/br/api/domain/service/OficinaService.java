@@ -40,10 +40,8 @@ public class OficinaService {
                 Map.of(
                         "nomeOficina", oficina.getNomeOficina(),
                         "oficineiroResponsavel", oficina.getOficineiroResponsavel(),
-                        "ativo", oficina.getAtivo().toString()
-                ),
-                "Cadastro de oficina"
-        );
+                        "ativo", oficina.getAtivo().toString()),
+                "Cadastro de oficina");
 
         return oficinaMapper.paraDTO(oficina);
     }
@@ -75,4 +73,81 @@ public class OficinaService {
         return oficinaRepository.findById(id)
                 .orElseThrow(() -> new EntidadeNaoEncontradaException("Oficina nao encontrada: id " + id));
     }
+
+    public OficinaResponseDTO editar(Long id, OficinaRequestDTO dto) {
+
+        Oficina oficina = buscarEntidadePorId(id);
+
+        // Guardar valores anteriores para auditoria
+        Map<String, Object> valorAnterior = Map.of(
+                "nomeOficina", oficina.getNomeOficina(),
+                "oficineiroResponsavel", oficina.getOficineiroResponsavel());
+
+        // Atualizar
+        oficina.setNomeOficina(dto.nomeOficina());
+        oficina.setOficineiroResponsavel(dto.oficineiroResponsavel());
+
+        oficina = oficinaRepository.save(oficina);
+
+        // Auditar
+        auditoriaService.registrar(
+                ModuloSistema.OFICINAS,
+                "oficina",
+                oficina.getOficinaId(),
+                AcaoSistema.EDITAR,
+                valorAnterior,
+                Map.of(
+                        "nomeOficina", oficina.getNomeOficina(),
+                        "oficineiroResponsavel", oficina.getOficineiroResponsavel()),
+                "Edição de oficina");
+
+        return oficinaMapper.paraDTO(oficina);
+    }
+
+    public OficinaResponseDTO inativar(Long id) {
+        Oficina oficina = buscarEntidadePorId(id);
+
+        if (!oficina.getAtivo()) {
+            throw new IllegalArgumentException("Oficina já está inativada.");
+        }
+
+        oficina.setAtivo(false);
+        oficina = oficinaRepository.save(oficina);
+
+        auditoriaService.registrar(
+                ModuloSistema.OFICINAS,
+                "oficina",
+                oficina.getOficinaId(),
+                AcaoSistema.EDITAR,
+                Map.of("ativo", true),
+                Map.of("ativo", false),
+                "Oficina inativada");
+
+        return oficinaMapper.paraDTO(oficina);
+    }
+
+    public OficinaResponseDTO reativar(Long id) {
+
+        Oficina oficina = buscarEntidadePorId(id);
+
+        if (oficina.getAtivo()) {
+            throw new IllegalArgumentException("Oficina já está ativa.");
+        }
+
+        oficina.setAtivo(true);
+
+        oficina = oficinaRepository.save(oficina);
+
+        auditoriaService.registrar(
+                ModuloSistema.OFICINAS,
+                "oficina",
+                oficina.getOficinaId(),
+                AcaoSistema.EDITAR,
+                Map.of("ativo", false),
+                Map.of("ativo", true),
+                "Oficina reativada");
+
+        return oficinaMapper.paraDTO(oficina);
+    }
+
 }

@@ -65,4 +65,49 @@ public class OficinaController {
     ) {
         return ResponseEntity.ok(Map.of("possivelDuplicidade", oficinaService.existeComMesmoNome(nome)));
     }
+
+    /**
+     * CA-14.2: Editar uma oficina existente.
+     * CA-14.4: Apenas Coordenador pode editar (recebe 403 se não for).
+     * 
+     * PUT /api/oficinas/{id}
+     * Body: { "nomeOficina": "...", "oficineiroResponsavel": "..." }
+     */
+    @PreAuthorize("hasRole('COORDENADOR')")
+    @PutMapping("/{id}")
+    public ResponseEntity<OficinaResponseDTO> editar(
+            @PathVariable Long id,
+            @Valid @RequestBody OficinaRequestDTO dto
+    ) {
+        OficinaResponseDTO atualizada = oficinaService.editar(id, dto);
+        return ResponseEntity.ok(atualizada);
+    }
+
+    /**
+     * CA-14.3: Inativar uma oficina (soft delete, permanece no BD).
+     * CA-14.4: Apenas Coordenador pode inativar (recebe 403 se não for).
+     * 
+     * PATCH /api/oficinas/{id}/inativar
+     * Body: vazio
+     */
+    @PreAuthorize("hasRole('COORDENADOR')")
+    @PatchMapping("/{id}/inativar")
+    public ResponseEntity<OficinaResponseDTO> inativar(@PathVariable Long id) {
+        OficinaResponseDTO inativada = oficinaService.inativar(id);
+        return ResponseEntity.ok(inativada);
+    }
+
+    /**
+     * CA-14.3: Reativar uma oficina (inverso de inativar).
+     * CA-14.4: Apenas Coordenador pode reativar (recebe 403 se não for).
+     * 
+     * PATCH /api/oficinas/{id}/reativar
+     * Body: vazio
+     */
+    @PreAuthorize("hasRole('COORDENADOR')")
+    @PatchMapping("/{id}/reativar")
+    public ResponseEntity<OficinaResponseDTO> reativar(@PathVariable Long id) {
+        OficinaResponseDTO reativada = oficinaService.reativar(id);
+        return ResponseEntity.ok(reativada);
+    }
 }
