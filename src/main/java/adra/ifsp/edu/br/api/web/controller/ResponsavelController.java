@@ -20,7 +20,7 @@ public class ResponsavelController {
 
     private final ResponsavelService responsavelService;
 
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'COORDENADOR')")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'COORDENADOR', 'SOCIOPEDAGOGICO')")
     @PostMapping
     public ResponseEntity<ResponsavelResponseDTO> cadastrar(@Valid @RequestBody ResponsavelRequestDTO dto) {
         ResponsavelResponseDTO criado = responsavelService.cadastrar(dto);
@@ -39,7 +39,13 @@ public class ResponsavelController {
         return ResponseEntity.ok(responsavelService.buscarPorId(id));
     }
 
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'COORDENADOR')")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'COORDENADOR', 'SOCIOPEDAGOGICO')")
+    @GetMapping("/cpf/{cpf}")
+    public ResponseEntity<ResponsavelResponseDTO> buscarPorCpf(@PathVariable String cpf) {
+        return ResponseEntity.ok(responsavelService.buscarPorCpf(cpf));
+    }
+
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'COORDENADOR', 'SOCIOPEDAGOGICO')")
     @PutMapping("/{id}")
     public ResponseEntity<ResponsavelResponseDTO> atualizar(@PathVariable Long id,
                                                               @Valid @RequestBody ResponsavelRequestDTO dto) {

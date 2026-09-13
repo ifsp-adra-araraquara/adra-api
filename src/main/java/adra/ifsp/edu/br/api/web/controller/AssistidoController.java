@@ -1,7 +1,6 @@
 package adra.ifsp.edu.br.api.web.controller;
 
 import java.net.URI;
-import java.util.List;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
