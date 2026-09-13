@@ -1,40 +1,33 @@
 package adra.ifsp.edu.br.api.domain.model;
 
-import adra.ifsp.edu.br.api.domain.enums.Turno;
 import jakarta.persistence.*;
-import lombok.Builder;
 import lombok.Data;
 
 import java.time.LocalDateTime;
 
 @Data
 @Entity
-@Table(name = "turma", schema = "adra")
-public class Turma {
+@Table(name = "oficina", schema = "adra")
+public class Oficina {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "turma_id")
-    private Long turmaId;
+    @Column(name = "oficina_id")
+    private Long oficinaId;
 
-    @Column(name = "nome_turma", nullable = false, length = 100)
-    private String nomeTurma;
+    @Column(name = "nome_oficina", nullable = false, length = 100)
+    private String nomeOficina;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "turno", nullable = false, length = 20)
-    private Turno turno;
-
-    @Column(name = "faixa_etaria", length = 50)
-    private String faixaEtaria;
-
-    @Column(name = "capacidade", nullable = false)
-    private Integer capacidade;
+    /**
+     * Campo descritivo (texto livre) - o oficineiro NAO e um usuario do
+     * sistema (consistente com o MVP de 3 perfis: Administrador,
+     * Coordenador, Sociopedagogico).
+     */
+    @Column(name = "oficineiro_responsavel", nullable = false, length = 150)
+    private String oficineiroResponsavel;
 
     @Column(name = "ativo", nullable = false)
     private Boolean ativo = true;
-
-    @Column(name = "observacoes", columnDefinition = "TEXT")
-    private String observacoes;
 
     @Column(name = "criado_em", nullable = false, updatable = false)
     private LocalDateTime criadoEm;

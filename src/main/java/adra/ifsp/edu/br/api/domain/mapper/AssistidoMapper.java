@@ -34,6 +34,9 @@ public class AssistidoMapper {
     }
 
     public AssistidoResponseDTO paraDTO(Assistido entidade) {
+        Long turmaId = entidade.getTurma() != null ? entidade.getTurma().getTurmaId() : null;
+        String nomeTurma = entidade.getTurma() != null ? entidade.getTurma().getNomeTurma() : null;
+
         return new AssistidoResponseDTO(
                 entidade.getAssistidoId(),
                 entidade.getNomeCompleto(),
@@ -45,6 +48,8 @@ public class AssistidoMapper {
                 entidade.getNecessidadesEspecificas(),
                 entidade.getObservacoes(),
                 entidade.getStatus(),
+                turmaId,
+                nomeTurma,
                 entidade.getTotalOcorrenciasAtivas(),
                 entidade.getTotalAdvertenciasAtivas(),
                 entidade.getTotalSuspensoes(),
