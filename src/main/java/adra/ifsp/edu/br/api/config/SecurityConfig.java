@@ -1,5 +1,6 @@
 package adra.ifsp.edu.br.api.config;
 
+import java.time.Duration;
 import java.util.List;
 
 import javax.crypto.spec.SecretKeySpec;
@@ -8,6 +9,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -21,6 +23,8 @@ import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.web.client.RestOperations;
+import org.springframework.web.client.RestTemplate;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -87,8 +91,15 @@ public class SecurityConfig {
     // O Supabase assina com ES256; o padrao do Nimbus e' RS256.
     @Bean
     public JwtDecoder decoderSupabase(@Value("${adra.supabase.jwks-uri}") String jwksUri) {
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(10000); // 10 segundos
+        factory.setReadTimeout(10000); // 10 segundos
+
+        RestTemplate restTemplate = new RestTemplate(factory);
+
         return NimbusJwtDecoder.withJwkSetUri(jwksUri)
                 .jwsAlgorithm(SignatureAlgorithm.ES256)
+                .restOperations(restTemplate)
                 .build();
     }
 

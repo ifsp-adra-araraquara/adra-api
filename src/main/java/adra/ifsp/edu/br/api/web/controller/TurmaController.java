@@ -21,7 +21,7 @@ public class TurmaController {
 
     private final TurmaService turmaService;
 
-    @PreAuthorize("hasAnyRole('SOCIOPEDAGO', 'COORDENADOR')")
+    @PreAuthorize("hasAnyRole('SOCIOPEDAGOGICO', 'COORDENADOR')")
     @GetMapping
     public ResponseEntity<List<TurmaResponseDTO>> listar(
             @RequestParam(required = false) String nome,
@@ -66,7 +66,7 @@ public class TurmaController {
         return null;
     }
 
-    @PreAuthorize("hasAnyRole('SOCIOPEDAGO', 'COORDENADOR')")
+    @PreAuthorize("hasAnyRole('SOCIOPEDAGOGICO', 'COORDENADOR')")
     @PostMapping
     public ResponseEntity<TurmaResponseDTO> cadastrar(
             @Valid @RequestBody TurmaRequestDTO turmaRequestDTO
@@ -75,7 +75,7 @@ public class TurmaController {
         return ResponseEntity.ok(turmaCriada);
     }
 
-    @PreAuthorize("hasAnyRole('SOCIOPEDAGO', 'COORDENADOR')")
+    @PreAuthorize("hasAnyRole('SOCIOPEDAGOGICO', 'COORDENADOR')")
     @GetMapping("/{id}")
     public ResponseEntity<TurmaResponseDTO> buscarPorId(
             @PathVariable Long id

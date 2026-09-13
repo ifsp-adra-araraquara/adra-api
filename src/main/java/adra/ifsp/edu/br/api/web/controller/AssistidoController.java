@@ -1,6 +1,8 @@
 package adra.ifsp.edu.br.api.web.controller;
 
 import java.net.URI;
+import java.util.List;
+import java.util.Map;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -10,6 +12,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import adra.ifsp.edu.br.api.domain.dto.PaginaDTO;
@@ -21,7 +24,6 @@ import adra.ifsp.edu.br.api.domain.service.AssistidoService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.RequestParam;
 
 @RestController
 @RequestMapping("/api/assistidos")
@@ -46,6 +48,25 @@ public class AssistidoController {
             @RequestParam(defaultValue = "0") int pagina,
             @RequestParam(defaultValue = "20") int tamanho) {
         return ResponseEntity.ok(assistidoService.listarPaginado(busca, turmaId, status, pagina, tamanho));
+    }
+
+    /**
+     * Endpoint leve para o alerta NAO BLOQUEANTE de duplicidade por nome
+     * e data de nascimento no formulario do front (CA-A02.2).
+     */
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'COORDENADOR')")
+    @GetMapping("/verificar-duplicidade")
+    public ResponseEntity<Map<String, Object>> verificarDuplicidade(
+            @RequestParam(required = false) String nomeCompleto,
+            @RequestParam(required = false) String dataNascimento
+    ) {
+        if (nomeCompleto == null || dataNascimento == null) {
+            return ResponseEntity.ok(Map.of(
+                    "possivelDuplicidade", false,
+                    "duplicados", List.of()
+            ));
+        }
+        return ResponseEntity.ok(assistidoService.verificarDuplicidade(nomeCompleto, dataNascimento));
     }
 
     @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'COORDENADOR', 'SOCIOPEDAGOGICO')")
