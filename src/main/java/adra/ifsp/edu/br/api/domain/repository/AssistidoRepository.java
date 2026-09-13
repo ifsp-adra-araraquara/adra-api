@@ -2,11 +2,12 @@ package adra.ifsp.edu.br.api.domain.repository;
 
 import adra.ifsp.edu.br.api.domain.model.Assistido;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
 import java.time.LocalDate;
 import java.util.List;
 
-public interface AssistidoRepository extends JpaRepository<Assistido, Long> {
+public interface AssistidoRepository extends JpaRepository<Assistido, Long>, JpaSpecificationExecutor<Assistido> {
 
     /**
      * Usado no alerta de duplicidade provavel do card "Cadastrar assistido":

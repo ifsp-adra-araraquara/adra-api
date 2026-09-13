@@ -1,16 +1,26 @@
 package adra.ifsp.edu.br.api.domain.service;
 
+import adra.ifsp.edu.br.api.domain.dto.PaginaDTO;
 import adra.ifsp.edu.br.api.domain.dto.assistido.AssistidoRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.assistido.AssistidoResponseDTO;
 import adra.ifsp.edu.br.api.domain.dto.assistido.AssistidoStatusRequestDTO;
 import adra.ifsp.edu.br.api.domain.enums.AcaoSistema;
 import adra.ifsp.edu.br.api.domain.enums.ModuloSistema;
+import adra.ifsp.edu.br.api.domain.enums.StatusGeral;
 import adra.ifsp.edu.br.api.domain.mapper.AssistidoMapper;
 import adra.ifsp.edu.br.api.domain.model.Assistido;
+import adra.ifsp.edu.br.api.domain.model.Turma;
 import adra.ifsp.edu.br.api.domain.repository.AssistidoRepository;
+import adra.ifsp.edu.br.api.domain.repository.AssistidoSpecification;
+import adra.ifsp.edu.br.api.domain.repository.TurmaRepository;
 import adra.ifsp.edu.br.api.exception.DuplicidadeProvavelException;
 import adra.ifsp.edu.br.api.exception.EntidadeNaoEncontradaException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,6 +36,7 @@ public class AssistidoService {
 
     private final AssistidoRepository assistidoRepository;
     private final AssistidoMapper assistidoMapper;
+    private final TurmaRepository turmaRepository;
     private final AuditoriaService auditoriaService;
 
     public AssistidoResponseDTO cadastrar(AssistidoRequestDTO dto) {
@@ -34,6 +45,13 @@ public class AssistidoService {
         }
 
         Assistido assistido = assistidoMapper.paraNovaEntidade(dto);
+
+        if (dto.turmaId() != null) {
+            Turma turma = turmaRepository.findById(dto.turmaId())
+                    .orElseThrow(() -> new EntidadeNaoEncontradaException("Turma nao encontrada: id " + dto.turmaId()));
+            assistido.setTurma(turma);
+        }
+
         assistido = assistidoRepository.save(assistido);
 
         auditoriaService.registrar(
@@ -61,6 +79,15 @@ public class AssistidoService {
                 .collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
+    public PaginaDTO<AssistidoResponseDTO> listarPaginado(String busca, Long turmaId, StatusGeral status, int pagina, int tamanho) {
+        Pageable pageable = PageRequest.of(pagina, tamanho, Sort.by(Sort.Direction.ASC, "nomeCompleto"));
+        Specification<Assistido> spec = AssistidoSpecification.comFiltros(busca, turmaId, status);
+        Page<AssistidoResponseDTO> page = assistidoRepository.findAll(spec, pageable)
+                .map(assistidoMapper::paraDTO);
+        return PaginaDTO.de(page);
+    }
+
     public AssistidoResponseDTO atualizar(Long id, AssistidoRequestDTO dto) {
         Assistido assistido = buscarEntidadePorId(id);
 
@@ -74,6 +101,15 @@ public class AssistidoService {
         );
 
         assistidoMapper.atualizarEntidade(assistido, dto);
+
+        if (dto.turmaId() != null) {
+            Turma turma = turmaRepository.findById(dto.turmaId())
+                    .orElseThrow(() -> new EntidadeNaoEncontradaException("Turma nao encontrada: id " + dto.turmaId()));
+            assistido.setTurma(turma);
+        } else {
+            assistido.setTurma(null);
+        }
+
         assistido = assistidoRepository.save(assistido);
 
         auditoriaService.registrar(

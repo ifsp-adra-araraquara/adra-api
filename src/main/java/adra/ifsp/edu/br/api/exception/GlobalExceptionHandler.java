@@ -12,6 +12,7 @@ import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import adra.ifsp.edu.br.api.domain.dto.comum.AlertaCpfDuplicadoDTO;
 
 import java.util.List;
 import java.util.UUID;
@@ -97,4 +98,15 @@ public class GlobalExceptionHandler {
                         "Ocorreu um erro inesperado. Informe o codigo " + correlacao + " ao suporte.",
                         request.getRequestURI(), correlacao));
     }
+
+    /**
+     * 409 com o responsavel existente no corpo, para o front oferecer
+     * reaproveitar o registro em vez de permitir duplicidade (diferente de
+     * DuplicidadeProvavelException: aqui nao ha "confirmar mesmo assim").
+     */
+    @ExceptionHandler(CpfDuplicadoException.class)
+    public ResponseEntity<AlertaCpfDuplicadoDTO> tratarCpfDuplicado(CpfDuplicadoException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new AlertaCpfDuplicadoDTO(ex.getMessage(), ex.getResponsavelExistente()));
+        }
 }

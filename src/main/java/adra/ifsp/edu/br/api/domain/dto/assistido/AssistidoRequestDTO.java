@@ -30,6 +30,8 @@ public record AssistidoRequestDTO(
 
         String observacoes,
 
+        Long turmaId,
+
         // Flag de confirmacao do alerta de duplicidade provavel (mesmo nome +
         // nascimento). Default false: primeira tentativa sempre verifica.
         boolean confirmarApesarDeDuplicidade

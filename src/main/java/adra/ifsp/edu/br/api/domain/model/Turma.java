@@ -20,6 +20,7 @@ public class Turma {
     @Column(name = "nome_turma", nullable = false, length = 100)
     private String nomeTurma;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "turno", nullable = false, length = 20)
     private Turno turno;
 

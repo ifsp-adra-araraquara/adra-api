@@ -1,5 +1,6 @@
 package adra.ifsp.edu.br.api.domain.dto.responsavel;
 
+import adra.ifsp.edu.br.api.domain.validation.ValidCpf;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Past;
@@ -17,8 +18,8 @@ public record ResponsavelRequestDTO(
         @Past(message = "Data de nascimento deve estar no passado")
         LocalDate dataNascimento,
 
-        // CPF opcional e NAO unico, so validamos formato quando informado.
-        @Pattern(regexp = "^$|\\d{11}", message = "CPF deve conter 11 digitos numericos")
+        @NotBlank(message = "CPF e' obrigatorio")
+        @ValidCpf(message = "CPF invalido")
         String cpf,
 
         @Pattern(regexp = "^$|\\d{10,11}", message = "Telefone deve conter DDD + numero (10 ou 11 digitos)")
