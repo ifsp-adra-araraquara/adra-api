@@ -6,6 +6,7 @@ import adra.ifsp.edu.br.api.domain.dto.assistido.AssistidoResponseDTO;
 import adra.ifsp.edu.br.api.domain.dto.assistido.AssistidoStatusRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.responsavel.ResponsavelRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.vinculo.VinculoFamiliarComResponsavelRequestDTO;
+import adra.ifsp.edu.br.api.domain.dto.vinculo.VinculoFamiliarRequestDTO;
 import adra.ifsp.edu.br.api.domain.enums.AcaoSistema;
 import adra.ifsp.edu.br.api.domain.enums.ModuloSistema;
 import adra.ifsp.edu.br.api.domain.enums.StatusGeral;
@@ -21,6 +22,7 @@ import adra.ifsp.edu.br.api.domain.repository.AssistidoSpecification;
 import adra.ifsp.edu.br.api.domain.repository.AssistidoTurmaHistoricoRepository;
 import adra.ifsp.edu.br.api.domain.repository.ResponsavelRepository;
 import adra.ifsp.edu.br.api.domain.repository.TurmaRepository;
+import adra.ifsp.edu.br.api.exception.AcessoNegadoException;
 import adra.ifsp.edu.br.api.exception.DuplicidadeProvavelException;
 import adra.ifsp.edu.br.api.exception.EntidadeNaoEncontradaException;
 import adra.ifsp.edu.br.api.exception.RegraNegocioException;
@@ -30,6 +32,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,6 +42,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -138,6 +142,12 @@ public class AssistidoService {
         );
     }
 
+    /**
+     * CA-A04: atualiza dados cadastrais, troca de turma (preservando
+     * historico) e responsaveis vinculados numa unica operacao atomica -
+     * a classe e' @Transactional, entao qualquer excecao aqui reverte as
+     * tres partes juntas (CA-A04.4).
+     */
     public AssistidoResponseDTO atualizar(Long id, AssistidoRequestDTO dto) {
         Assistido assistido = buscarEntidadePorId(id);
 
@@ -152,6 +162,7 @@ public class AssistidoService {
 
         assistidoMapper.atualizarEntidade(assistido, dto);
         atualizarTurma(assistido, dto.turmaId());
+        atualizarResponsaveis(assistido, dto.responsaveisVinculados(), dto.responsaveis());
 
         assistido = assistidoRepository.save(assistido);
 
@@ -195,6 +206,95 @@ public class AssistidoService {
         }
 
         assistido.setTurma(novaTurma);
+    }
+
+    /**
+     * CA-A04.3: reconcilia os vinculos de responsavel do assistido a partir
+     * de duas listas - as que devem PERMANECER (responsaveisVinculados,
+     * identificadas por responsavelId) e as NOVAS a cadastrar e vincular
+     * (responsaveisNovos). Qualquer vinculo atual que nao aparecer entre as
+     * que devem permanecer e' desvinculado.
+     * <p>
+     * Se nenhuma das duas listas vier no payload (ambas null), esta chamada
+     * nao esta gerenciando responsaveis - mantem como esta.
+     */
+    private void atualizarResponsaveis(Assistido assistido,
+                                        List<VinculoFamiliarRequestDTO> responsaveisVinculados,
+                                        List<VinculoFamiliarComResponsavelRequestDTO> responsaveisNovos) {
+        if (responsaveisVinculados == null && responsaveisNovos == null) {
+            return;
+        }
+
+        List<VinculoFamiliarRequestDTO> paraManter = responsaveisVinculados == null ? List.of() : responsaveisVinculados;
+        List<VinculoFamiliarComResponsavelRequestDTO> novos = responsaveisNovos == null ? List.of() : responsaveisNovos;
+
+        Set<Long> idsParaManter = paraManter.stream()
+                .map(VinculoFamiliarRequestDTO::responsavelId)
+                .collect(Collectors.toSet());
+
+        List<AssistidoResponsavel> paraRemover = assistido.getVinculosFamiliares().stream()
+                .filter(vinculo -> !idsParaManter.contains(vinculo.getResponsavel().getResponsavelId()))
+                .toList();
+
+        if (idsParaManter.size() + novos.size() == 0) {
+            throw new RegraNegocioException("O assistido deve manter pelo menos um responsavel vinculado");
+        }
+
+        if (!paraRemover.isEmpty() && !usuarioAtualEhAdministrador()) {
+            throw new AcessoNegadoException("Somente o administrador pode remover um responsavel vinculado");
+        }
+
+        paraRemover.forEach(vinculo -> assistido.getVinculosFamiliares().remove(vinculo));
+
+        for (VinculoFamiliarRequestDTO dtoVinculo : paraManter) {
+            AssistidoResponsavel vinculo = assistido.getVinculosFamiliares().stream()
+                    .filter(v -> v.getResponsavel().getResponsavelId().equals(dtoVinculo.responsavelId()))
+                    .findFirst()
+                    .orElseThrow(() -> new EntidadeNaoEncontradaException(
+                            "Vinculo nao encontrado para o responsavel id " + dtoVinculo.responsavelId()));
+
+            vinculo.setParentesco(dtoVinculo.parentesco());
+            vinculo.setResponsavelPrincipal(dtoVinculo.responsavelPrincipal());
+            vinculo.setContatoEmergencia(dtoVinculo.contatoEmergencia());
+            vinculo.setAutorizadoRetirada(dtoVinculo.autorizadoRetirada());
+            vinculo.setObservacoes(dtoVinculo.observacoes());
+        }
+
+        for (VinculoFamiliarComResponsavelRequestDTO dtoNovo : novos) {
+            Responsavel responsavel = (dtoNovo.cpf() != null && !dtoNovo.cpf().isBlank())
+                    ? responsavelRepository.findByCpf(dtoNovo.cpf()).orElseGet(() -> criarNovoResponsavel(dtoNovo))
+                    : criarNovoResponsavel(dtoNovo);
+
+            AssistidoResponsavel vinculo = AssistidoResponsavel.builder()
+                    .id(new AssistidoResponsavelId(assistido.getAssistidoId(), responsavel.getResponsavelId()))
+                    .assistido(assistido)
+                    .responsavel(responsavel)
+                    .parentesco(dtoNovo.parentesco())
+                    .responsavelPrincipal(dtoNovo.responsavelPrincipal())
+                    .contatoEmergencia(dtoNovo.contatoEmergencia())
+                    .autorizadoRetirada(dtoNovo.autorizadoRetirada())
+                    .observacoes(dtoNovo.observacoes())
+                    .build();
+
+            assistido.getVinculosFamiliares().add(vinculo);
+        }
+
+        long totalPrincipais = assistido.getVinculosFamiliares().stream()
+                .filter(AssistidoResponsavel::isResponsavelPrincipal)
+                .count();
+
+        if (totalPrincipais == 0) {
+            throw new RegraNegocioException("Pelo menos um responsavel deve ser marcado como responsavel principal");
+        }
+        if (totalPrincipais > 1) {
+            throw new RegraNegocioException("Apenas um responsavel pode ser marcado como responsavel principal");
+        }
+    }
+
+    private boolean usuarioAtualEhAdministrador() {
+        var autenticacao = SecurityContextHolder.getContext().getAuthentication();
+        return autenticacao != null && autenticacao.getAuthorities().stream()
+                .anyMatch(autoridade -> autoridade.getAuthority().equals("ROLE_ADMINISTRADOR"));
     }
 
     /** Muda o status (ex.: encerrar vinculo com a instituicao) - fluxo separado da edicao cadastral. */
