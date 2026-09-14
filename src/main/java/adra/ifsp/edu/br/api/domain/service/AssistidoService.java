@@ -13,10 +13,12 @@ import adra.ifsp.edu.br.api.domain.mapper.AssistidoMapper;
 import adra.ifsp.edu.br.api.domain.model.Assistido;
 import adra.ifsp.edu.br.api.domain.model.AssistidoResponsavel;
 import adra.ifsp.edu.br.api.domain.model.AssistidoResponsavelId;
+import adra.ifsp.edu.br.api.domain.model.AssistidoTurmaHistorico;
 import adra.ifsp.edu.br.api.domain.model.Responsavel;
 import adra.ifsp.edu.br.api.domain.model.Turma;
 import adra.ifsp.edu.br.api.domain.repository.AssistidoRepository;
 import adra.ifsp.edu.br.api.domain.repository.AssistidoSpecification;
+import adra.ifsp.edu.br.api.domain.repository.AssistidoTurmaHistoricoRepository;
 import adra.ifsp.edu.br.api.domain.repository.ResponsavelRepository;
 import adra.ifsp.edu.br.api.domain.repository.TurmaRepository;
 import adra.ifsp.edu.br.api.exception.DuplicidadeProvavelException;
@@ -46,6 +48,7 @@ public class AssistidoService {
     private final AssistidoMapper assistidoMapper;
     private final TurmaRepository turmaRepository;
     private final ResponsavelRepository responsavelRepository;
+    private final AssistidoTurmaHistoricoRepository turmaHistoricoRepository;
     private final AuditoriaService auditoriaService;
 
     public AssistidoResponseDTO cadastrar(AssistidoRequestDTO dto) {
@@ -74,6 +77,15 @@ public class AssistidoService {
         // CA-A02.4: Criar assistido e vínculos em transação atômica
         assistido = assistidoRepository.save(assistido);
         criarVinculosResponsaveis(assistido, dto.responsaveis());
+
+        // Abre o primeiro periodo de historico de turma (CA-A04.2), se ja
+        // entrou vinculado a uma turma.
+        if (turma != null) {
+            turmaHistoricoRepository.save(AssistidoTurmaHistorico.builder()
+                    .assistido(assistido)
+                    .turma(turma)
+                    .build());
+        }
 
         auditoriaService.registrar(
                 ModuloSistema.ASSISTIDOS,
