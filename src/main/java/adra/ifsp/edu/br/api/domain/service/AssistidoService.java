@@ -34,9 +34,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
@@ -149,14 +151,7 @@ public class AssistidoService {
         );
 
         assistidoMapper.atualizarEntidade(assistido, dto);
-
-        if (dto.turmaId() != null) {
-            Turma turma = turmaRepository.findById(dto.turmaId())
-                    .orElseThrow(() -> new EntidadeNaoEncontradaException("Turma nao encontrada: id " + dto.turmaId()));
-            assistido.setTurma(turma);
-        } else {
-            assistido.setTurma(null);
-        }
+        atualizarTurma(assistido, dto.turmaId());
 
         assistido = assistidoRepository.save(assistido);
 
@@ -171,6 +166,35 @@ public class AssistidoService {
         );
 
         return assistidoMapper.paraDTO(assistido);
+    }
+
+    /**
+     * CA-A04.2: so mexe no historico se a turma realmente mudou. Fecha o
+     * periodo aberto (se houver) e abre um novo - nunca sobrescreve.
+     */
+    private void atualizarTurma(Assistido assistido, Long novaTurmaId) {
+        Long turmaAtualId = assistido.getTurma() != null ? assistido.getTurma().getTurmaId() : null;
+        if (Objects.equals(turmaAtualId, novaTurmaId)) {
+            return;
+        }
+
+        turmaHistoricoRepository.findByAssistido_AssistidoIdAndDataFimIsNull(assistido.getAssistidoId())
+                .ifPresent(historico -> historico.setDataFim(OffsetDateTime.now()));
+
+        Turma novaTurma = null;
+        if (novaTurmaId != null) {
+            novaTurma = turmaRepository.findById(novaTurmaId)
+                    .orElseThrow(() -> new EntidadeNaoEncontradaException("Turma nao encontrada: id " + novaTurmaId));
+            if (!Boolean.TRUE.equals(novaTurma.getAtivo())) {
+                throw new RegraNegocioException("A turma informada nao esta ativa");
+            }
+            turmaHistoricoRepository.save(AssistidoTurmaHistorico.builder()
+                    .assistido(assistido)
+                    .turma(novaTurma)
+                    .build());
+        }
+
+        assistido.setTurma(novaTurma);
     }
 
     /** Muda o status (ex.: encerrar vinculo com a instituicao) - fluxo separado da edicao cadastral. */
