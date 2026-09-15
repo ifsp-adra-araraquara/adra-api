@@ -100,4 +100,20 @@ public class TurmaController {
     ) {
         return ResponseEntity.ok(turmaService.alterarStatus(id, statusRequestDTO));
     }
+
+    @PreAuthorize("hasAnyRole('OFICINEIRO', 'SOCIOPEDAGOGICO', 'COORDENADOR')")
+    @GetMapping("/minhas-turmas/{idOficineiro}")
+    public ResponseEntity<List<TurmaResponseDTO>> minhasTurmas(
+            @PathVariable Long idOficineiro
+    ) {
+        return ResponseEntity.ok(turmaService.minhasTurmas(idOficineiro));
+    }
+
+    @PreAuthorize("hasAnyRole('OFICINEIRO', 'SOCIOPEDAGOGICO', 'COORDENADOR')")
+    @GetMapping("/oficina/{idOficina}")
+    public ResponseEntity<List<TurmaResponseDTO>> minhasTurmasPorOficina(
+            @PathVariable Long idOficina
+    ) {
+        return ResponseEntity.ok(turmaService.minhasTurmasPorOficina(idOficina));
+    }
 }

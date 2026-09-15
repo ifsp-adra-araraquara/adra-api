@@ -29,6 +29,30 @@ public class TurmaService {
     private final TurmaMapper turmaMapper;
     private final AuditoriaService auditoriaService;
 
+    public List<TurmaResponseDTO> minhasTurmas(Long idOficineiros){
+        List<Turma> minhasTurmas = turmaRepository.findByOficineiroResponsavelUsuarioId(idOficineiros);
+
+        if(minhasTurmas == null){
+            return null;
+        }
+
+        return minhasTurmas.stream()
+                .map(turmaMapper::paraDTO)
+                .collect(Collectors.toList());
+    }
+
+    public List<TurmaResponseDTO> minhasTurmasPorOficina(Long idOficina){
+        List<Turma> minhasTurmas = turmaRepository.findByOficinaOficinaId(idOficina);
+
+        if(minhasTurmas == null){
+            return null;
+        }
+
+        return minhasTurmas.stream()
+                .map(turmaMapper::paraDTO)
+                .collect(Collectors.toList());
+    }
+
     public TurmaResponseDTO cadastrar(TurmaRequestDTO dto) {
         Turma turma = turmaMapper.paraNovaEntidade(dto);
         turma = turmaRepository.save(turma);
@@ -56,14 +80,14 @@ public class TurmaService {
 
     public List<TurmaResponseDTO> listarTodas() {
         return turmaRepository.findAll().stream()
-                .map(TurmaMapper::paraDTO)
+                .map(turmaMapper::paraDTO)
                 .collect(Collectors.toList());
     }
 
     public List<TurmaResponseDTO> listarComFiltros(String nome, Turno turno, Boolean ativo) {
         Specification<Turma> spec = TurmaSpecification.comFiltros(nome, turno, ativo);
         return turmaRepository.findAll(spec).stream()
-                .map(TurmaMapper::paraDTO)
+                .map(turmaMapper::paraDTO)
                 .collect(Collectors.toList());
     }
 

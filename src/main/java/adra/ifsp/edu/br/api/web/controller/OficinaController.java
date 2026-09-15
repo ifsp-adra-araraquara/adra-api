@@ -110,4 +110,12 @@ public class OficinaController {
         OficinaResponseDTO reativada = oficinaService.reativar(id);
         return ResponseEntity.ok(reativada);
     }
+
+    @PreAuthorize("hasAnyRole('OFICINEIRO', 'SOCIOPEDAGOGICO', 'COORDENADOR')")
+    @GetMapping("/minhas-oficinas/{idOficineiro}")
+    public ResponseEntity<List<OficinaResponseDTO>> minhasOficinas(
+            @PathVariable Long idOficineiro
+    ) {
+        return ResponseEntity.ok(oficinaService.minhasOficinas(idOficineiro));
+    }
 }

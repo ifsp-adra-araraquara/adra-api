@@ -23,8 +23,9 @@ public class Oficina {
      * sistema (consistente com o MVP de 3 perfis: Administrador,
      * Coordenador, Sociopedagogico).
      */
-    @Column(name = "oficineiro_responsavel", nullable = false, length = 150)
-    private String oficineiroResponsavel;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "oficineiro_id", nullable = false)
+    private Usuario oficineiroResponsavel;
 
     @Column(name = "ativo", nullable = false)
     private Boolean ativo = true;

@@ -27,6 +27,18 @@ public class OficinaService {
     private final OficinaMapper oficinaMapper;
     private final AuditoriaService auditoriaService;
 
+    public List<OficinaResponseDTO> minhasOficinas(Long idOficineiro) {
+        List<Oficina> oficinas = oficinaRepository.findByOficineiroResponsavelUsuarioId(idOficineiro);
+
+        if(oficinas == null){
+            return null;
+        }
+
+        return oficinas.stream()
+                .map(oficinaMapper::paraDTO)
+                .collect(Collectors.toList());
+    }
+
     public OficinaResponseDTO cadastrar(OficinaRequestDTO dto) {
         Oficina oficina = oficinaMapper.paraNovaEntidade(dto);
         oficina = oficinaRepository.save(oficina);
@@ -39,7 +51,7 @@ public class OficinaService {
                 null,
                 Map.of(
                         "nomeOficina", oficina.getNomeOficina(),
-                        "oficineiroResponsavel", oficina.getOficineiroResponsavel(),
+                        "oficineiroResponsavelId", oficina.getOficineiroResponsavel() != null ? oficina.getOficineiroResponsavel().getUsuarioId().toString() : null,
                         "ativo", oficina.getAtivo().toString()),
                 "Cadastro de oficina");
 
@@ -53,7 +65,7 @@ public class OficinaService {
     public List<OficinaResponseDTO> listarComFiltros(String nome, Boolean ativo) {
         Specification<Oficina> spec = OficinaSpecification.comFiltros(nome, ativo);
         return oficinaRepository.findAll(spec).stream()
-                .map(OficinaMapper::paraDTO)
+                .map(oficinaMapper::paraDTO)
                 .collect(Collectors.toList());
     }
 
@@ -81,11 +93,10 @@ public class OficinaService {
         // Guardar valores anteriores para auditoria
         Map<String, Object> valorAnterior = Map.of(
                 "nomeOficina", oficina.getNomeOficina(),
-                "oficineiroResponsavel", oficina.getOficineiroResponsavel());
+                "oficineiroResponsavelId", oficina.getOficineiroResponsavel() != null ? oficina.getOficineiroResponsavel().getUsuarioId() : null);
 
-        // Atualizar
-        oficina.setNomeOficina(dto.nomeOficina());
-        oficina.setOficineiroResponsavel(dto.oficineiroResponsavel());
+        // Atualizar usando o mapper
+        oficinaMapper.atualizarEntidade(oficina, dto);
 
         oficina = oficinaRepository.save(oficina);
 
@@ -98,7 +109,7 @@ public class OficinaService {
                 valorAnterior,
                 Map.of(
                         "nomeOficina", oficina.getNomeOficina(),
-                        "oficineiroResponsavel", oficina.getOficineiroResponsavel()),
+                        "oficineiroResponsavelId", oficina.getOficineiroResponsavel() != null ? oficina.getOficineiroResponsavel().getUsuarioId() : null),
                 "Edição de oficina");
 
         return oficinaMapper.paraDTO(oficina);

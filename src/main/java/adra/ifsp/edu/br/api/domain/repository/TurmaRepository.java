@@ -8,5 +8,6 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import java.util.List;
 
 public interface TurmaRepository extends JpaRepository<Turma, Long>, JpaSpecificationExecutor<Turma> {
-    // Não precisa mais do método @Query - vamos usar Specifications
+    List<Turma> findByOficineiroResponsavelUsuarioId(Long idOficineiro);
+    List<Turma> findByOficinaOficinaId(Long idOficina);
 }

@@ -17,6 +17,14 @@ public class Turma {
     @Column(name = "turma_id")
     private Long turmaId;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "oficina_id", nullable = false)
+    private Oficina oficina;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "oficineiro_id", nullable = false)
+    private Usuario oficineiroResponsavel;
+
     @Column(name = "nome_turma", nullable = false, length = 100)
     private String nomeTurma;
 

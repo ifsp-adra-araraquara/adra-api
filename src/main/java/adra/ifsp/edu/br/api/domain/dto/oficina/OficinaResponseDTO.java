@@ -5,7 +5,7 @@ import adra.ifsp.edu.br.api.domain.model.Oficina;
 public record OficinaResponseDTO(
         Long oficinaId,
         String nomeOficina,
-        String oficineiroResponsavel,
+        Long oficineiroResponsavelId,
         Boolean ativo
 ) {
 
@@ -17,7 +17,7 @@ public record OficinaResponseDTO(
         return new OficinaResponseDTO(
                 oficina.getOficinaId(),
                 oficina.getNomeOficina(),
-                oficina.getOficineiroResponsavel(),
+                oficina.getOficineiroResponsavel() != null ? oficina.getOficineiroResponsavel().getUsuarioId() : null,
                 oficina.getAtivo()
         );
     }
