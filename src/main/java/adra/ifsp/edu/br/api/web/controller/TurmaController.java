@@ -1,6 +1,7 @@
 
 package adra.ifsp.edu.br.api.web.controller;
 
+import adra.ifsp.edu.br.api.domain.dto.turma.CriacaoTurmaDTO;
 import adra.ifsp.edu.br.api.domain.dto.turma.TurmaRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.turma.TurmaResponseDTO;
 import adra.ifsp.edu.br.api.domain.dto.turma.TurmaStatusRequestDTO;
@@ -72,6 +73,15 @@ public class TurmaController {
             @Valid @RequestBody TurmaRequestDTO turmaRequestDTO
     ) {
         TurmaResponseDTO turmaCriada = turmaService.cadastrar(turmaRequestDTO);
+        return ResponseEntity.ok(turmaCriada);
+    }
+
+    @PreAuthorize("hasAnyRole('SOCIOPEDAGOGICO', 'COORDENADOR')")
+    @PostMapping("/com-horario")
+    public ResponseEntity<TurmaResponseDTO> cadastrarComHorario(
+            @Valid @RequestBody CriacaoTurmaDTO criacaoTurmaDTO
+    ) {
+        TurmaResponseDTO turmaCriada = turmaService.cadastrarComHorario(criacaoTurmaDTO);
         return ResponseEntity.ok(turmaCriada);
     }
 

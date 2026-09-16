@@ -1,5 +1,6 @@
 package adra.ifsp.edu.br.api.domain.service;
 
+import adra.ifsp.edu.br.api.domain.dto.turma.CriacaoTurmaDTO;
 import adra.ifsp.edu.br.api.domain.dto.turma.TurmaRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.turma.TurmaResponseDTO;
 import adra.ifsp.edu.br.api.domain.dto.turma.TurmaStatusRequestDTO;
@@ -16,6 +17,7 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.DayOfWeek;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -69,6 +71,42 @@ public class TurmaService {
                         "ativo", turma.getAtivo().toString()
                 ),
                 "Cadastro de turma"
+        );
+
+        return turmaMapper.paraDTO(turma);
+    }
+
+    public TurmaResponseDTO cadastrarComHorario(CriacaoTurmaDTO dto) {
+        for (DayOfWeek dia : dto.getDiasDaSemana()) {
+            if (turmaRepository.existsConflitoHorarioOficineiro(
+                    dto.getOficineiroResponsavelId(),
+                    dia,
+                    dto.getHorarioInicio(),
+                    dto.getHorarioFim())) {
+                throw new IllegalStateException(
+                        "Conflito de horário: O oficineiro já possui uma turma ativa " +
+                        "no dia " + dia.name() + " no horário solicitado."
+                );
+            }
+        }
+
+        Turma turma = turmaMapper.paraNovaEntidadeComHorario(dto);
+        turma = turmaRepository.save(turma);
+
+        auditoriaService.registrar(
+                ModuloSistema.TURMAS,
+                "turma",
+                turma.getTurmaId(),
+                AcaoSistema.CRIAR,
+                null,
+                Map.of(
+                        "nomeTurma", turma.getNomeTurma(),
+                        "turno", turma.getTurno().name(),
+                        "diasDaSemana", turma.getDiasDaSemana().toString(),
+                        "horarioInicio", turma.getHorarioInicio().toString(),
+                        "horarioFim", turma.getHorarioFim().toString()
+                ),
+                "Cadastro de turma com horário"
         );
 
         return turmaMapper.paraDTO(turma);

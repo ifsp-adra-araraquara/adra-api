@@ -5,7 +5,10 @@ import jakarta.persistence.*;
 import lombok.Builder;
 import lombok.Data;
 
+import java.time.DayOfWeek;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.util.List;
 
 @Data
 @Entity
@@ -43,6 +46,18 @@ public class Turma {
 
     @Column(name = "observacoes", columnDefinition = "TEXT")
     private String observacoes;
+
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "turma_dia_semana", schema = "adra", joinColumns = @JoinColumn(name = "turma_id"))
+    @Column(name = "dia_semana")
+    @Enumerated(EnumType.STRING)
+    private List<DayOfWeek> diasDaSemana;
+
+    @Column(name = "horario_inicio")
+    private LocalTime horarioInicio;
+
+    @Column(name = "horario_fim")
+    private LocalTime horarioFim;
 
     @Column(name = "criado_em", nullable = false, updatable = false)
     private LocalDateTime criadoEm;

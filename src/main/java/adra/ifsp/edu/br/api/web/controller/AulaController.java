@@ -1,7 +1,9 @@
 package adra.ifsp.edu.br.api.web.controller;
 
+import adra.ifsp.edu.br.api.domain.dto.aula.AulaComDetalhesResponseDTO;
 import adra.ifsp.edu.br.api.domain.dto.aula.AulaRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.aula.AulaResponseDTO;
+import adra.ifsp.edu.br.api.domain.model.CriacaoAulas;
 import adra.ifsp.edu.br.api.domain.service.AulaService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -26,10 +28,23 @@ public class AulaController {
         return ResponseEntity.ok(aulaService.cadastrar(aulaRequestDTO));
     }
 
+
+    @PreAuthorize("hasAnyRole('OFICINEIRO', 'SOCIOPEDAGOGICO', 'COORDENADOR')")
+    @PostMapping("/varias-aulas")
+    public ResponseEntity<Boolean> cadastrarVariasAulas(@RequestBody CriacaoAulas criacaoAulas){
+        return ResponseEntity.ok(aulaService.cadastrarVariasAulas(criacaoAulas));
+    }
+
     @PreAuthorize("hasAnyRole('OFICINEIRO', 'SOCIOPEDAGOGICO', 'COORDENADOR')")
     @GetMapping
-    public ResponseEntity<List<AulaResponseDTO>> listarTodas() {
-        return ResponseEntity.ok(aulaService.listarTodas());
+    public ResponseEntity<List<AulaResponseDTO>> listar(
+            @RequestParam(required = false) Long turmaId,
+            @RequestParam(required = false) String nomeTurma,
+            @RequestParam(required = false) String titulo
+    ) {
+        return ResponseEntity.ok(
+                aulaService.listarComFiltros(turmaId, nomeTurma, titulo)
+        );
     }
 
     @PreAuthorize("hasAnyRole('OFICINEIRO', 'SOCIOPEDAGOGICO', 'COORDENADOR')")
@@ -42,6 +57,12 @@ public class AulaController {
     @GetMapping("/turma/{idTurma}")
     public ResponseEntity<List<AulaResponseDTO>> buscarPorTurma(@PathVariable Long idTurma) {
         return ResponseEntity.ok(aulaService.findByTurma(idTurma));
+    }
+
+    @PreAuthorize("hasAnyRole('OFICINEIRO', 'SOCIOPEDAGOGICO', 'COORDENADOR')")
+    @GetMapping("/turma/{idTurma}/detalhes")
+    public ResponseEntity<List<AulaComDetalhesResponseDTO>> buscarPorTurmaComDetalhes(@PathVariable Long idTurma) {
+        return ResponseEntity.ok(aulaService.findByTurmaComDetalhes(idTurma));
     }
 
     @PreAuthorize("hasAnyRole('OFICINEIRO', 'SOCIOPEDAGOGICO', 'COORDENADOR')")
@@ -59,4 +80,6 @@ public class AulaController {
         aulaService.deletar(id);
         return ResponseEntity.noContent().build();
     }
+
+
 }

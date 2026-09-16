@@ -1,5 +1,6 @@
 package adra.ifsp.edu.br.api.domain.mapper;
 
+import adra.ifsp.edu.br.api.domain.dto.turma.CriacaoTurmaDTO;
 import adra.ifsp.edu.br.api.domain.dto.turma.TurmaRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.turma.TurmaResponseDTO;
 import adra.ifsp.edu.br.api.domain.model.Oficina;
@@ -38,6 +39,34 @@ public class TurmaMapper {
         nova.setFaixaEtaria(dto.faixaEtaria());
         nova.setCapacidade(dto.capacidade());
         nova.setObservacoes(dto.observacoes());
+        nova.setAtivo(true);
+
+        return nova;
+    }
+
+    public Turma paraNovaEntidadeComHorario(CriacaoTurmaDTO dto) {
+        Turma nova = new Turma();
+
+        if (dto.getOficinaId() != null) {
+            Oficina oficina = oficinaRepository.findById(dto.getOficinaId())
+                    .orElseThrow(() -> new EntidadeNaoEncontradaException("Oficina não encontrada: id " + dto.getOficinaId()));
+            nova.setOficina(oficina);
+        }
+
+        if (dto.getOficineiroResponsavelId() != null) {
+            Usuario oficineiro = usuarioRepository.findById(dto.getOficineiroResponsavelId())
+                    .orElseThrow(() -> new EntidadeNaoEncontradaException("Usuário não encontrado: id " + dto.getOficineiroResponsavelId()));
+            nova.setOficineiroResponsavel(oficineiro);
+        }
+
+        nova.setNomeTurma(dto.getNomeTurma());
+        nova.setTurno(dto.getTurno());
+        nova.setFaixaEtaria(dto.getFaixaEtaria());
+        nova.setCapacidade(dto.getCapacidade());
+        nova.setObservacoes(dto.getObservacoes());
+        nova.setDiasDaSemana(dto.getDiasDaSemana());
+        nova.setHorarioInicio(dto.getHorarioInicio());
+        nova.setHorarioFim(dto.getHorarioFim());
         nova.setAtivo(true);
 
         return nova;

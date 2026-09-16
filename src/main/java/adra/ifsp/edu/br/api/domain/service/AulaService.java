@@ -1,19 +1,24 @@
 package adra.ifsp.edu.br.api.domain.service;
 
+import adra.ifsp.edu.br.api.domain.dto.aula.AulaComDetalhesResponseDTO;
 import adra.ifsp.edu.br.api.domain.dto.aula.AulaRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.aula.AulaResponseDTO;
 import adra.ifsp.edu.br.api.domain.enums.AcaoSistema;
 import adra.ifsp.edu.br.api.domain.enums.ModuloSistema;
 import adra.ifsp.edu.br.api.domain.mapper.AulaMapper;
 import adra.ifsp.edu.br.api.domain.model.Aula;
+import adra.ifsp.edu.br.api.domain.model.CriacaoAulas;
 import adra.ifsp.edu.br.api.domain.model.Turma;
 import adra.ifsp.edu.br.api.domain.repository.AulaRepository;
+import adra.ifsp.edu.br.api.domain.repository.AulaSpecification;
 import adra.ifsp.edu.br.api.domain.repository.TurmaRepository;
 import adra.ifsp.edu.br.api.exception.EntidadeNaoEncontradaException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -48,8 +53,65 @@ public class AulaService {
         return aulaMapper.paraDTO(aula);
     }
 
+    public Boolean cadastrarVariasAulas(CriacaoAulas criacaoAulas){
+        Turma turma = turmaRepository.findById(criacaoAulas.getTurmaId())
+                .orElseThrow(() -> new EntidadeNaoEncontradaException("Turma não encontrada: id " + criacaoAulas.getTurmaId()));
+
+        LocalDate dataAtual = criacaoAulas.getDataInicio();
+        int aulasCriadas = 0;
+        int aulasPuladas = 0;
+
+        while (!dataAtual.isAfter(criacaoAulas.getDataFim())) {
+            if (criacaoAulas.getDiasDaSemana().contains(dataAtual.getDayOfWeek())) {
+                if (!aulaRepository.existsByTurmaAndDataAula(turma, dataAtual)) {
+                    Aula aula = new Aula();
+                    aula.setTurma(turma);
+                    aula.setDataAula(dataAtual);
+                    aula.setHorarioInicio(criacaoAulas.getHorarioInicio());
+                    aula.setHorarioFim(criacaoAulas.getHorarioFim());
+                    aula.setTitulo(criacaoAulas.getTitulo());
+                    aula.setDescricao(criacaoAulas.getDescricao());
+                    aula.setConteudoPrevisto(criacaoAulas.getConteudoPrevisto());
+                    aula.setObjetivos(criacaoAulas.getObjetivos());
+                    aula.setRecursosNecessarios(criacaoAulas.getRecursosNecessarios());
+                    aula.setObservacoes(criacaoAulas.getObservacoes());
+
+                    aulaRepository.save(aula);
+                    aulasCriadas++;
+                } else {
+                    aulasPuladas++;
+                }
+            }
+            dataAtual = dataAtual.plusDays(1);
+        }
+
+        auditoriaService.registrar(
+                ModuloSistema.AULAS,
+                "aula",
+                turma.getTurmaId(),
+                AcaoSistema.CRIAR,
+                null,
+                Map.of(
+                        "turmaId", turma.getTurmaId().toString(),
+                        "quantidadeAulas", String.valueOf(aulasCriadas),
+                        "aulasPuladas", String.valueOf(aulasPuladas),
+                        "periodo", criacaoAulas.getDataInicio() + " a " + criacaoAulas.getDataFim()
+                ),
+                "Criação em lote de aulas para turma"
+        );
+
+        return aulasCriadas > 0;
+    }
+
     public List<AulaResponseDTO> listarTodas() {
         return aulaRepository.findAll().stream()
+                .map(aulaMapper::paraDTO)
+                .collect(Collectors.toList());
+    }
+
+    public List<AulaResponseDTO> listarComFiltros(Long turmaId, String nomeTurma, String titulo) {
+        Specification<Aula> spec = AulaSpecification.comFiltros(turmaId, nomeTurma, titulo);
+        return aulaRepository.findAll(spec).stream()
                 .map(aulaMapper::paraDTO)
                 .collect(Collectors.toList());
     }
@@ -69,6 +131,21 @@ public class AulaService {
 
         return aulas.stream()
                 .map(aulaMapper::paraDTO)
+                .collect(Collectors.toList());
+    }
+
+    public List<AulaComDetalhesResponseDTO> findByTurmaComDetalhes(Long idTurma) {
+        Optional<Turma> turma = turmaRepository.findById(idTurma);
+
+        if (turma.isEmpty()) {
+            throw new EntidadeNaoEncontradaException("Turma não encontrada: id " + idTurma);
+        }
+
+        List<Aula> aulas = aulaRepository.findByTurma(turma.get());
+        long quantidadeAlunos = aulaRepository.countAlunosAtivosPorTurma(idTurma);
+
+        return aulas.stream()
+                .map(aula -> aulaMapper.paraDTOComDetalhes(aula, (int) quantidadeAlunos))
                 .collect(Collectors.toList());
     }
 

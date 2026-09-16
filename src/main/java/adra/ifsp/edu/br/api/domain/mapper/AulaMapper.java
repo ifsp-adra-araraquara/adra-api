@@ -1,5 +1,6 @@
 package adra.ifsp.edu.br.api.domain.mapper;
 
+import adra.ifsp.edu.br.api.domain.dto.aula.AulaComDetalhesResponseDTO;
 import adra.ifsp.edu.br.api.domain.dto.aula.AulaRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.aula.AulaResponseDTO;
 import adra.ifsp.edu.br.api.domain.model.Aula;
@@ -42,5 +43,9 @@ public class AulaMapper {
 
     public AulaResponseDTO paraDTO(Aula aula) {
         return AulaResponseDTO.fromEntity(aula);
+    }
+
+    public AulaComDetalhesResponseDTO paraDTOComDetalhes(Aula aula, Integer quantidadeAlunos) {
+        return AulaComDetalhesResponseDTO.fromEntity(aula, quantidadeAlunos);
     }
 }
