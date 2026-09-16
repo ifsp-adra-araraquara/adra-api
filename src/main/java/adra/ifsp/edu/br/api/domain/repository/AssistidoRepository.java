@@ -1,5 +1,6 @@
 package adra.ifsp.edu.br.api.domain.repository;
 
+import adra.ifsp.edu.br.api.domain.enums.StatusGeral;
 import adra.ifsp.edu.br.api.domain.model.Assistido;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
@@ -15,4 +16,10 @@ public interface AssistidoRepository extends JpaRepository<Assistido, Long>, Jpa
      * Ao editar, exclua o proprio id do resultado no service.
      */
     List<Assistido> findByNomeCompletoIgnoreCaseAndDataNascimento(String nomeCompleto, LocalDate dataNascimento);
+
+    /**
+     * Usado pra montar a contagem de "Alunos" nas telas de turma
+     * (ex.: "Minhas turmas" do oficineiro).
+     */
+    long countByTurma_TurmaIdAndStatus(Long turmaId, StatusGeral status);
 }

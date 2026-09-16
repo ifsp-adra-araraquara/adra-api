@@ -19,9 +19,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -114,6 +112,48 @@ public class AulaService {
         return aulaRepository.findAll(spec).stream()
                 .map(aulaMapper::paraDTO)
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * Igual a listarComFiltros, mas ja enriquecido com nome da turma,
+     * oficineiro responsavel e quantidade de alunos ativos — usado na tela
+     * "Aulas" do sociopedagogico/coordenador, que por padrao mostra as
+     * aulas de hoje (dataAula = hoje) com um filtro de data em cima pra
+     * trocar o dia, sem precisar saber turmaId de antemao.
+     */
+    public List<AulaComDetalhesResponseDTO> listarComDetalhesComFiltros(
+            Long turmaId, String nomeTurma, String titulo, LocalDate dataAula
+    ) {
+        Specification<Aula> spec = AulaSpecification.comFiltros(turmaId, nomeTurma, titulo, dataAula);
+
+        List<Aula> aulas = aulaRepository.findAll(spec);
+        aulas.sort(
+                Comparator.comparing(Aula::getDataAula)
+                        .thenComparing(Aula::getHorarioInicio, Comparator.nullsLast(Comparator.naturalOrder()))
+        );
+
+        Map<Long, Integer> quantidadeAlunosPorTurma = new HashMap<>();
+        List<AulaComDetalhesResponseDTO> resultado = new ArrayList<>();
+
+        for (Aula aula : aulas) {
+            Turma turma = aula.getTurma();
+            Long turmaIdAula = (turma != null) ? turma.getTurmaId() : null;
+
+            Integer quantidadeAlunos = 0;
+            if (turmaIdAula != null) {
+                Integer emCache = quantidadeAlunosPorTurma.get(turmaIdAula);
+                if (emCache == null) {
+                    long total = aulaRepository.countAlunosAtivosPorTurma(turmaIdAula);
+                    emCache = (int) total;
+                    quantidadeAlunosPorTurma.put(turmaIdAula, emCache);
+                }
+                quantidadeAlunos = emCache;
+            }
+
+            resultado.add(aulaMapper.paraDTOComDetalhes(aula, quantidadeAlunos));
+        }
+
+        return resultado;
     }
 
     public AulaResponseDTO buscarPorId(Long id) {

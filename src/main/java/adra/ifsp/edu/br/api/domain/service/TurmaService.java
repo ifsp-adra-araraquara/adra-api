@@ -1,14 +1,17 @@
 package adra.ifsp.edu.br.api.domain.service;
 
 import adra.ifsp.edu.br.api.domain.dto.turma.CriacaoTurmaDTO;
+import adra.ifsp.edu.br.api.domain.dto.turma.TurmaComAlunosResponseDTO;
 import adra.ifsp.edu.br.api.domain.dto.turma.TurmaRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.turma.TurmaResponseDTO;
 import adra.ifsp.edu.br.api.domain.dto.turma.TurmaStatusRequestDTO;
 import adra.ifsp.edu.br.api.domain.enums.AcaoSistema;
 import adra.ifsp.edu.br.api.domain.enums.ModuloSistema;
+import adra.ifsp.edu.br.api.domain.enums.StatusGeral;
 import adra.ifsp.edu.br.api.domain.enums.Turno;
 import adra.ifsp.edu.br.api.domain.mapper.TurmaMapper;
 import adra.ifsp.edu.br.api.domain.model.Turma;
+import adra.ifsp.edu.br.api.domain.repository.AssistidoRepository;
 import adra.ifsp.edu.br.api.domain.repository.TurmaRepository;
 import adra.ifsp.edu.br.api.domain.repository.TurmaSpecification;
 import adra.ifsp.edu.br.api.exception.EntidadeNaoEncontradaException;
@@ -30,8 +33,14 @@ public class TurmaService {
     private final TurmaRepository turmaRepository;
     private final TurmaMapper turmaMapper;
     private final AuditoriaService auditoriaService;
+    private final AssistidoRepository assistidoRepository;
 
-    public List<TurmaResponseDTO> minhasTurmas(Long idOficineiros){
+    /**
+     * Igual a minhasTurmas, mas ja traz o nome da oficina e a quantidade de
+     * alunos ativos resolvidos — usado na aba "Minhas turmas" do oficineiro,
+     * que precisa mostrar isso direto na tabela sem chamada extra por turma.
+     */
+    public List<TurmaComAlunosResponseDTO> minhasTurmas(Long idOficineiros){
         List<Turma> minhasTurmas = turmaRepository.findByOficineiroResponsavelUsuarioId(idOficineiros);
 
         if(minhasTurmas == null){
@@ -39,7 +48,10 @@ public class TurmaService {
         }
 
         return minhasTurmas.stream()
-                .map(turmaMapper::paraDTO)
+                .map(turma -> TurmaComAlunosResponseDTO.fromEntity(
+                        turma,
+                        assistidoRepository.countByTurma_TurmaIdAndStatus(turma.getTurmaId(), StatusGeral.ATIVO)
+                ))
                 .collect(Collectors.toList());
     }
 

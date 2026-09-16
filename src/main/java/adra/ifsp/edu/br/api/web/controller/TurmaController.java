@@ -2,6 +2,7 @@
 package adra.ifsp.edu.br.api.web.controller;
 
 import adra.ifsp.edu.br.api.domain.dto.turma.CriacaoTurmaDTO;
+import adra.ifsp.edu.br.api.domain.dto.turma.TurmaComAlunosResponseDTO;
 import adra.ifsp.edu.br.api.domain.dto.turma.TurmaRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.turma.TurmaResponseDTO;
 import adra.ifsp.edu.br.api.domain.dto.turma.TurmaStatusRequestDTO;
@@ -113,7 +114,7 @@ public class TurmaController {
 
     @PreAuthorize("hasAnyRole('OFICINEIRO', 'SOCIOPEDAGOGICO', 'COORDENADOR')")
     @GetMapping("/minhas-turmas/{idOficineiro}")
-    public ResponseEntity<List<TurmaResponseDTO>> minhasTurmas(
+    public ResponseEntity<List<TurmaComAlunosResponseDTO>> minhasTurmas(
             @PathVariable Long idOficineiro
     ) {
         return ResponseEntity.ok(turmaService.minhasTurmas(idOficineiro));

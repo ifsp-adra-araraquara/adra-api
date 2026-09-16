@@ -3,6 +3,8 @@ package adra.ifsp.edu.br.api.domain.repository;
 import adra.ifsp.edu.br.api.domain.model.Aula;
 import org.springframework.data.jpa.domain.Specification;
 
+import java.time.LocalDate;
+
 public class AulaSpecification {
 
     public static Specification<Aula> filtroTurmaId(Long turmaId) {
@@ -38,9 +40,28 @@ public class AulaSpecification {
         };
     }
 
+    /**
+     * Filtra por data exata da aula (usada na tela "Aulas" do sociopedagógico:
+     * por padrão mostra as aulas de hoje, com um filtro de data em cima pra
+     * trocar o dia).
+     */
+    public static Specification<Aula> filtroDataAula(LocalDate dataAula) {
+        return (root, query, criteriaBuilder) -> {
+            if (dataAula == null) {
+                return criteriaBuilder.conjunction();
+            }
+            return criteriaBuilder.equal(root.get("dataAula"), dataAula);
+        };
+    }
+
     public static Specification<Aula> comFiltros(Long turmaId, String nomeTurma, String titulo) {
+        return comFiltros(turmaId, nomeTurma, titulo, null);
+    }
+
+    public static Specification<Aula> comFiltros(Long turmaId, String nomeTurma, String titulo, LocalDate dataAula) {
         return Specification.where(filtroTurmaId(turmaId))
                 .and(filtroNomeTurma(nomeTurma))
-                .and(filtroTituloAula(titulo));
+                .and(filtroTituloAula(titulo))
+                .and(filtroDataAula(dataAula));
     }
 }

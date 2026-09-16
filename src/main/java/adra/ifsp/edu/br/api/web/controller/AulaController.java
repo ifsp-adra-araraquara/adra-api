@@ -7,10 +7,12 @@ import adra.ifsp.edu.br.api.domain.model.CriacaoAulas;
 import adra.ifsp.edu.br.api.domain.service.AulaService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -44,6 +46,26 @@ public class AulaController {
     ) {
         return ResponseEntity.ok(
                 aulaService.listarComFiltros(turmaId, nomeTurma, titulo)
+        );
+    }
+
+    /**
+     * Versao enriquecida de listar() (nome da turma, oficineiro responsavel e
+     * quantidade de alunos) com filtro por data — usada na tela "Aulas" do
+     * sociopedagogico/coordenador: por padrao traz as aulas de hoje, com um
+     * filtro de data em cima pra trocar o dia. Nao restringe por turma nem
+     * exige turmaId de antemao.
+     */
+    @PreAuthorize("hasAnyRole('OFICINEIRO', 'SOCIOPEDAGOGICO', 'COORDENADOR')")
+    @GetMapping("/com-detalhes")
+    public ResponseEntity<List<AulaComDetalhesResponseDTO>> listarComDetalhes(
+            @RequestParam(required = false) Long turmaId,
+            @RequestParam(required = false) String nomeTurma,
+            @RequestParam(required = false) String titulo,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dataAula
+    ) {
+        return ResponseEntity.ok(
+                aulaService.listarComDetalhesComFiltros(turmaId, nomeTurma, titulo, dataAula)
         );
     }
 
