@@ -101,6 +101,7 @@ public class UsuarioAdminService {
 
     public UsuarioResponseDTO alterarStatus(Long id, UsuarioStatusRequestDTO dto) {
         exigirAdministrador();
+        validarNaoInativarProprioUsuario(id, dto.ativo());
 
         Usuario usuario = usuarioService.buscarEntidadePorId(id);
         UsuarioResponseDTO resposta = usuarioService.alterarStatus(id, dto);
@@ -114,6 +115,30 @@ public class UsuarioAdminService {
         }
 
         return resposta;
+    }
+
+    private void validarNaoInativarProprioUsuario(Long id, Boolean ativo) {
+        if (Boolean.FALSE.equals(ativo)) {
+            Long usuarioAutenticadoId = obterIdUsuarioAutenticado();
+            if (id.equals(usuarioAutenticadoId)) {
+                throw new RegraNegocioException("Não é permitido inativar seu próprio usuário.");
+            }
+        }
+    }
+
+    private Long obterIdUsuarioAutenticado() {
+        if (SecurityContextHolder.getContext().getAuthentication() == null) {
+            return null;
+        }
+        Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        if (principal instanceof Jwt jwt) {
+            try {
+                return Long.valueOf(jwt.getSubject());
+            } catch (NumberFormatException e) {
+                log.warn("Subject do token JWT não é um ID numérico válido: {}", jwt.getSubject());
+            }
+        }
+        return null;
     }
 
     private void desfazerIdentidade(UUID authUid) {
