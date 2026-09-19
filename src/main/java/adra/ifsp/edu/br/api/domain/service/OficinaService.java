@@ -14,6 +14,7 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -90,15 +91,27 @@ public class OficinaService {
 
         Oficina oficina = buscarEntidadePorId(id);
 
-        // Guardar valores anteriores para auditoria
-        Map<String, Object> valorAnterior = Map.of(
-                "nomeOficina", oficina.getNomeOficina(),
-                "oficineiroResponsavelId", oficina.getOficineiroResponsavel() != null ? oficina.getOficineiroResponsavel().getUsuarioId() : null);
+        // Guardar valores anteriores para auditoria.
+        // Usa HashMap (não Map.of) porque oficineiroResponsavelId pode ser
+        // null em oficinas antigas (cadastradas antes desse campo virar
+        // obrigatório no front) - Map.of lança NullPointerException em
+        // qualquer valor null, mesmo que a chave exista.
+        Map<String, Object> valorAnterior = new HashMap<>();
+        valorAnterior.put("nomeOficina", oficina.getNomeOficina());
+        valorAnterior.put(
+                "oficineiroResponsavelId",
+                oficina.getOficineiroResponsavel() != null ? oficina.getOficineiroResponsavel().getUsuarioId() : null);
 
         // Atualizar usando o mapper
         oficinaMapper.atualizarEntidade(oficina, dto);
 
         oficina = oficinaRepository.save(oficina);
+
+        Map<String, Object> valorNovo = new HashMap<>();
+        valorNovo.put("nomeOficina", oficina.getNomeOficina());
+        valorNovo.put(
+                "oficineiroResponsavelId",
+                oficina.getOficineiroResponsavel() != null ? oficina.getOficineiroResponsavel().getUsuarioId() : null);
 
         // Auditar
         auditoriaService.registrar(
@@ -107,9 +120,7 @@ public class OficinaService {
                 oficina.getOficinaId(),
                 AcaoSistema.EDITAR,
                 valorAnterior,
-                Map.of(
-                        "nomeOficina", oficina.getNomeOficina(),
-                        "oficineiroResponsavelId", oficina.getOficineiroResponsavel() != null ? oficina.getOficineiroResponsavel().getUsuarioId() : null),
+                valorNovo,
                 "Edição de oficina");
 
         return oficinaMapper.paraDTO(oficina);

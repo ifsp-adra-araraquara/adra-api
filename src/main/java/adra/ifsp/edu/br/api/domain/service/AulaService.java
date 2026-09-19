@@ -192,13 +192,19 @@ public class AulaService {
     public AulaResponseDTO atualizar(Long id, AulaRequestDTO dto) {
         Aula aula = buscarEntidadePorId(id);
 
-        Map<String, Object> valorAnterior = Map.of(
-                "dataAula", aula.getDataAula().toString(),
-                "titulo", aula.getTitulo()
-        );
+        // Usa HashMap (não Map.of) porque titulo pode ser null (aula ainda
+        // sem os campos definidos) - Map.of lança NullPointerException em
+        // qualquer valor null, mesmo que a chave exista.
+        Map<String, Object> valorAnterior = new HashMap<>();
+        valorAnterior.put("dataAula", aula.getDataAula().toString());
+        valorAnterior.put("titulo", aula.getTitulo());
 
         aulaMapper.atualizarEntidade(aula, dto);
         aula = aulaRepository.save(aula);
+
+        Map<String, Object> valorNovo = new HashMap<>();
+        valorNovo.put("dataAula", aula.getDataAula().toString());
+        valorNovo.put("titulo", aula.getTitulo());
 
         auditoriaService.registrar(
                 ModuloSistema.AULAS,
@@ -206,10 +212,7 @@ public class AulaService {
                 aula.getAulaId(),
                 AcaoSistema.EDITAR,
                 valorAnterior,
-                Map.of(
-                        "dataAula", aula.getDataAula().toString(),
-                        "titulo", aula.getTitulo()
-                ),
+                valorNovo,
                 "Atualização de aula"
         );
 
