@@ -16,6 +16,30 @@ public class AulaSpecification {
         };
     }
 
+    public static Specification<Aula> filtroOficinaId(Long oficinaId) {
+        return (root, query, criteriaBuilder) -> {
+            if (oficinaId == null) {
+                return criteriaBuilder.conjunction();
+            }
+            return criteriaBuilder.equal(root.get("turma").get("oficina").get("oficinaId"), oficinaId);
+        };
+    }
+
+    public static Specification<Aula> filtroPeriodo(LocalDate dataInicio, LocalDate dataFim) {
+        return (root, query, criteriaBuilder) -> {
+            if (dataInicio == null && dataFim == null) {
+                return criteriaBuilder.conjunction();
+            }
+            if (dataInicio != null && dataFim != null) {
+                return criteriaBuilder.between(root.get("dataAula"), dataInicio, dataFim);
+            }
+            if (dataInicio != null) {
+                return criteriaBuilder.greaterThanOrEqualTo(root.get("dataAula"), dataInicio);
+            }
+            return criteriaBuilder.lessThanOrEqualTo(root.get("dataAula"), dataFim);
+        };
+    }
+
     public static Specification<Aula> filtroNomeTurma(String nomeTurma) {
         return (root, query, criteriaBuilder) -> {
             if (nomeTurma == null || nomeTurma.isBlank()) {
@@ -55,11 +79,20 @@ public class AulaSpecification {
     }
 
     public static Specification<Aula> comFiltros(Long turmaId, String nomeTurma, String titulo) {
-        return comFiltros(turmaId, nomeTurma, titulo, null);
+        return comFiltros(turmaId, null, null, null, nomeTurma, titulo, null);
     }
 
     public static Specification<Aula> comFiltros(Long turmaId, String nomeTurma, String titulo, LocalDate dataAula) {
+        return comFiltros(turmaId, null, null, null, nomeTurma, titulo, dataAula);
+    }
+
+    public static Specification<Aula> comFiltros(
+            Long turmaId, Long oficinaId, LocalDate dataInicio, LocalDate dataFim,
+            String nomeTurma, String titulo, LocalDate dataAula
+    ) {
         return Specification.where(filtroTurmaId(turmaId))
+                .and(filtroOficinaId(oficinaId))
+                .and(filtroPeriodo(dataInicio, dataFim))
                 .and(filtroNomeTurma(nomeTurma))
                 .and(filtroTituloAula(titulo))
                 .and(filtroDataAula(dataAula));

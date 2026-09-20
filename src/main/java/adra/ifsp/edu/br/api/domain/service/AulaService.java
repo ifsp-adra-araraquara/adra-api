@@ -3,6 +3,8 @@ package adra.ifsp.edu.br.api.domain.service;
 import adra.ifsp.edu.br.api.domain.dto.aula.AulaComDetalhesResponseDTO;
 import adra.ifsp.edu.br.api.domain.dto.aula.AulaRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.aula.AulaResponseDTO;
+import adra.ifsp.edu.br.api.domain.dto.aula.AulaStatusPatchRequestDTO;
+import adra.ifsp.edu.br.api.domain.dto.aula.GerarAulasResponseDTO;
 import adra.ifsp.edu.br.api.domain.enums.AcaoSistema;
 import adra.ifsp.edu.br.api.domain.enums.ModuloSistema;
 import adra.ifsp.edu.br.api.domain.mapper.AulaMapper;
@@ -11,6 +13,7 @@ import adra.ifsp.edu.br.api.domain.model.CriacaoAulas;
 import adra.ifsp.edu.br.api.domain.model.Turma;
 import adra.ifsp.edu.br.api.domain.repository.AulaRepository;
 import adra.ifsp.edu.br.api.domain.repository.AulaSpecification;
+import adra.ifsp.edu.br.api.domain.repository.ExcecaoCalendarioRepository;
 import adra.ifsp.edu.br.api.domain.repository.TurmaRepository;
 import adra.ifsp.edu.br.api.exception.EntidadeNaoEncontradaException;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +31,7 @@ import java.util.stream.Collectors;
 public class AulaService {
     private final AulaRepository aulaRepository;
     private final TurmaRepository turmaRepository;
+    private final ExcecaoCalendarioRepository excecaoCalendarioRepository;
     private final AulaMapper aulaMapper;
     private final AuditoriaService auditoriaService;
 
@@ -51,17 +55,26 @@ public class AulaService {
         return aulaMapper.paraDTO(aula);
     }
 
-    public Boolean cadastrarVariasAulas(CriacaoAulas criacaoAulas){
+    public GerarAulasResponseDTO gerarAulas(CriacaoAulas criacaoAulas) {
         Turma turma = turmaRepository.findById(criacaoAulas.getTurmaId())
                 .orElseThrow(() -> new EntidadeNaoEncontradaException("Turma não encontrada: id " + criacaoAulas.getTurmaId()));
 
+        Set<LocalDate> datasExcecao = excecaoCalendarioRepository.findDatasExcecaoBetween(
+                criacaoAulas.getDataInicio(),
+                criacaoAulas.getDataFim()
+        );
+
         LocalDate dataAtual = criacaoAulas.getDataInicio();
+        List<Aula> novasAulas = new ArrayList<>();
         int aulasCriadas = 0;
-        int aulasPuladas = 0;
+        int aulasExcecaoPuladas = 0;
+        int aulasDuplicadasPuladas = 0;
 
         while (!dataAtual.isAfter(criacaoAulas.getDataFim())) {
             if (criacaoAulas.getDiasDaSemana().contains(dataAtual.getDayOfWeek())) {
-                if (!aulaRepository.existsByTurmaAndDataAula(turma, dataAtual)) {
+                if (datasExcecao != null && datasExcecao.contains(dataAtual)) {
+                    aulasExcecaoPuladas++;
+                } else if (!aulaRepository.existsByTurmaAndDataAula(turma, dataAtual)) {
                     Aula aula = new Aula();
                     aula.setTurma(turma);
                     aula.setDataAula(dataAtual);
@@ -74,10 +87,10 @@ public class AulaService {
                     aula.setRecursosNecessarios(criacaoAulas.getRecursosNecessarios());
                     aula.setObservacoes(criacaoAulas.getObservacoes());
 
-                    aulaRepository.save(aula);
+                    novasAulas.add(aulaRepository.save(aula));
                     aulasCriadas++;
                 } else {
-                    aulasPuladas++;
+                    aulasDuplicadasPuladas++;
                 }
             }
             dataAtual = dataAtual.plusDays(1);
@@ -92,13 +105,23 @@ public class AulaService {
                 Map.of(
                         "turmaId", turma.getTurmaId().toString(),
                         "quantidadeAulas", String.valueOf(aulasCriadas),
-                        "aulasPuladas", String.valueOf(aulasPuladas),
+                        "aulasExcecaoPuladas", String.valueOf(aulasExcecaoPuladas),
+                        "aulasDuplicadasPuladas", String.valueOf(aulasDuplicadasPuladas),
                         "periodo", criacaoAulas.getDataInicio() + " a " + criacaoAulas.getDataFim()
                 ),
-                "Criação em lote de aulas para turma"
+                "Criação em lote de aulas para turma com suporte a exceções"
         );
 
-        return aulasCriadas > 0;
+        List<AulaResponseDTO> aulasDTO = novasAulas.stream()
+                .map(aulaMapper::paraDTO)
+                .collect(Collectors.toList());
+
+        return new GerarAulasResponseDTO(aulasCriadas, aulasExcecaoPuladas, aulasDuplicadasPuladas, aulasDTO);
+    }
+
+    public Boolean cadastrarVariasAulas(CriacaoAulas criacaoAulas) {
+        GerarAulasResponseDTO resultado = gerarAulas(criacaoAulas);
+        return resultado.aulasCriadas() > 0;
     }
 
     public List<AulaResponseDTO> listarTodas() {
@@ -108,7 +131,15 @@ public class AulaService {
     }
 
     public List<AulaResponseDTO> listarComFiltros(Long turmaId, String nomeTurma, String titulo) {
-        Specification<Aula> spec = AulaSpecification.comFiltros(turmaId, nomeTurma, titulo);
+        return listarComFiltros(turmaId, null, null, null, nomeTurma, titulo);
+    }
+
+    public List<AulaResponseDTO> listarComFiltros(
+            Long turmaId, Long oficinaId, LocalDate dataInicio, LocalDate dataFim, String nomeTurma, String titulo
+    ) {
+        Specification<Aula> spec = AulaSpecification.comFiltros(
+                turmaId, oficinaId, dataInicio, dataFim, nomeTurma, titulo, null
+        );
         return aulaRepository.findAll(spec).stream()
                 .map(aulaMapper::paraDTO)
                 .collect(Collectors.toList());
@@ -192,9 +223,6 @@ public class AulaService {
     public AulaResponseDTO atualizar(Long id, AulaRequestDTO dto) {
         Aula aula = buscarEntidadePorId(id);
 
-        // Usa HashMap (não Map.of) porque titulo pode ser null (aula ainda
-        // sem os campos definidos) - Map.of lança NullPointerException em
-        // qualquer valor null, mesmo que a chave exista.
         Map<String, Object> valorAnterior = new HashMap<>();
         valorAnterior.put("dataAula", aula.getDataAula().toString());
         valorAnterior.put("titulo", aula.getTitulo());
@@ -214,6 +242,31 @@ public class AulaService {
                 valorAnterior,
                 valorNovo,
                 "Atualização de aula"
+        );
+
+        return aulaMapper.paraDTO(aula);
+    }
+
+    public AulaResponseDTO atualizarStatus(Long id, AulaStatusPatchRequestDTO dto) {
+        Aula aula = buscarEntidadePorId(id);
+
+        Map<String, Object> valorAnterior = new HashMap<>();
+        valorAnterior.put("statusAula", aula.getStatusAula() != null ? aula.getStatusAula().name() : null);
+
+        aula.setStatusAula(dto.statusAula());
+        aula = aulaRepository.save(aula);
+
+        Map<String, Object> valorNovo = new HashMap<>();
+        valorNovo.put("statusAula", aula.getStatusAula().name());
+
+        auditoriaService.registrar(
+                ModuloSistema.AULAS,
+                "aula",
+                aula.getAulaId(),
+                AcaoSistema.EDITAR,
+                valorAnterior,
+                valorNovo,
+                "Atualização pontual de status de aula"
         );
 
         return aulaMapper.paraDTO(aula);

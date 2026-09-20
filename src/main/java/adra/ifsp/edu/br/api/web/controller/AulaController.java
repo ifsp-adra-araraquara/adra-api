@@ -1,8 +1,6 @@
 package adra.ifsp.edu.br.api.web.controller;
 
-import adra.ifsp.edu.br.api.domain.dto.aula.AulaComDetalhesResponseDTO;
-import adra.ifsp.edu.br.api.domain.dto.aula.AulaRequestDTO;
-import adra.ifsp.edu.br.api.domain.dto.aula.AulaResponseDTO;
+import adra.ifsp.edu.br.api.domain.dto.aula.*;
 import adra.ifsp.edu.br.api.domain.model.CriacaoAulas;
 import adra.ifsp.edu.br.api.domain.service.AulaService;
 import jakarta.validation.Valid;
@@ -22,7 +20,7 @@ public class AulaController {
 
     private final AulaService aulaService;
 
-    @PreAuthorize("hasAnyRole('OFICINEIRO', 'SOCIOPEDAGOGICO', 'COORDENADOR')")
+    @PreAuthorize("hasRole('COORDENADOR')")
     @PostMapping
     public ResponseEntity<AulaResponseDTO> cadastrar(
             @Valid @RequestBody AulaRequestDTO aulaRequestDTO
@@ -30,22 +28,50 @@ public class AulaController {
         return ResponseEntity.ok(aulaService.cadastrar(aulaRequestDTO));
     }
 
+    @PreAuthorize("hasRole('COORDENADOR')")
+    @PostMapping("/gerar")
+    public ResponseEntity<GerarAulasResponseDTO> gerarAulas(
+            @Valid @RequestBody CriacaoAulas criacaoAulas
+    ) {
+        return ResponseEntity.ok(aulaService.gerarAulas(criacaoAulas));
+    }
 
-    @PreAuthorize("hasAnyRole('OFICINEIRO', 'SOCIOPEDAGOGICO', 'COORDENADOR')")
+    @PreAuthorize("hasRole('COORDENADOR')")
     @PostMapping("/varias-aulas")
-    public ResponseEntity<Boolean> cadastrarVariasAulas(@RequestBody CriacaoAulas criacaoAulas){
+    public ResponseEntity<Boolean> cadastrarVariasAulas(@RequestBody CriacaoAulas criacaoAulas) {
         return ResponseEntity.ok(aulaService.cadastrarVariasAulas(criacaoAulas));
+    }
+
+    @PreAuthorize("hasRole('COORDENADOR')")
+    @PatchMapping("/{id}")
+    public ResponseEntity<AulaResponseDTO> atualizarStatus(
+            @PathVariable Long id,
+            @Valid @RequestBody AulaStatusPatchRequestDTO dto
+    ) {
+        return ResponseEntity.ok(aulaService.atualizarStatus(id, dto));
     }
 
     @PreAuthorize("hasAnyRole('OFICINEIRO', 'SOCIOPEDAGOGICO', 'COORDENADOR')")
     @GetMapping
     public ResponseEntity<List<AulaResponseDTO>> listar(
-            @RequestParam(required = false) Long turmaId,
+            @RequestParam(name = "turmaId", required = false) Long turmaId,
+            @RequestParam(name = "turma_id", required = false) Long turmaIdSnake,
+            @RequestParam(name = "oficinaId", required = false) Long oficinaId,
+            @RequestParam(name = "oficina_id", required = false) Long oficinaIdSnake,
+            @RequestParam(name = "dataInicio", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dataInicio,
+            @RequestParam(name = "data_inicio", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dataInicioSnake,
+            @RequestParam(name = "dataFim", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dataFim,
+            @RequestParam(name = "data_fim", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dataFimSnake,
             @RequestParam(required = false) String nomeTurma,
             @RequestParam(required = false) String titulo
     ) {
+        Long resolvedTurmaId = turmaId != null ? turmaId : turmaIdSnake;
+        Long resolvedOficinaId = oficinaId != null ? oficinaId : oficinaIdSnake;
+        LocalDate resolvedDataInicio = dataInicio != null ? dataInicio : dataInicioSnake;
+        LocalDate resolvedDataFim = dataFim != null ? dataFim : dataFimSnake;
+
         return ResponseEntity.ok(
-                aulaService.listarComFiltros(turmaId, nomeTurma, titulo)
+                aulaService.listarComFiltros(resolvedTurmaId, resolvedOficinaId, resolvedDataInicio, resolvedDataFim, nomeTurma, titulo)
         );
     }
 
@@ -87,7 +113,7 @@ public class AulaController {
         return ResponseEntity.ok(aulaService.findByTurmaComDetalhes(idTurma));
     }
 
-    @PreAuthorize("hasAnyRole('OFICINEIRO', 'SOCIOPEDAGOGICO', 'COORDENADOR')")
+    @PreAuthorize("hasRole('COORDENADOR')")
     @PutMapping("/{id}")
     public ResponseEntity<AulaResponseDTO> atualizar(
             @PathVariable Long id,
@@ -96,12 +122,10 @@ public class AulaController {
         return ResponseEntity.ok(aulaService.atualizar(id, aulaRequestDTO));
     }
 
-    @PreAuthorize("hasAnyRole('OFICINEIRO', 'SOCIOPEDAGOGICO', 'COORDENADOR')")
+    @PreAuthorize("hasRole('COORDENADOR')")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deletar(@PathVariable Long id) {
         aulaService.deletar(id);
         return ResponseEntity.noContent().build();
     }
-
-
 }
