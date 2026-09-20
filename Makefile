@@ -63,7 +63,7 @@ prod:
 	./gradlew bootRun --args='--spring.profiles.active=prod'
 
 prod-direct:
-	SPRING_DATASOURCE_URL='jdbc:postgresql://db.kceyjdtxmxkgfhihatip.supabase.co:5432/postgres?currentSchema=adra&stringtype=unspecified' \
+	SPRING_DATASOURCE_URL='jdbc:postgresql://db.zphybvsrvcsucqsbbidw.supabase.co:5432/postgres?currentSchema=adra&stringtype=unspecified' \
 	SPRING_DATASOURCE_USERNAME=postgres \
 	./gradlew bootRun --args='--spring.profiles.active=prod'
 
