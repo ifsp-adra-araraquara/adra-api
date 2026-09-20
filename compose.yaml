@@ -2,8 +2,10 @@ name: adra-deploy
 
 services:
   app:
+    image: ghcr.io/ifsp-adra-araraquara/adra-api:latest
     build: .
     restart: unless-stopped
+    mem_limit: 1g
     environment:
       SPRING_PROFILES_ACTIVE: "${SPRING_PROFILES_ACTIVE:?use make docker-stage ou docker-prod}"
       SUPABASE_PASSWORD: "${SUPABASE_PASSWORD:?defina SUPABASE_PASSWORD}"

@@ -13,4 +13,4 @@ WORKDIR /app
 COPY --from=build /build/build/libs/*.jar app.jar
 USER adra
 EXPOSE 8080
-ENTRYPOINT ["java", "-XX:MaxRAMPercentage=75", "-jar", "app.jar"]
+ENTRYPOINT ["java", "-XX:MaxRAMPercentage=65", "-XX:+ExitOnOutOfMemoryError", "-jar", "app.jar"]
