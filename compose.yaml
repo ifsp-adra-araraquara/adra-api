@@ -1,0 +1,39 @@
+name: adra-deploy
+
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: "${SPRING_PROFILES_ACTIVE:?use make docker-stage ou docker-prod}"
+      SUPABASE_PASSWORD: "${SUPABASE_PASSWORD:?defina SUPABASE_PASSWORD}"
+      SUPABASE_SERVICE_KEY: "${SUPABASE_SERVICE_KEY:?defina SUPABASE_SERVICE_KEY}"
+      ADRA_JWT_SEGREDO: "${ADRA_JWT_SEGREDO:?defina ADRA_JWT_SEGREDO}"
+      BREVO_API_KEY: "${BREVO_API_KEY:?defina BREVO_API_KEY}"
+      ADRA_CORS_ORIGENS: "${ADRA_CORS_ORIGENS:?defina a origem liberada no CORS}"
+      ADRA_FRONTEND_URL: "${ADRA_FRONTEND_URL:?defina a URL do frontend}"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:8080/actuator/health/liveness"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      API_DOMAIN: "${API_DOMAIN:?defina o dominio}"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - app
+
+volumes:
+  caddy_data:
+  caddy_config:

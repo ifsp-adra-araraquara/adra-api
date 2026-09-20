@@ -19,7 +19,7 @@ make seed    # usuários fictícios e identidades
 Local não precisa de segredo, usa as chaves de demonstração da CLI. `make down`
 derruba.
 
-Quem cria o schema é o Flyway, no boot — por isso o `make seed` vem depois do
+Quem cria o schema é o Flyway, no boot. Por isso o `make seed` vem depois do
 `make run`. Ele insere os usuários fictícios e cria a identidade de cada um no
 Auth local. Os e-mails e a senha são os mesmos do stage, para não ter que
 decorar dois conjuntos de credencial. Senha `mudar123`:
@@ -66,7 +66,7 @@ src/main/resources/db/migration/V20260920143000__criar_tabela_oficina.sql
 ```
 
 O número no nome é a data e a hora de agora. É só para duas pessoas em branches
-diferentes nunca escolherem o mesmo — por isso use o `make migration` em vez de
+diferentes nunca escolherem o mesmo. Por isso use o `make migration` em vez de
 criar o arquivo na mão.
 
 Dentro é SQL normal, com o schema na frente do nome da tabela:
@@ -77,7 +77,7 @@ ALTER TABLE adra.responsavel ADD COLUMN cpf varchar(20);
 
 Salva e roda `make run`. O Flyway aplica. Da próxima vez ele não aplica de novo.
 
-Se você mexeu numa `@Entity`, o arquivo tem que refletir a mesma mudança — o
+Se você mexeu numa `@Entity`, o arquivo tem que refletir a mesma mudança. O
 Flyway não lê o código Java, e o Hibernate não cria nada.
 
 ### Duas regras
@@ -97,6 +97,49 @@ e não executa nada (`spring.flyway.baseline-on-migrate`).
 Ele é o único arquivo que não foi criado pelo `make migration`. Não mexa nele.
 
 `sql/legacy/` é o que era aplicado à mão antes disso. Só histórico, não roda.
+
+## Container Docker
+
+Isto **não** é o jeito de desenvolver, para isso use no `make run` (ou `make stage`), que
+tem hot reload e reinicia em segundos. O container serve para conferir o que vai
+para o servidor no deploy: a imagem constrói, sobe atrás do [Caddy](https://caddyserver.com)
+com HTTPS, e as variáveis chegam certas.
+
+```bash
+make docker-stage   # imagem rodando contra o banco de stage
+make docker-prod    # imagem rodando contra o banco de producao
+make docker-logs    # acompanha os logs 
+make docker-down    # derruba tudo.
+```
+
+O `docker-stage` lê os segredos do seu `.env.stage`
+O `docker-prod` do `.env.prod` 
+Em resumo, os mesmos arquivos que o `make stage` e o `make prod` já usam.
+
+Na sua máquina o domínio é `localhost`, então o Caddy assina com a CA local dele
+e você chega na API por `https://localhost`. Precisa de `curl -k`, porque o
+certificado não é de uma autoridade pública.
+
+A aplicação não publica porta no host: só o Caddy fala com ela. E a imagem não
+tem profile embutido sem `SPRING_PROFILES_ACTIVE` ela falha no boot, de
+propósito, para nunca subir apontando para o banco errado.
+
+Se faltar alguma variável, o compose recusa antes de subir e diz qual é.
+
+Horário do container é sempre UTC. Converter para o fuso local é trabalho de quem exibe o dado.
+
+### No servidor
+
+Lá não tem Makefile nem `.env.stage`: existe um `.env` no diretório do projeto,
+copiado do `.env.example` e preenchido, e o comando é
+
+```bash
+docker compose up -d
+```
+
+`API_DOMAIN` e `ADRA_CORS_ORIGENS` saem desse `.env`. Trocar de domínio depois é
+editar o arquivo e rodar o comando de novo. O Caddy emite o certificado novo
+sozinho.
 
 ## Testes
 
