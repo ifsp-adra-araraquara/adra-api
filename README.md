@@ -11,16 +11,18 @@ fora.
 
 ```bash
 make up      # Postgres e Auth locais
-make reset   # schema, seeds e identidades
-make run     # API em localhost:8080
+make reset   # derruba o schema adra
+make run     # API em localhost:8080; o Flyway recria o schema no boot
+make seed    # usuários fictícios e identidades
 ```
 
 Local não precisa de segredo, usa as chaves de demonstração da CLI. `make down`
 derruba.
 
-O `make reset` recria o schema, insere os usuários fictícios e cria a identidade
-de cada um no Auth local. Os e-mails e a senha são os mesmos do stage, para não
-ter que decorar dois conjuntos de credencial. Senha `mudar123`:
+Quem cria o schema é o Flyway, no boot — por isso o `make seed` vem depois do
+`make run`. Ele insere os usuários fictícios e cria a identidade de cada um no
+Auth local. Os e-mails e a senha são os mesmos do stage, para não ter que
+decorar dois conjuntos de credencial. Senha `mudar123`:
 
 | E-mail | Perfil |
 | --- | --- |
@@ -45,8 +47,56 @@ do arquivo, que é como CI e deploy injetam os valores.
 
 ## Banco
 
-O `sql/migrations` é aplicado à mão. O `sql/schema_adra.sql` é o schema
-consolidado, e é o que o `make reset` joga no banco local.
+Quem cria e atualiza o schema é o Flyway, sozinho, toda vez que a API sobe. Os
+arquivos ficam em `src/main/resources/db/migration`.
+
+### Mudei o banco, e agora?
+
+Criou tabela nova, adicionou coluna, criou índice: pede o arquivo pro make e
+escreve o SQL dentro dele.
+
+```bash
+make migration nome=criar_tabela_oficina
+```
+
+Ele cria o arquivo vazio e imprime o caminho:
+
+```
+src/main/resources/db/migration/V20260920143000__criar_tabela_oficina.sql
+```
+
+O número no nome é a data e a hora de agora. É só para duas pessoas em branches
+diferentes nunca escolherem o mesmo — por isso use o `make migration` em vez de
+criar o arquivo na mão.
+
+Dentro é SQL normal, com o schema na frente do nome da tabela:
+
+```sql
+ALTER TABLE adra.responsavel ADD COLUMN cpf varchar(20);
+```
+
+Salva e roda `make run`. O Flyway aplica. Da próxima vez ele não aplica de novo.
+
+Se você mexeu numa `@Entity`, o arquivo tem que refletir a mesma mudança — o
+Flyway não lê o código Java, e o Hibernate não cria nada.
+
+### Duas regras
+
+1. **Arquivo que já rodou não se edita.** Errou? Cria outro arquivo corrigindo.
+   O Flyway guarda um checksum de cada um e a API não sobe se algum mudar.
+2. **Não mexa no schema pelo Studio do Supabase.** O Flyway não fica sabendo, e
+   o banco de cada um começa a ficar diferente do outro.
+
+### O arquivo de baseline
+
+O `V20260920123202__baseline.sql` é um dump do stage tirado no dia em que o
+Flyway entrou. Banco novo (o seu local, o dos testes) constrói tudo a partir
+dele. Stage e produção já tinham o schema, então o Flyway só marca como aplicado
+e não executa nada (`spring.flyway.baseline-on-migrate`).
+
+Ele é o único arquivo que não foi criado pelo `make migration`. Não mexa nele.
+
+`sql/legacy/` é o que era aplicado à mão antes disso. Só histórico, não roda.
 
 ## Testes
 
