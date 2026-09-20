@@ -2,8 +2,7 @@ name: adra-deploy
 
 services:
   app:
-    image: ghcr.io/ifsp-adra-araraquara/adra-api:latest
-    build: .
+    image: ghcr.io/ifsp-adra-araraquara/adra-api:${IMAGE_TAG:-latest}
     restart: unless-stopped
     mem_limit: 1g
     environment:

@@ -141,6 +141,33 @@ docker compose up -d
 editar o arquivo e rodar o comando de novo. O Caddy emite o certificado novo
 sozinho.
 
+## Deploy
+
+Merge na `main` dispara o deploy sozinho. O GitHub Actions roda os testes,
+constrói a imagem, publica no GHCR e atualiza o droplet. Dá para acompanhar na
+aba Actions do repositório.
+
+Em pull request só os testes rodam. Nada toca produção antes do merge.
+
+Para subir de novo sem commitar nada, use o botão "Run workflow" na aba Actions.
+
+### Rollback
+
+Cada build publica duas tags: `latest` e `sha-<commit>`. O droplet guarda a tag
+ativa na variável `IMAGE_TAG` do `.env`. Para voltar a uma versão anterior:
+
+```bash
+ssh -i ~/.ssh/adra-ci adra@IP_DO_DROPLET "sha-COMMIT_ANTERIOR"
+```
+
+A chave de CI é amarrada ao script de deploy no `authorized_keys` do servidor,
+então esse comando não abre shell nenhum. Ele só troca a versão e sobe.
+
+### O que o servidor precisa ter
+
+`compose.yaml`, `Caddyfile`, um `.env` preenchido e o `scripts/deploy.sh` deste
+repositório copiado para `~/adra/deploy.sh`, com permissão de execução.
+
 ## Testes
 
 `make test` roda `./gradlew test`. Os testes sobem o próprio Postgres via

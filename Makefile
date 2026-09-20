@@ -5,6 +5,8 @@ SUPABASE ?= supabase
 DB_CONTAINER ?= supabase_db_adra-api
 PSQL = docker exec -i $(DB_CONTAINER) psql -U postgres -d postgres -v ON_ERROR_STOP=1
 
+IMAGE = ghcr.io/ifsp-adra-araraquara/adra-api
+
 DOCKER_VARS = API_DOMAIN=localhost \
 	ADRA_CORS_ORIGENS=http://localhost:4200 \
 	ADRA_FRONTEND_URL=http://localhost:4200
@@ -68,12 +70,14 @@ prod-direct:
 	./gradlew bootRun --args='--spring.profiles.active=prod'
 
 docker-stage:
+	docker build -t $(IMAGE):latest .
 	$(DOCKER_VARS) SPRING_PROFILES_ACTIVE=stage \
-		docker compose --env-file .env.stage up -d --build
+		docker compose --env-file .env.stage up -d
 
 docker-prod:
+	docker build -t $(IMAGE):latest .
 	$(DOCKER_VARS) SPRING_PROFILES_ACTIVE=prod \
-		docker compose --env-file .env.prod up -d --build
+		docker compose --env-file .env.prod up -d
 
 docker-down:
 	docker compose -p adra-deploy down
