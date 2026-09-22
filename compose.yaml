@@ -11,8 +11,6 @@ services:
       SUPABASE_SERVICE_KEY: "${SUPABASE_SERVICE_KEY:?defina SUPABASE_SERVICE_KEY}"
       ADRA_JWT_SEGREDO: "${ADRA_JWT_SEGREDO:?defina ADRA_JWT_SEGREDO}"
       BREVO_API_KEY: "${BREVO_API_KEY:?defina BREVO_API_KEY}"
-      ADRA_CORS_ORIGENS: "${ADRA_CORS_ORIGENS:?defina a origem liberada no CORS}"
-      ADRA_FRONTEND_URL: "${ADRA_FRONTEND_URL:?defina a URL do frontend}"
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:8080/actuator/health/liveness"]
       interval: 30s

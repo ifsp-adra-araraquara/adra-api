@@ -7,9 +7,7 @@ PSQL = docker exec -i $(DB_CONTAINER) psql -U postgres -d postgres -v ON_ERROR_S
 
 IMAGE = ghcr.io/ifsp-adra-araraquara/adra-api
 
-DOCKER_VARS = API_DOMAIN=localhost \
-	ADRA_CORS_ORIGENS=http://localhost:4200 \
-	ADRA_FRONTEND_URL=http://localhost:4200
+DOCKER_VARS = API_DOMAIN=localhost
 
 .PHONY: help up down reset seed migration run stage stage-direct prod prod-direct docker-stage docker-prod docker-down docker-logs test psql
 

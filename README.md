@@ -137,9 +137,11 @@ copiado do `.env.example` e preenchido, e o comando é
 docker compose up -d
 ```
 
-`API_DOMAIN` e `ADRA_CORS_ORIGENS` saem desse `.env`. Trocar de domínio depois é
-editar o arquivo e rodar o comando de novo. O Caddy emite o certificado novo
-sozinho.
+`API_DOMAIN` sai desse `.env`. Trocar de domínio depois é editar o arquivo e
+rodar o comando de novo. O Caddy emite o certificado novo sozinho.
+
+A URL do front e a origem liberada no CORS não são segredo e ficam no
+`application-prod.properties`. Mudou o front de lugar, muda lá e faz merge.
 
 ## Deploy
 
