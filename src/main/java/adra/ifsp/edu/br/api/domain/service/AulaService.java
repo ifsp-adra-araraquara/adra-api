@@ -153,9 +153,12 @@ public class AulaService {
      * trocar o dia, sem precisar saber turmaId de antemao.
      */
     public List<AulaComDetalhesResponseDTO> listarComDetalhesComFiltros(
-            Long turmaId, String nomeTurma, String titulo, LocalDate dataAula
+        Long turmaId, Long oficinaId, LocalDate dataInicio, LocalDate dataFim,
+        String nomeTurma, String titulo, LocalDate dataAula
     ) {
-        Specification<Aula> spec = AulaSpecification.comFiltros(turmaId, nomeTurma, titulo, dataAula);
+        Specification<Aula> spec = AulaSpecification.comFiltros(
+                turmaId, oficinaId, dataInicio, dataFim, nomeTurma, titulo, dataAula
+        );
 
         List<Aula> aulas = aulaRepository.findAll(spec);
         aulas.sort(

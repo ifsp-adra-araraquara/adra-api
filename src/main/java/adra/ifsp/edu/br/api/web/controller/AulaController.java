@@ -86,12 +86,15 @@ public class AulaController {
     @GetMapping("/com-detalhes")
     public ResponseEntity<List<AulaComDetalhesResponseDTO>> listarComDetalhes(
             @RequestParam(required = false) Long turmaId,
+            @RequestParam(required = false) Long oficinaId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dataInicio,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dataFim,
             @RequestParam(required = false) String nomeTurma,
             @RequestParam(required = false) String titulo,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dataAula
     ) {
         return ResponseEntity.ok(
-                aulaService.listarComDetalhesComFiltros(turmaId, nomeTurma, titulo, dataAula)
+                aulaService.listarComDetalhesComFiltros(turmaId, oficinaId, dataInicio, dataFim, nomeTurma, titulo, dataAula)
         );
     }
 
