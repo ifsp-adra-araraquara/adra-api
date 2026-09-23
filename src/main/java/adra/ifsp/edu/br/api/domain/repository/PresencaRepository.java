@@ -10,15 +10,11 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import java.util.List;
 import java.util.Optional;
 
-public interface PresencaRepository extends JpaRepository<Presenca, Long>, JpaSpecificationExecutor<Presenca> {
+public interface PresencaRepository extends JpaRepository<Presenca, Long> {
 
     List<Presenca> findByAula(Aula aula);
 
     List<Presenca> findByAssistido(Assistido assistido);
 
     Optional<Presenca> findByAulaAndAssistido(Aula aula, Assistido assistido);
-
-    List<Presenca> findByAulaAndStatusPresenca(Aula aula, StatusPresenca statusPresenca);
-
-    boolean existsByAulaAndAssistido(Aula aula, Assistido assistido);
 }

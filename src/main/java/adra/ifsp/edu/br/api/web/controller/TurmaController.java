@@ -1,11 +1,13 @@
 
 package adra.ifsp.edu.br.api.web.controller;
 
+import adra.ifsp.edu.br.api.domain.dto.assistido.AssistidoResponseDTO;
 import adra.ifsp.edu.br.api.domain.dto.turma.CriacaoTurmaDTO;
 import adra.ifsp.edu.br.api.domain.dto.turma.TurmaComAlunosResponseDTO;
 import adra.ifsp.edu.br.api.domain.dto.turma.TurmaRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.turma.TurmaResponseDTO;
 import adra.ifsp.edu.br.api.domain.dto.turma.TurmaStatusRequestDTO;
+import adra.ifsp.edu.br.api.domain.dto.turma.VincularAlunosTurmaDTO;
 import adra.ifsp.edu.br.api.domain.enums.Turno;
 import adra.ifsp.edu.br.api.domain.service.TurmaService;
 import jakarta.validation.Valid;
@@ -126,5 +128,22 @@ public class TurmaController {
             @PathVariable Long idOficina
     ) {
         return ResponseEntity.ok(turmaService.minhasTurmasPorOficina(idOficina));
+    }
+
+    // Botão "+" da tabela de turmas: vincula assistidos à turma (cria os
+    // vínculos em turma_aluno, que é o que o CA-65/chamada usa como roster).
+    @PreAuthorize("hasAnyRole('SOCIOPEDAGOGICO', 'COORDENADOR')")
+    @PostMapping("/{id}/alunos")
+    public ResponseEntity<List<AssistidoResponseDTO>> vincularAlunos(
+            @PathVariable Long id,
+            @Valid @RequestBody VincularAlunosTurmaDTO dto
+    ) {
+        return ResponseEntity.ok(turmaService.vincularAlunos(id, dto));
+    }
+
+    @PreAuthorize("hasAnyRole('OFICINEIRO', 'SOCIOPEDAGOGICO', 'COORDENADOR')")
+    @GetMapping("/{id}/alunos")
+    public ResponseEntity<List<AssistidoResponseDTO>> listarAlunosVinculados(@PathVariable Long id) {
+        return ResponseEntity.ok(turmaService.listarAlunosVinculados(id));
     }
 }

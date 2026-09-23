@@ -11,14 +11,17 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+// CA-65.5: só Coordenador e Sociopedagógico lançam/editam chamada — OFICINEIRO
+// saiu da lista (não é um perfil de usuário do sistema no MVP, ver decisão
+// já fechada no projeto: Oficineiro é campo de texto, não login).
 @RestController
 @RequestMapping("/api/chamadas")
 @RequiredArgsConstructor
+@PreAuthorize("hasAnyRole('COORDENADOR', 'SOCIOPEDAGOGICO')")
 public class ChamadaController {
 
     private final PresencaService presencaService;
 
-    @PreAuthorize("hasAnyRole('OFICINEIRO', 'SOCIOPEDAGOGICO', 'COORDENADOR')")
     @PostMapping
     public ResponseEntity<PresencaResponseDTO> registrarPresenca(
             @Valid @RequestBody PresencaRequestDTO presencaRequestDTO
@@ -26,7 +29,6 @@ public class ChamadaController {
         return ResponseEntity.ok(presencaService.registrarPresenca(presencaRequestDTO));
     }
 
-    @PreAuthorize("hasAnyRole('OFICINEIRO', 'SOCIOPEDAGOGICO', 'COORDENADOR')")
     @PostMapping("/aula/{idAula}")
     public ResponseEntity<List<PresencaResponseDTO>> registrarChamada(
             @PathVariable Long idAula,
@@ -35,19 +37,16 @@ public class ChamadaController {
         return ResponseEntity.ok(presencaService.registrarChamada(idAula, presencas));
     }
 
-    @PreAuthorize("hasAnyRole('OFICINEIRO', 'SOCIOPEDAGOGICO', 'COORDENADOR')")
     @GetMapping("/aula/{idAula}")
     public ResponseEntity<List<PresencaResponseDTO>> buscarPorAula(@PathVariable Long idAula) {
         return ResponseEntity.ok(presencaService.buscarPorAula(idAula));
     }
 
-    @PreAuthorize("hasAnyRole('OFICINEIRO', 'SOCIOPEDAGOGICO', 'COORDENADOR')")
     @GetMapping("/assistido/{idAssistido}")
     public ResponseEntity<List<PresencaResponseDTO>> buscarPorAssistido(@PathVariable Long idAssistido) {
         return ResponseEntity.ok(presencaService.buscarPorAssistido(idAssistido));
     }
 
-    @PreAuthorize("hasAnyRole('OFICINEIRO', 'SOCIOPEDAGOGICO', 'COORDENADOR')")
     @PutMapping("/{id}")
     public ResponseEntity<PresencaResponseDTO> atualizarPresenca(
             @PathVariable Long id,
@@ -56,7 +55,6 @@ public class ChamadaController {
         return ResponseEntity.ok(presencaService.atualizarPresenca(id, presencaRequestDTO));
     }
 
-    @PreAuthorize("hasAnyRole('OFICINEIRO', 'SOCIOPEDAGOGICO', 'COORDENADOR')")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deletarPresenca(@PathVariable Long id) {
         presencaService.deletarPresenca(id);

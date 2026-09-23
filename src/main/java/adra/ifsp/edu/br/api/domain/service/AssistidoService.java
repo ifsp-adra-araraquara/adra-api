@@ -47,6 +47,7 @@ public class AssistidoService {
     private final TurmaRepository turmaRepository;
     private final ResponsavelRepository responsavelRepository;
     private final AuditoriaService auditoriaService;
+    private final VinculoTurmaService vinculoTurmaService;
 
     public AssistidoResponseDTO cadastrar(AssistidoRequestDTO dto) {
         if (!dto.confirmarApesarDeDuplicidade()) {
@@ -74,6 +75,10 @@ public class AssistidoService {
         // CA-A02.4: Criar assistido e vínculos em transação atômica
         assistido = assistidoRepository.save(assistido);
         criarVinculosResponsaveis(assistido, dto.responsaveis());
+
+        // Mantém turma_aluno em dia — é o que o CA-65 (chamada) usa pra montar
+        // o roster de uma aula, não Assistido.turma diretamente.
+        vinculoTurmaService.vincular(assistido, turma);
 
         auditoriaService.registrar(
                 ModuloSistema.ASSISTIDOS,
@@ -138,8 +143,9 @@ public class AssistidoService {
 
         assistidoMapper.atualizarEntidade(assistido, dto);
 
+        Turma turma = null;
         if (dto.turmaId() != null) {
-            Turma turma = turmaRepository.findById(dto.turmaId())
+            turma = turmaRepository.findById(dto.turmaId())
                     .orElseThrow(() -> new EntidadeNaoEncontradaException("Turma nao encontrada: id " + dto.turmaId()));
             assistido.setTurma(turma);
         } else {
@@ -147,6 +153,7 @@ public class AssistidoService {
         }
 
         assistido = assistidoRepository.save(assistido);
+        vinculoTurmaService.vincular(assistido, turma);
 
         auditoriaService.registrar(
                 ModuloSistema.ASSISTIDOS,

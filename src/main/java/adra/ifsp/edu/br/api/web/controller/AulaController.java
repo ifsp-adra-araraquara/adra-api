@@ -42,7 +42,10 @@ public class AulaController {
         return ResponseEntity.ok(aulaService.cadastrarVariasAulas(criacaoAulas));
     }
 
-    @PreAuthorize("hasRole('COORDENADOR')")
+    // CA-65.3: quem faz a chamada (sociopedagógico) é quem marca a aula como
+    // REALIZADA nesse fluxo — precisa poder chamar esse PATCH pontual de
+    // status também, não só o coordenador.
+    @PreAuthorize("hasAnyRole('SOCIOPEDAGOGICO', 'COORDENADOR')")
     @PatchMapping("/{id}")
     public ResponseEntity<AulaResponseDTO> atualizarStatus(
             @PathVariable Long id,

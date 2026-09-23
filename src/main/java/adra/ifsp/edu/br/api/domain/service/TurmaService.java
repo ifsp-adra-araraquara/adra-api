@@ -1,20 +1,26 @@
 package adra.ifsp.edu.br.api.domain.service;
 
+import adra.ifsp.edu.br.api.domain.dto.assistido.AssistidoResponseDTO;
 import adra.ifsp.edu.br.api.domain.dto.turma.CriacaoTurmaDTO;
 import adra.ifsp.edu.br.api.domain.dto.turma.TurmaComAlunosResponseDTO;
 import adra.ifsp.edu.br.api.domain.dto.turma.TurmaRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.turma.TurmaResponseDTO;
 import adra.ifsp.edu.br.api.domain.dto.turma.TurmaStatusRequestDTO;
+import adra.ifsp.edu.br.api.domain.dto.turma.VincularAlunosTurmaDTO;
 import adra.ifsp.edu.br.api.domain.enums.AcaoSistema;
 import adra.ifsp.edu.br.api.domain.enums.ModuloSistema;
 import adra.ifsp.edu.br.api.domain.enums.StatusGeral;
 import adra.ifsp.edu.br.api.domain.enums.Turno;
+import adra.ifsp.edu.br.api.domain.mapper.AssistidoMapper;
 import adra.ifsp.edu.br.api.domain.mapper.TurmaMapper;
+import adra.ifsp.edu.br.api.domain.model.Assistido;
 import adra.ifsp.edu.br.api.domain.model.Turma;
 import adra.ifsp.edu.br.api.domain.repository.AssistidoRepository;
+import adra.ifsp.edu.br.api.domain.repository.TurmaAlunosRepository;
 import adra.ifsp.edu.br.api.domain.repository.TurmaRepository;
 import adra.ifsp.edu.br.api.domain.repository.TurmaSpecification;
 import adra.ifsp.edu.br.api.exception.EntidadeNaoEncontradaException;
+import adra.ifsp.edu.br.api.exception.RegraNegocioException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
@@ -34,6 +40,9 @@ public class TurmaService {
     private final TurmaMapper turmaMapper;
     private final AuditoriaService auditoriaService;
     private final AssistidoRepository assistidoRepository;
+    private final AssistidoMapper assistidoMapper;
+    private final TurmaAlunosRepository turmaAlunosRepository;
+    private final VinculoTurmaService vinculoTurmaService;
 
     /**
      * Igual a minhasTurmas, mas ja traz o nome da oficina e a quantidade de
@@ -188,6 +197,54 @@ public class TurmaService {
         );
 
         return turmaMapper.paraDTO(turma);
+    }
+
+    /**
+     * Botão "+" da tela de turmas: vincula um ou mais assistidos à turma.
+     * Fecha o vínculo ativo anterior de cada um (em qualquer turma) e abre um
+     * novo em turma_aluno — que é o que o CA-65 (chamada) usa pra montar o
+     * roster de uma aula — e mantém Assistido.turma em sincronia (outras
+     * telas/queries do sistema ainda leem esse ponteiro direto).
+     */
+    public List<AssistidoResponseDTO> vincularAlunos(Long turmaId, VincularAlunosTurmaDTO dto) {
+        Turma turma = buscarEntidadePorId(turmaId);
+
+        if (!turma.getAtivo()) {
+            throw new RegraNegocioException("Não é possível vincular assistidos a uma turma inativa.");
+        }
+
+        List<Assistido> assistidos = assistidoRepository.findAllById(dto.assistidoIds());
+        if (assistidos.size() != dto.assistidoIds().size()) {
+            throw new EntidadeNaoEncontradaException("Um ou mais assistidos informados não foram encontrados.");
+        }
+
+        for (Assistido assistido : assistidos) {
+            vinculoTurmaService.vincular(assistido, turma);
+            assistido.setTurma(turma);
+        }
+        assistidoRepository.saveAll(assistidos);
+
+        auditoriaService.registrar(
+                ModuloSistema.TURMAS,
+                "turma_aluno",
+                turmaId,
+                AcaoSistema.CRIAR,
+                null,
+                Map.of("assistidosVinculados", String.valueOf(assistidos.size())),
+                "Vínculo de assistidos à turma"
+        );
+
+        return assistidos.stream().map(assistidoMapper::paraDTO).collect(Collectors.toList());
+    }
+
+    /** Quem está vinculado ativamente à turma hoje (turma_aluno) — usado pra excluir do modal quem já está na turma. */
+    public List<AssistidoResponseDTO> listarAlunosVinculados(Long turmaId) {
+        Turma turma = buscarEntidadePorId(turmaId);
+
+        return turmaAlunosRepository.findByTurmaAndStatusAndDataSaidaIsNull(turma, StatusGeral.ATIVO)
+                .stream()
+                .map(vinculo -> assistidoMapper.paraDTO(vinculo.getAssistido()))
+                .collect(Collectors.toList());
     }
 
     Turma buscarEntidadePorId(Long id) {
