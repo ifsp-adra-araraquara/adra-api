@@ -1,6 +1,7 @@
 package adra.ifsp.edu.br.api.domain.service;
 
 import java.util.EnumSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -94,6 +95,19 @@ public class UsuarioService {
         Specification<Usuario> spec = UsuarioSpecification.comFiltros(busca, perfil, ativo);
         PageRequest pageRequest = PageRequest.of(pagina, tamanho, Sort.by("nomeCompleto").ascending());
         return PaginaDTO.de(usuarioRepository.findAll(spec, pageRequest).map(usuarioMapper::paraDTO));
+    }
+
+    /**
+     * Lista enxuta (sem paginação) dos oficineiros ativos, usada pra
+     * preencher selects no front (ex.: modal de criar turma).
+     */
+    @Transactional(readOnly = true)
+    public List<UsuarioResponseDTO> listarOficineiros() {
+        Specification<Usuario> spec = UsuarioSpecification.comFiltros(null, NomeNivelPermissao.OFICINEIRO, true);
+        return usuarioRepository.findAll(spec, Sort.by("nomeCompleto").ascending())
+                .stream()
+                .map(usuarioMapper::paraDTO)
+                .toList();
     }
 
     public UsuarioResponseDTO atualizar(Long id, UsuarioRequestDTO dto) {

@@ -1,13 +1,17 @@
 package adra.ifsp.edu.br.api.domain.service;
 
+import adra.ifsp.edu.br.api.domain.dto.turma.CriacaoTurmaDTO;
+import adra.ifsp.edu.br.api.domain.dto.turma.TurmaComAlunosResponseDTO;
 import adra.ifsp.edu.br.api.domain.dto.turma.TurmaRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.turma.TurmaResponseDTO;
 import adra.ifsp.edu.br.api.domain.dto.turma.TurmaStatusRequestDTO;
 import adra.ifsp.edu.br.api.domain.enums.AcaoSistema;
 import adra.ifsp.edu.br.api.domain.enums.ModuloSistema;
+import adra.ifsp.edu.br.api.domain.enums.StatusGeral;
 import adra.ifsp.edu.br.api.domain.enums.Turno;
 import adra.ifsp.edu.br.api.domain.mapper.TurmaMapper;
 import adra.ifsp.edu.br.api.domain.model.Turma;
+import adra.ifsp.edu.br.api.domain.repository.AssistidoRepository;
 import adra.ifsp.edu.br.api.domain.repository.TurmaRepository;
 import adra.ifsp.edu.br.api.domain.repository.TurmaSpecification;
 import adra.ifsp.edu.br.api.exception.EntidadeNaoEncontradaException;
@@ -16,6 +20,7 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.DayOfWeek;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -28,6 +33,39 @@ public class TurmaService {
     private final TurmaRepository turmaRepository;
     private final TurmaMapper turmaMapper;
     private final AuditoriaService auditoriaService;
+    private final AssistidoRepository assistidoRepository;
+
+    /**
+     * Igual a minhasTurmas, mas ja traz o nome da oficina e a quantidade de
+     * alunos ativos resolvidos — usado na aba "Minhas turmas" do oficineiro,
+     * que precisa mostrar isso direto na tabela sem chamada extra por turma.
+     */
+    public List<TurmaComAlunosResponseDTO> minhasTurmas(Long idOficineiros){
+        List<Turma> minhasTurmas = turmaRepository.findByOficineiroResponsavelUsuarioId(idOficineiros);
+
+        if(minhasTurmas == null){
+            return null;
+        }
+
+        return minhasTurmas.stream()
+                .map(turma -> TurmaComAlunosResponseDTO.fromEntity(
+                        turma,
+                        assistidoRepository.countByTurma_TurmaIdAndStatus(turma.getTurmaId(), StatusGeral.ATIVO)
+                ))
+                .collect(Collectors.toList());
+    }
+
+    public List<TurmaResponseDTO> minhasTurmasPorOficina(Long idOficina){
+        List<Turma> minhasTurmas = turmaRepository.findByOficinaOficinaId(idOficina);
+
+        if(minhasTurmas == null){
+            return null;
+        }
+
+        return minhasTurmas.stream()
+                .map(turmaMapper::paraDTO)
+                .collect(Collectors.toList());
+    }
 
     public TurmaResponseDTO cadastrar(TurmaRequestDTO dto) {
         Turma turma = turmaMapper.paraNovaEntidade(dto);
@@ -50,20 +88,56 @@ public class TurmaService {
         return turmaMapper.paraDTO(turma);
     }
 
+    public TurmaResponseDTO cadastrarComHorario(CriacaoTurmaDTO dto) {
+        for (DayOfWeek dia : dto.getDiasDaSemana()) {
+            if (turmaRepository.existsConflitoHorarioOficineiro(
+                    dto.getOficineiroResponsavelId(),
+                    dia,
+                    dto.getHorarioInicio(),
+                    dto.getHorarioFim())) {
+                throw new IllegalStateException(
+                        "Conflito de horário: O oficineiro já possui uma turma ativa " +
+                        "no dia " + dia.name() + " no horário solicitado."
+                );
+            }
+        }
+
+        Turma turma = turmaMapper.paraNovaEntidadeComHorario(dto);
+        turma = turmaRepository.save(turma);
+
+        auditoriaService.registrar(
+                ModuloSistema.TURMAS,
+                "turma",
+                turma.getTurmaId(),
+                AcaoSistema.CRIAR,
+                null,
+                Map.of(
+                        "nomeTurma", turma.getNomeTurma(),
+                        "turno", turma.getTurno().name(),
+                        "diasDaSemana", turma.getDiasDaSemana().toString(),
+                        "horarioInicio", turma.getHorarioInicio().toString(),
+                        "horarioFim", turma.getHorarioFim().toString()
+                ),
+                "Cadastro de turma com horário"
+        );
+
+        return turmaMapper.paraDTO(turma);
+    }
+
     public TurmaResponseDTO buscarPorId(Long id) {
         return turmaMapper.paraDTO(buscarEntidadePorId(id));
     }
 
     public List<TurmaResponseDTO> listarTodas() {
         return turmaRepository.findAll().stream()
-                .map(TurmaMapper::paraDTO)
+                .map(turmaMapper::paraDTO)
                 .collect(Collectors.toList());
     }
 
     public List<TurmaResponseDTO> listarComFiltros(String nome, Turno turno, Boolean ativo) {
         Specification<Turma> spec = TurmaSpecification.comFiltros(nome, turno, ativo);
         return turmaRepository.findAll(spec).stream()
-                .map(TurmaMapper::paraDTO)
+                .map(turmaMapper::paraDTO)
                 .collect(Collectors.toList());
     }
 

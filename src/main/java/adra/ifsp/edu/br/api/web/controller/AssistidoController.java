@@ -39,7 +39,7 @@ public class AssistidoController {
         return ResponseEntity.created(URI.create("/api/assistidos/" + criado.assistidoId())).body(criado);
     }
 
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'COORDENADOR', 'SOCIOPEDAGOGICO')")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'COORDENADOR', 'SOCIOPEDAGOGICO', 'OFICINEIRO')")
     @GetMapping
     public ResponseEntity<PaginaDTO<AssistidoResponseDTO>> listar(
             @RequestParam(required = false) String busca,

@@ -4,6 +4,8 @@ import adra.ifsp.edu.br.api.domain.model.Oficina;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
+import java.util.List;
+
 public interface OficinaRepository extends JpaRepository<Oficina, Long>, JpaSpecificationExecutor<Oficina> {
 
     /**
@@ -12,4 +14,7 @@ public interface OficinaRepository extends JpaRepository<Oficina, Long>, JpaSpec
      * componente decide se mostra o aviso, sem impedir o submit.
      */
     boolean existsByNomeOficinaIgnoreCase(String nomeOficina);
+
+    List<Oficina> findByOficineiroResponsavelUsuarioId(Long idResponsavel);
+
 }

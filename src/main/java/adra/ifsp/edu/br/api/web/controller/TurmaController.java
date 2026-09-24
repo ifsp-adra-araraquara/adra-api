@@ -1,6 +1,8 @@
 
 package adra.ifsp.edu.br.api.web.controller;
 
+import adra.ifsp.edu.br.api.domain.dto.turma.CriacaoTurmaDTO;
+import adra.ifsp.edu.br.api.domain.dto.turma.TurmaComAlunosResponseDTO;
 import adra.ifsp.edu.br.api.domain.dto.turma.TurmaRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.turma.TurmaResponseDTO;
 import adra.ifsp.edu.br.api.domain.dto.turma.TurmaStatusRequestDTO;
@@ -76,6 +78,15 @@ public class TurmaController {
     }
 
     @PreAuthorize("hasAnyRole('SOCIOPEDAGOGICO', 'COORDENADOR')")
+    @PostMapping("/com-horario")
+    public ResponseEntity<TurmaResponseDTO> cadastrarComHorario(
+            @Valid @RequestBody CriacaoTurmaDTO criacaoTurmaDTO
+    ) {
+        TurmaResponseDTO turmaCriada = turmaService.cadastrarComHorario(criacaoTurmaDTO);
+        return ResponseEntity.ok(turmaCriada);
+    }
+
+    @PreAuthorize("hasAnyRole('SOCIOPEDAGOGICO', 'COORDENADOR')")
     @GetMapping("/{id}")
     public ResponseEntity<TurmaResponseDTO> buscarPorId(
             @PathVariable Long id
@@ -99,5 +110,21 @@ public class TurmaController {
             @Valid @RequestBody TurmaStatusRequestDTO statusRequestDTO
     ) {
         return ResponseEntity.ok(turmaService.alterarStatus(id, statusRequestDTO));
+    }
+
+    @PreAuthorize("hasAnyRole('OFICINEIRO', 'SOCIOPEDAGOGICO', 'COORDENADOR')")
+    @GetMapping("/minhas-turmas/{idOficineiro}")
+    public ResponseEntity<List<TurmaComAlunosResponseDTO>> minhasTurmas(
+            @PathVariable Long idOficineiro
+    ) {
+        return ResponseEntity.ok(turmaService.minhasTurmas(idOficineiro));
+    }
+
+    @PreAuthorize("hasAnyRole('OFICINEIRO', 'SOCIOPEDAGOGICO', 'COORDENADOR')")
+    @GetMapping("/oficina/{idOficina}")
+    public ResponseEntity<List<TurmaResponseDTO>> minhasTurmasPorOficina(
+            @PathVariable Long idOficina
+    ) {
+        return ResponseEntity.ok(turmaService.minhasTurmasPorOficina(idOficina));
     }
 }

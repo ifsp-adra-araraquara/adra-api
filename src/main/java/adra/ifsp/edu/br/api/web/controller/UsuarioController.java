@@ -1,6 +1,7 @@
 package adra.ifsp.edu.br.api.web.controller;
 
 import java.net.URI;
+import java.util.List;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -56,6 +57,18 @@ public class UsuarioController {
             @RequestParam(defaultValue = "0") int pagina,
             @RequestParam(defaultValue = "20") int tamanho) {
         return ResponseEntity.ok(usuarioService.listar(busca, perfil, ativo, pagina, tamanho));
+    }
+
+    /**
+     * Lista enxuta (sem paginação) dos oficineiros ativos, para preencher
+     * selects no front (ex.: escolher o oficineiro responsável ao criar uma
+     * turma). Só Coordenador usa isso hoje - Sociopedagógico não tem acesso
+     * a nenhuma rota de /api/usuarios.
+     */
+    @PreAuthorize("hasRole('COORDENADOR')")
+    @GetMapping("/oficineiros")
+    public ResponseEntity<List<UsuarioResponseDTO>> listarOficineiros() {
+        return ResponseEntity.ok(usuarioService.listarOficineiros());
     }
 
     @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'COORDENADOR')")

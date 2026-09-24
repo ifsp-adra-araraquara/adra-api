@@ -7,6 +7,12 @@ import jakarta.validation.constraints.*;
 
 public record TurmaRequestDTO(
 
+        @NotNull(message = "Informe a oficina.")
+        Long oficinaId,
+
+        @NotNull(message = "Informe o oficineiro responsável.")
+        Long oficineiroResponsavelId,
+
         @NotBlank(message = "Informe o nome da turma.")
         @Size(max = 100, message = "O nome da turma deve ter no máximo 100 caracteres.")
         String nomeTurma,

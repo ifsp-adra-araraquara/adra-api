@@ -14,6 +14,7 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -27,6 +28,18 @@ public class OficinaService {
     private final OficinaMapper oficinaMapper;
     private final AuditoriaService auditoriaService;
 
+    public List<OficinaResponseDTO> minhasOficinas(Long idOficineiro) {
+        List<Oficina> oficinas = oficinaRepository.findByOficineiroResponsavelUsuarioId(idOficineiro);
+
+        if(oficinas == null){
+            return null;
+        }
+
+        return oficinas.stream()
+                .map(oficinaMapper::paraDTO)
+                .collect(Collectors.toList());
+    }
+
     public OficinaResponseDTO cadastrar(OficinaRequestDTO dto) {
         Oficina oficina = oficinaMapper.paraNovaEntidade(dto);
         oficina = oficinaRepository.save(oficina);
@@ -39,7 +52,7 @@ public class OficinaService {
                 null,
                 Map.of(
                         "nomeOficina", oficina.getNomeOficina(),
-                        "oficineiroResponsavel", oficina.getOficineiroResponsavel(),
+                        "oficineiroResponsavelId", oficina.getOficineiroResponsavel() != null ? oficina.getOficineiroResponsavel().getUsuarioId().toString() : null,
                         "ativo", oficina.getAtivo().toString()),
                 "Cadastro de oficina");
 
@@ -53,7 +66,7 @@ public class OficinaService {
     public List<OficinaResponseDTO> listarComFiltros(String nome, Boolean ativo) {
         Specification<Oficina> spec = OficinaSpecification.comFiltros(nome, ativo);
         return oficinaRepository.findAll(spec).stream()
-                .map(OficinaMapper::paraDTO)
+                .map(oficinaMapper::paraDTO)
                 .collect(Collectors.toList());
     }
 
@@ -78,16 +91,27 @@ public class OficinaService {
 
         Oficina oficina = buscarEntidadePorId(id);
 
-        // Guardar valores anteriores para auditoria
-        Map<String, Object> valorAnterior = Map.of(
-                "nomeOficina", oficina.getNomeOficina(),
-                "oficineiroResponsavel", oficina.getOficineiroResponsavel());
+        // Guardar valores anteriores para auditoria.
+        // Usa HashMap (não Map.of) porque oficineiroResponsavelId pode ser
+        // null em oficinas antigas (cadastradas antes desse campo virar
+        // obrigatório no front) - Map.of lança NullPointerException em
+        // qualquer valor null, mesmo que a chave exista.
+        Map<String, Object> valorAnterior = new HashMap<>();
+        valorAnterior.put("nomeOficina", oficina.getNomeOficina());
+        valorAnterior.put(
+                "oficineiroResponsavelId",
+                oficina.getOficineiroResponsavel() != null ? oficina.getOficineiroResponsavel().getUsuarioId() : null);
 
-        // Atualizar
-        oficina.setNomeOficina(dto.nomeOficina());
-        oficina.setOficineiroResponsavel(dto.oficineiroResponsavel());
+        // Atualizar usando o mapper
+        oficinaMapper.atualizarEntidade(oficina, dto);
 
         oficina = oficinaRepository.save(oficina);
+
+        Map<String, Object> valorNovo = new HashMap<>();
+        valorNovo.put("nomeOficina", oficina.getNomeOficina());
+        valorNovo.put(
+                "oficineiroResponsavelId",
+                oficina.getOficineiroResponsavel() != null ? oficina.getOficineiroResponsavel().getUsuarioId() : null);
 
         // Auditar
         auditoriaService.registrar(
@@ -96,9 +120,7 @@ public class OficinaService {
                 oficina.getOficinaId(),
                 AcaoSistema.EDITAR,
                 valorAnterior,
-                Map.of(
-                        "nomeOficina", oficina.getNomeOficina(),
-                        "oficineiroResponsavel", oficina.getOficineiroResponsavel()),
+                valorNovo,
                 "Edição de oficina");
 
         return oficinaMapper.paraDTO(oficina);
