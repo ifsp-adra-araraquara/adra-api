@@ -19,6 +19,7 @@ import adra.ifsp.edu.br.api.domain.dto.PaginaDTO;
 import adra.ifsp.edu.br.api.domain.dto.assistido.AssistidoRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.assistido.AssistidoResponseDTO;
 import adra.ifsp.edu.br.api.domain.dto.assistido.AssistidoStatusRequestDTO;
+import adra.ifsp.edu.br.api.domain.dto.turma.VinculoTurmaAssistidoResponseDTO;
 import adra.ifsp.edu.br.api.domain.enums.StatusGeral;
 import adra.ifsp.edu.br.api.domain.service.AssistidoService;
 import jakarta.validation.Valid;
@@ -87,5 +88,12 @@ public class AssistidoController {
     public ResponseEntity<AssistidoResponseDTO> alterarStatus(@PathVariable Long id,
                                                                 @Valid @RequestBody AssistidoStatusRequestDTO dto) {
         return ResponseEntity.ok(assistidoService.alterarStatus(id, dto));
+    }
+
+    /** Aba "Turmas" do modal do assistido — histórico de vínculos (turma_aluno), só pro coordenador. */
+    @PreAuthorize("hasRole('COORDENADOR')")
+    @GetMapping("/{id}/turmas")
+    public ResponseEntity<List<VinculoTurmaAssistidoResponseDTO>> listarHistoricoTurmas(@PathVariable Long id) {
+        return ResponseEntity.ok(assistidoService.listarHistoricoTurmas(id));
     }
 }

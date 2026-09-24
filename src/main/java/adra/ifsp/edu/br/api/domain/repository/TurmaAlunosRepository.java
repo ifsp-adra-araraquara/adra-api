@@ -16,6 +16,9 @@ public interface TurmaAlunosRepository extends JpaRepository<TurmaAlunos, Long> 
     /** Vínculo(s) atualmente aberto(s) do assistido (dataSaida null), em qualquer turma. */
     List<TurmaAlunos> findByAssistidoAndStatusAndDataSaidaIsNull(Assistido assistido, StatusGeral status);
 
+    /** Histórico completo de vínculos do assistido (turmas atuais e passadas) — aba "Turmas" no modal do assistido. */
+    List<TurmaAlunos> findByAssistidoOrderByDataEntradaDesc(Assistido assistido);
+
     /** Quem está vinculado ativamente à turma HOJE — usado no "+ Vincular alunos" da tela de turmas. */
     List<TurmaAlunos> findByTurmaAndStatusAndDataSaidaIsNull(Turma turma, StatusGeral status);
 

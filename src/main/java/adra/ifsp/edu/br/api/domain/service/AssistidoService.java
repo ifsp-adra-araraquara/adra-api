@@ -5,6 +5,7 @@ import adra.ifsp.edu.br.api.domain.dto.assistido.AssistidoRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.assistido.AssistidoResponseDTO;
 import adra.ifsp.edu.br.api.domain.dto.assistido.AssistidoStatusRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.responsavel.ResponsavelRequestDTO;
+import adra.ifsp.edu.br.api.domain.dto.turma.VinculoTurmaAssistidoResponseDTO;
 import adra.ifsp.edu.br.api.domain.dto.vinculo.VinculoFamiliarComResponsavelRequestDTO;
 import adra.ifsp.edu.br.api.domain.enums.AcaoSistema;
 import adra.ifsp.edu.br.api.domain.enums.ModuloSistema;
@@ -18,6 +19,7 @@ import adra.ifsp.edu.br.api.domain.model.Turma;
 import adra.ifsp.edu.br.api.domain.repository.AssistidoRepository;
 import adra.ifsp.edu.br.api.domain.repository.AssistidoSpecification;
 import adra.ifsp.edu.br.api.domain.repository.ResponsavelRepository;
+import adra.ifsp.edu.br.api.domain.repository.TurmaAlunosRepository;
 import adra.ifsp.edu.br.api.domain.repository.TurmaRepository;
 import adra.ifsp.edu.br.api.exception.DuplicidadeProvavelException;
 import adra.ifsp.edu.br.api.exception.EntidadeNaoEncontradaException;
@@ -48,6 +50,7 @@ public class AssistidoService {
     private final ResponsavelRepository responsavelRepository;
     private final AuditoriaService auditoriaService;
     private final VinculoTurmaService vinculoTurmaService;
+    private final TurmaAlunosRepository turmaAlunosRepository;
 
     public AssistidoResponseDTO cadastrar(AssistidoRequestDTO dto) {
         if (!dto.confirmarApesarDeDuplicidade()) {
@@ -189,6 +192,18 @@ public class AssistidoService {
         );
 
         return assistidoMapper.paraDTO(assistido);
+    }
+
+    /**
+     * Histórico de turmas do assistido (turma_aluno) — aba "Turmas" do modal
+     * do assistido, só pro coordenador (ver AssistidoController).
+     */
+    @Transactional(readOnly = true)
+    public List<VinculoTurmaAssistidoResponseDTO> listarHistoricoTurmas(Long id) {
+        Assistido assistido = buscarEntidadePorId(id);
+        return turmaAlunosRepository.findByAssistidoOrderByDataEntradaDesc(assistido).stream()
+                .map(VinculoTurmaAssistidoResponseDTO::fromEntity)
+                .collect(Collectors.toList());
     }
 
     Assistido buscarEntidadePorId(Long id) {
