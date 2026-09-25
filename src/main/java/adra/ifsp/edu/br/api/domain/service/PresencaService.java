@@ -5,7 +5,6 @@ import adra.ifsp.edu.br.api.domain.dto.presenca.PresencaResponseDTO;
 import adra.ifsp.edu.br.api.domain.enums.AcaoSistema;
 import adra.ifsp.edu.br.api.domain.enums.ModuloSistema;
 import adra.ifsp.edu.br.api.domain.enums.StatusAula;
-import adra.ifsp.edu.br.api.domain.enums.StatusGeral;
 import adra.ifsp.edu.br.api.domain.enums.StatusPresenca;
 import adra.ifsp.edu.br.api.domain.mapper.PresencaMapper;
 import adra.ifsp.edu.br.api.domain.model.Assistido;
@@ -75,10 +74,11 @@ public class PresencaService {
         Map<Long, Presenca> existentesPorAssistidoId = presencaRepository.findByAula(aula).stream()
                 .collect(Collectors.toMap(p -> p.getAssistido().getAssistidoId(), p -> p));
 
-        // CA-65.1: só dá pra lançar presença de quem estava vinculado à turma
-        // da aula na data dela (turma_aluno é a fonte de verdade do roster).
+        // CA-65.1 + CA-70.1/70.3: só dá pra lançar presença de quem estava
+        // vinculado à turma na data da aula E não estava desligado antes/na
+        // data dela (findElegiveisParaChamada já cruza os dois critérios).
         Set<Long> assistidosDaTurma = turmaAlunosRepository
-                .findVinculosAtivosNaData(aula.getTurma(), StatusGeral.ATIVO, aula.getDataAula())
+                .findElegiveisParaChamada(aula.getTurma(), aula.getDataAula())
                 .stream()
                 .map(v -> v.getAssistido().getAssistidoId())
                 .collect(Collectors.toSet());
@@ -152,7 +152,9 @@ public class PresencaService {
                 .map(assistidoId -> {
                     PresencaRequestDTO dto = dtoPorAssistidoId.get(assistidoId);
                     if (dto.statusPresenca() == StatusPresenca.PRESENTE) {
-                        return PresencaResponseDTO.presente(idAula, assistidoId);
+                        return PresencaResponseDTO.presente(
+                                idAula, assistidoId, assistidosPorId.get(assistidoId).getNomeCompleto()
+                        );
                     }
                     return presencaMapper.paraDTO(salvasPorAssistidoId.get(assistidoId));
                 })
@@ -168,13 +170,15 @@ public class PresencaService {
 
         validarAulaRealizada(aula); // CA-65.3
 
-        // CA-65.1
+        // CA-65.1 + CA-70.1/70.3
         boolean pertenceATurma = turmaAlunosRepository
-                .findVinculosAtivosNaData(aula.getTurma(), StatusGeral.ATIVO, aula.getDataAula())
+                .findElegiveisParaChamada(aula.getTurma(), aula.getDataAula())
                 .stream()
                 .anyMatch(v -> v.getAssistido().getAssistidoId().equals(assistido.getAssistidoId()));
         if (!pertenceATurma) {
-            throw new RegraNegocioException("Assistido não está vinculado à turma desta aula.");
+            throw new RegraNegocioException(
+                    "Assistido não está vinculado à turma desta aula, ou já estava desligado na data."
+            );
         }
 
         Optional<Presenca> existente = presencaRepository.findByAulaAndAssistido(aula, assistido);
@@ -187,7 +191,7 @@ public class PresencaService {
                             "statusPresenca", "PRESENTE"),
                     "Registro de presença (sem linha — presente)"
             );
-            return PresencaResponseDTO.presente(aula.getAulaId(), assistido.getAssistidoId());
+            return PresencaResponseDTO.presente(aula.getAulaId(), assistido.getAssistidoId(), assistido.getNomeCompleto());
         }
 
         Usuario usuarioLogado = usuarioAutenticadoService.getUsuarioAtual();
@@ -232,8 +236,8 @@ public class PresencaService {
         Aula aula = aulaRepository.findById(idAula)
                 .orElseThrow(() -> new EntidadeNaoEncontradaException("Aula não encontrada: id " + idAula));
 
-        List<TurmaAlunos> vinculosAtivos = turmaAlunosRepository.findVinculosAtivosNaData(
-                aula.getTurma(), StatusGeral.ATIVO, aula.getDataAula());
+        List<TurmaAlunos> vinculosAtivos = turmaAlunosRepository.findElegiveisParaChamada(
+                aula.getTurma(), aula.getDataAula());
 
         List<Presenca> faltas = presencaRepository.findByAula(aula);
 
@@ -259,9 +263,25 @@ public class PresencaService {
         Presenca presenca = buscarEntidadePorId(id);
         validarAulaRealizada(presenca.getAula()); // CA-65.3 vale pra edição também
 
+        // CA-70.3: "corrigir" chamada de quem já estava desligado na data da
+        // aula também é rejeitado (não só o lançamento novo via POST). Aulas
+        // anteriores à saída continuam elegíveis, então isso não trava
+        // correção de histórico (CA-70.2).
+        Long assistidoIdDaPresenca = presenca.getAssistido().getAssistidoId();
+        boolean elegivel = turmaAlunosRepository
+                .findElegiveisParaChamada(presenca.getAula().getTurma(), presenca.getAula().getDataAula())
+                .stream()
+                .anyMatch(v -> v.getAssistido().getAssistidoId().equals(assistidoIdDaPresenca));
+        if (!elegivel) {
+            throw new RegraNegocioException(
+                    "Assistido não está vinculado à turma desta aula, ou já estava desligado na data."
+            );
+        }
+
         if (dto.statusPresenca() == StatusPresenca.PRESENTE) {
             Long aulaId = presenca.getAula().getAulaId();
             Long assistidoId = presenca.getAssistido().getAssistidoId();
+            String nomeCompleto = presenca.getAssistido().getNomeCompleto();
 
             presencaRepository.delete(presenca);
 
@@ -272,7 +292,7 @@ public class PresencaService {
                     "Atualização de presença (virou presente — linha removida)"
             );
 
-            return PresencaResponseDTO.presente(aulaId, assistidoId);
+            return PresencaResponseDTO.presente(aulaId, assistidoId, nomeCompleto);
         }
 
         Map<String, Object> valorAnterior = Map.of("statusPresenca", presenca.getStatusPresenca().name());

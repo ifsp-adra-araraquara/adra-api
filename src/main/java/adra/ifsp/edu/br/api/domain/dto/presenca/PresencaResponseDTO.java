@@ -11,6 +11,10 @@ public record PresencaResponseDTO(
         Long presencaId,
         Long aulaId,
         Long assistidoId,
+        // CA-66.1: front monta a lista de alunos da chamada só com este DTO
+        // (GET /api/chamadas/aula/{id}), sem precisar de um segundo request a
+        // /api/assistidos — evita ter duas fontes de roster desalinhadas.
+        String nomeCompleto,
         StatusPresenca statusPresenca,
         MotivoFalta motivoFalta,
         String observacao,
@@ -29,8 +33,10 @@ public record PresencaResponseDTO(
      * falta pra esse (aula, assistido). presencaId/criadoEm/atualizadoEm ficam null
      * de propósito, pra deixar claro pro consumidor que isso é inferido, não persistido.
      */
-    public static PresencaResponseDTO presente(Long aulaId, Long assistidoId) {
-        return new PresencaResponseDTO(null, aulaId, assistidoId, StatusPresenca.PRESENTE, null, null, null, null);
+    public static PresencaResponseDTO presente(Long aulaId, Long assistidoId, String nomeCompleto) {
+        return new PresencaResponseDTO(
+                null, aulaId, assistidoId, nomeCompleto, StatusPresenca.PRESENTE, null, null, null, null
+        );
     }
 
     public static PresencaResponseDTO fromEntity(Presenca presenca, FaltaJustificada faltaJustificada) {
@@ -38,6 +44,7 @@ public record PresencaResponseDTO(
                 presenca.getPresencaId(),
                 presenca.getAula() != null ? presenca.getAula().getAulaId() : null,
                 presenca.getAssistido() != null ? presenca.getAssistido().getAssistidoId() : null,
+                presenca.getAssistido() != null ? presenca.getAssistido().getNomeCompleto() : null,
                 presenca.getStatusPresenca(),
                 faltaJustificada != null ? faltaJustificada.getMotivoFalta() : null,
                 faltaJustificada != null ? faltaJustificada.getObservacao() : null,

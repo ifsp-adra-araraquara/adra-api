@@ -129,7 +129,7 @@ public class PresencaMapper {
                 .map(assistido -> {
                     Presenca falta = faltaPorAssistidoId.get(assistido.getAssistidoId());
                     if (falta == null) {
-                        return PresencaResponseDTO.presente(idAula, assistido.getAssistidoId());
+                        return PresencaResponseDTO.presente(idAula, assistido.getAssistidoId(), assistido.getNomeCompleto());
                     }
                     return PresencaResponseDTO.fromEntity(falta, faltaJustificadaPorPresencaId.get(falta.getPresencaId()));
                 })

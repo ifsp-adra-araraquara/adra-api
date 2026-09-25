@@ -42,4 +42,18 @@ public interface TurmaAlunosRepository extends JpaRepository<TurmaAlunos, Long> 
             @Param("turma") Turma turma,
             @Param("status") StatusGeral status,
             @Param("data") LocalDate data);
+
+    /**
+     * CA-70.1/CA-70.2: roster real de "quem pode ter chamada lançada" numa
+     * aula — vínculo ativo na data (regra acima) E assistido não desligado
+     * antes/na data da aula (AssistidoSpecification.elegivelParaChamada).
+     * Filtra em Java de propósito: é uma regra de Assistido, não de
+     * TurmaAlunos, e não vale a pena reescrever/duplicar a JPQL acima só
+     * pra isso (turma pequena, filtro em memória é irrelevante em custo).
+     */
+    default List<TurmaAlunos> findElegiveisParaChamada(Turma turma, LocalDate data) {
+        return findVinculosAtivosNaData(turma, StatusGeral.ATIVO, data).stream()
+                .filter(vinculo -> AssistidoSpecification.elegivelParaChamada(vinculo.getAssistido(), data))
+                .toList();
+    }
 }
