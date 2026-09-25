@@ -42,5 +42,12 @@ dependencies {
 }
 
 tasks.named('test') {
-	useJUnitPlatform()
+	// Testes marcados @Tag("stage") batem no Postgres real do time (precisam
+	// de .env.stage + rede) — nunca rodam num "./gradlew test" comum, só
+	// explicitamente via "-PstageTests" (ex.: ./gradlew test -PstageTests --tests "*StageIT").
+	useJUnitPlatform {
+		if (!project.hasProperty('stageTests')) {
+			excludeTags 'stage'
+		}
+	}
 }
