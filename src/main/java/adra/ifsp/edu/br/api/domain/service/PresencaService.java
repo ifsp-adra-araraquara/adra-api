@@ -4,6 +4,7 @@ import adra.ifsp.edu.br.api.domain.dto.presenca.PresencaRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.presenca.PresencaResponseDTO;
 import adra.ifsp.edu.br.api.domain.enums.AcaoSistema;
 import adra.ifsp.edu.br.api.domain.enums.ModuloSistema;
+import adra.ifsp.edu.br.api.domain.enums.NomeNivelPermissao;
 import adra.ifsp.edu.br.api.domain.enums.StatusAula;
 import adra.ifsp.edu.br.api.domain.enums.StatusPresenca;
 import adra.ifsp.edu.br.api.domain.mapper.PresencaMapper;
@@ -16,12 +17,14 @@ import adra.ifsp.edu.br.api.domain.repository.AssistidoRepository;
 import adra.ifsp.edu.br.api.domain.repository.AulaRepository;
 import adra.ifsp.edu.br.api.domain.repository.PresencaRepository;
 import adra.ifsp.edu.br.api.domain.repository.TurmaAlunosRepository;
+import adra.ifsp.edu.br.api.exception.AcessoNegadoException;
 import adra.ifsp.edu.br.api.exception.EntidadeNaoEncontradaException;
 import adra.ifsp.edu.br.api.exception.RegraNegocioException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -261,6 +264,9 @@ public class PresencaService {
     /** No modelo esparso, "atualizar pra PRESENTE" apaga a linha em vez de guardar um status. */
     public PresencaResponseDTO atualizarPresenca(Long id, PresencaRequestDTO dto) {
         Presenca presenca = buscarEntidadePorId(id);
+        Usuario usuarioLogado = usuarioAutenticadoService.getUsuarioAtual();
+
+        validarPermissaoCorrecaoPorData(presenca.getAula(), usuarioLogado); // US-67
         validarAulaRealizada(presenca.getAula()); // CA-65.3 vale pra edição também
 
         // CA-70.3: "corrigir" chamada de quem já estava desligado na data da
@@ -298,7 +304,7 @@ public class PresencaService {
         Map<String, Object> valorAnterior = Map.of("statusPresenca", presenca.getStatusPresenca().name());
 
         presencaMapper.atualizarEntidade(presenca, dto);
-        presenca.setAtualizadoPor(usuarioAutenticadoService.getUsuarioAtual());
+        presenca.setAtualizadoPor(usuarioLogado);
         presenca = presencaRepository.save(presenca);
         presencaMapper.sincronizarFaltaJustificada(presenca, dto);
 
@@ -332,6 +338,24 @@ public class PresencaService {
                 null,
                 "Exclusão de presença"
         );
+    }
+
+    /**
+     * US-67: Coordenador corrige chamada de qualquer data; Sociopedagógico só
+     * pode corrigir a chamada do dia atual — evita abrir brecha de alteração
+     * indevida de histórico por quem lança a chamada no dia a dia.
+     */
+    private void validarPermissaoCorrecaoPorData(Aula aula, Usuario usuarioLogado) {
+        NomeNivelPermissao perfil = usuarioLogado.getNivelPermissao().getNome();
+        boolean ehSociopedagogicoForaDoDia =
+                perfil == NomeNivelPermissao.SOCIOPEDAGOGICO && !aula.getDataAula().isEqual(LocalDate.now());
+
+        if (ehSociopedagogicoForaDoDia) {
+            throw new AcessoNegadoException(
+                    "Sociopedagógico só pode corrigir a chamada do dia atual (aula de "
+                            + aula.getDataAula() + ")."
+            );
+        }
     }
 
     private void validarAulaRealizada(Aula aula) {
