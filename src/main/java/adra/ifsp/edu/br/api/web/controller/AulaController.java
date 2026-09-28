@@ -101,6 +101,20 @@ public class AulaController {
         );
     }
 
+    /**
+     * US-71: painel do coordenador com o status de lançamento da chamada
+     * ("LANCADA"/"PENDENTE") de cada aula do período, sem abrir aula por aula.
+     */
+    @PreAuthorize("hasRole('COORDENADOR')")
+    @GetMapping("/status-chamada")
+    public ResponseEntity<List<AulaStatusChamadaResponseDTO>> listarStatusChamada(
+            @RequestParam(name = "turma_id", required = false) Long turmaId,
+            @RequestParam(name = "data_inicio", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dataInicio,
+            @RequestParam(name = "data_fim", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dataFim
+    ) {
+        return ResponseEntity.ok(aulaService.listarStatusChamada(turmaId, dataInicio, dataFim));
+    }
+
     @PreAuthorize("hasAnyRole('OFICINEIRO', 'SOCIOPEDAGOGICO', 'COORDENADOR')")
     @GetMapping("/{id}")
     public ResponseEntity<AulaResponseDTO> buscarPorId(@PathVariable Long id) {

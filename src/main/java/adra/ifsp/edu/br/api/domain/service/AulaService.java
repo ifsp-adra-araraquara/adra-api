@@ -3,10 +3,12 @@ package adra.ifsp.edu.br.api.domain.service;
 import adra.ifsp.edu.br.api.domain.dto.aula.AulaComDetalhesResponseDTO;
 import adra.ifsp.edu.br.api.domain.dto.aula.AulaRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.aula.AulaResponseDTO;
+import adra.ifsp.edu.br.api.domain.dto.aula.AulaStatusChamadaResponseDTO;
 import adra.ifsp.edu.br.api.domain.dto.aula.AulaStatusPatchRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.aula.GerarAulasResponseDTO;
 import adra.ifsp.edu.br.api.domain.enums.AcaoSistema;
 import adra.ifsp.edu.br.api.domain.enums.ModuloSistema;
+import adra.ifsp.edu.br.api.domain.enums.StatusChamada;
 import adra.ifsp.edu.br.api.domain.mapper.AulaMapper;
 import adra.ifsp.edu.br.api.domain.model.Aula;
 import adra.ifsp.edu.br.api.domain.model.CriacaoAulas;
@@ -14,8 +16,10 @@ import adra.ifsp.edu.br.api.domain.model.Turma;
 import adra.ifsp.edu.br.api.domain.repository.AulaRepository;
 import adra.ifsp.edu.br.api.domain.repository.AulaSpecification;
 import adra.ifsp.edu.br.api.domain.repository.ExcecaoCalendarioRepository;
+import adra.ifsp.edu.br.api.domain.repository.PresencaRepository;
 import adra.ifsp.edu.br.api.domain.repository.TurmaRepository;
 import adra.ifsp.edu.br.api.exception.EntidadeNaoEncontradaException;
+import adra.ifsp.edu.br.api.exception.RegraNegocioException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
@@ -32,6 +36,7 @@ public class AulaService {
     private final AulaRepository aulaRepository;
     private final TurmaRepository turmaRepository;
     private final ExcecaoCalendarioRepository excecaoCalendarioRepository;
+    private final PresencaRepository presencaRepository;
     private final AulaMapper aulaMapper;
     private final AuditoriaService auditoriaService;
 
@@ -188,6 +193,40 @@ public class AulaService {
         }
 
         return resultado;
+    }
+
+    /**
+     * US-71: cruza as aulas do período/turma com a existência de presenças —
+     * "lançada" se já há ao menos uma presença, "pendente" se não. Aulas
+     * canceladas/remarcadas e futuras ficam de fora (CA-71.3).
+     */
+    @Transactional(readOnly = true)
+    public List<AulaStatusChamadaResponseDTO> listarStatusChamada(Long turmaId, LocalDate dataInicio, LocalDate dataFim) {
+        if (dataInicio != null && dataFim != null && dataInicio.isAfter(dataFim)) {
+            throw new RegraNegocioException("A data inicial não pode ser posterior à data final.");
+        }
+
+        Specification<Aula> spec = AulaSpecification.filtroTurmaId(turmaId)
+                .and(AulaSpecification.filtroPeriodo(dataInicio, dataFim))
+                .and(AulaSpecification.filtroAulaComChamadaEsperada(LocalDate.now()));
+
+        List<Aula> aulas = aulaRepository.findAll(spec);
+        if (aulas.isEmpty()) {
+            return List.of();
+        }
+
+        Set<Long> aulasComPresenca = presencaRepository.findAulaIdsComPresenca(
+                aulas.stream().map(Aula::getAulaId).toList()
+        );
+
+        return aulas.stream()
+                .sorted(Comparator.comparing(Aula::getDataAula)
+                        .thenComparing(Aula::getHorarioInicio, Comparator.nullsLast(Comparator.naturalOrder())))
+                .map(aula -> AulaStatusChamadaResponseDTO.fromEntity(
+                        aula,
+                        aulasComPresenca.contains(aula.getAulaId()) ? StatusChamada.LANCADA : StatusChamada.PENDENTE
+                ))
+                .toList();
     }
 
     public AulaResponseDTO buscarPorId(Long id) {

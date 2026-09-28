@@ -6,9 +6,13 @@ import adra.ifsp.edu.br.api.domain.model.Assistido;
 import adra.ifsp.edu.br.api.domain.enums.StatusPresenca;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 public interface PresencaRepository extends JpaRepository<Presenca, Long> {
 
@@ -17,4 +21,8 @@ public interface PresencaRepository extends JpaRepository<Presenca, Long> {
     List<Presenca> findByAssistido(Assistido assistido);
 
     Optional<Presenca> findByAulaAndAssistido(Aula aula, Assistido assistido);
+
+    /** US-71: quais destas aulas já têm ao menos uma presença lançada. */
+    @Query("SELECT DISTINCT p.aula.aulaId FROM Presenca p WHERE p.aula.aulaId IN :aulaIds")
+    Set<Long> findAulaIdsComPresenca(@Param("aulaIds") Collection<Long> aulaIds);
 }
