@@ -18,6 +18,11 @@ public record PresencaResponseDTO(
         StatusPresenca statusPresenca,
         MotivoFalta motivoFalta,
         String observacao,
+        // US-68 (CA-68.1 e CA-68.2): rastreabilidade de autoria de quem lançou ou alterou
+        Long criadoPorId,
+        String criadoPorNome,
+        Long atualizadoPorId,
+        String atualizadoPorNome,
         LocalDateTime criadoEm,
         LocalDateTime atualizadoEm
 ) {
@@ -35,7 +40,8 @@ public record PresencaResponseDTO(
      */
     public static PresencaResponseDTO presente(Long aulaId, Long assistidoId, String nomeCompleto) {
         return new PresencaResponseDTO(
-                null, aulaId, assistidoId, nomeCompleto, StatusPresenca.PRESENTE, null, null, null, null
+                null, aulaId, assistidoId, nomeCompleto, StatusPresenca.PRESENTE, null, null,
+                null, null, null, null, null, null
         );
     }
 
@@ -48,6 +54,10 @@ public record PresencaResponseDTO(
                 presenca.getStatusPresenca(),
                 faltaJustificada != null ? faltaJustificada.getMotivoFalta() : null,
                 faltaJustificada != null ? faltaJustificada.getObservacao() : null,
+                presenca.getCriadoPor() != null ? presenca.getCriadoPor().getUsuarioId() : null,
+                presenca.getCriadoPor() != null ? presenca.getCriadoPor().getNomeCompleto() : null,
+                presenca.getAtualizadoPor() != null ? presenca.getAtualizadoPor().getUsuarioId() : null,
+                presenca.getAtualizadoPor() != null ? presenca.getAtualizadoPor().getNomeCompleto() : null,
                 presenca.getCriadoEm(),
                 presenca.getAtualizadoEm()
         );

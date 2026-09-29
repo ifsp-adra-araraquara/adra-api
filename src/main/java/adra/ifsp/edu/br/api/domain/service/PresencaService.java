@@ -242,7 +242,7 @@ public class PresencaService {
         List<TurmaAlunos> vinculosAtivos = turmaAlunosRepository.findElegiveisParaChamada(
                 aula.getTurma(), aula.getDataAula());
 
-        List<Presenca> faltas = presencaRepository.findByAula(aula);
+        List<Presenca> faltas = presencaRepository.findByAulaWithUsuarios(aula);
 
         return presencaMapper.montarChamadaCompleta(idAula, vinculosAtivos, faltas);
     }
@@ -258,7 +258,7 @@ public class PresencaService {
         Assistido assistido = assistidoRepository.findById(idAssistido)
                 .orElseThrow(() -> new EntidadeNaoEncontradaException("Assistido não encontrado: id " + idAssistido));
 
-        return presencaMapper.paraDTOList(presencaRepository.findByAssistido(assistido));
+        return presencaMapper.paraDTOList(presencaRepository.findByAssistidoWithUsuarios(assistido));
     }
 
     /** No modelo esparso, "atualizar pra PRESENTE" apaga a linha em vez de guardar um status. */
