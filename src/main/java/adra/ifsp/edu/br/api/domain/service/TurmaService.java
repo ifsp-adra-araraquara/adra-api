@@ -145,9 +145,33 @@ public class TurmaService {
 
     public List<TurmaResponseDTO> listarComFiltros(String nome, Turno turno, Boolean ativo) {
         Specification<Turma> spec = TurmaSpecification.comFiltros(nome, turno, ativo);
-        return turmaRepository.findAll(spec).stream()
-                .map(turmaMapper::paraDTO)
+        List<Turma> turmas = turmaRepository.findAll(spec);
+
+        Map<Long, Integer> matriculadosPorTurma = contarAtivosPorTurma(turmas);
+
+        return turmas.stream()
+                .map(turma -> turmaMapper.paraDTO(turma, matriculadosPorTurma.getOrDefault(turma.getTurmaId(), 0)))
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * Contagem de assistidos ativos por turma, em uma única query agrupada
+     * (AssistidoRepository#contarAtivosPorTurma) em vez de uma COUNT por
+     * turma — a listagem geral de Turmas pode trazer dezenas de linhas e
+     * cada uma precisa mostrar ocupação (matriculados/capacidade).
+     */
+    private Map<Long, Integer> contarAtivosPorTurma(List<Turma> turmas) {
+        if (turmas.isEmpty()) {
+            return Map.of();
+        }
+
+        List<Long> turmaIds = turmas.stream().map(Turma::getTurmaId).collect(Collectors.toList());
+
+        return assistidoRepository.contarAtivosPorTurma(turmaIds, StatusGeral.ATIVO).stream()
+                .collect(Collectors.toMap(
+                        linha -> (Long) linha[0],
+                        linha -> ((Long) linha[1]).intValue()
+                ));
     }
 
     public TurmaResponseDTO atualizar(Long id, TurmaRequestDTO dto) {

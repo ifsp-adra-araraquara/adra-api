@@ -93,16 +93,11 @@ public class TurmaMapper {
     }
 
     public TurmaResponseDTO paraDTO(Turma turma) {
-        return new TurmaResponseDTO(
-                turma.getTurmaId(),
-                turma.getOficina() != null ? turma.getOficina().getOficinaId() : null,
-                turma.getOficineiroResponsavel() != null ? turma.getOficineiroResponsavel().getUsuarioId() : null,
-                turma.getNomeTurma(),
-                turma.getTurno(),
-                turma.getFaixaEtaria(),
-                turma.getCapacidade(),
-                turma.getAtivo(),
-                turma.getObservacoes()
-        );
+        return TurmaResponseDTO.fromEntity(turma);
+    }
+
+    /** Ver TurmaResponseDTO#fromEntity(Turma, Integer) — contagem já resolvida em lote pelo chamador. */
+    public TurmaResponseDTO paraDTO(Turma turma, Integer quantidadeAlunos) {
+        return TurmaResponseDTO.fromEntity(turma, quantidadeAlunos);
     }
 }

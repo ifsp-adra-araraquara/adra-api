@@ -28,4 +28,21 @@ public interface AulaRepository extends JpaRepository<Aula, Long>, JpaSpecificat
 
     @Query("SELECT COUNT(a) FROM Assistido a WHERE a.turma.turmaId = :turmaId AND a.status = 'ATIVO'")
     long countAlunosAtivosPorTurma(@Param("turmaId") Long turmaId);
+
+    /**
+     * Últimas (até) 10 aulas realizadas de uma turma antes de uma data —
+     * usado pra calcular faltas consecutivas na hora de abrir a chamada
+     * (ver PresencaService). Limite fixo pequeno: 10 aulas já cobre
+     * qualquer limiar razoável de "faltas seguidas" sem trazer o histórico
+     * inteiro da turma.
+     */
+    List<Aula> findTop10ByTurmaAndStatusAulaAndDataAulaLessThanOrderByDataAulaDesc(
+            Turma turma, StatusAula statusAula, LocalDate dataAula);
+
+    /** Mesma ideia, sem data-âncora — pra grade de frequência da turma (tela separada, não ligada a uma aula específica). */
+    List<Aula> findTop10ByTurmaAndStatusAulaOrderByDataAulaDesc(Turma turma, StatusAula statusAula);
+
+    /** Aulas realizadas de uma turma num período — usado pra montar o histórico de frequência de um assistido. */
+    List<Aula> findByTurmaAndStatusAulaAndDataAulaBetweenOrderByDataAulaAsc(
+            Turma turma, StatusAula statusAula, LocalDate dataInicio, LocalDate dataFim);
 }
