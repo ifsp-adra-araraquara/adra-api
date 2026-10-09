@@ -1,7 +1,6 @@
 package adra.ifsp.edu.br.api.domain.dto.usuario;
 
 import adra.ifsp.edu.br.api.domain.dto.modulo.ModuloDTO;
-import adra.ifsp.edu.br.api.domain.enums.EspecialidadeSaude;
 import adra.ifsp.edu.br.api.domain.enums.NomeNivelPermissao;
 
 import java.time.OffsetDateTime;
@@ -12,7 +11,6 @@ public record UsuarioResponseDTO(
         String nomeCompleto,
         String email,
         NomeNivelPermissao nivelPermissao,
-        EspecialidadeSaude especialidade,
         String cargoFuncao,
         String telefone,
         boolean ativo,

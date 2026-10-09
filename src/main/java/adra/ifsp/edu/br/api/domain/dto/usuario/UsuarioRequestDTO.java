@@ -1,6 +1,5 @@
 package adra.ifsp.edu.br.api.domain.dto.usuario;
 
-import adra.ifsp.edu.br.api.domain.enums.EspecialidadeSaude;
 import adra.ifsp.edu.br.api.domain.enums.NomeNivelPermissao;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -20,11 +19,6 @@ public record UsuarioRequestDTO(
 
         @NotNull(message = "Nivel de permissao e' obrigatorio")
         NomeNivelPermissao nivelPermissao,
-
-        // Obrigatorio somente quando nivelPermissao == PROFISSIONAL_SAUDE -
-        // validado no service, nao aqui (a obrigatoriedade e' condicional
-        // ao valor de outro campo, o que o Bean Validation padrao nao cobre bem).
-        EspecialidadeSaude especialidade,
 
         @Size(max = 120)
         String cargoFuncao,

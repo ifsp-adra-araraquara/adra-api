@@ -1,6 +1,5 @@
 package adra.ifsp.edu.br.api.domain.model;
 
-import adra.ifsp.edu.br.api.domain.enums.EspecialidadeSaude;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -50,12 +49,6 @@ public class Usuario {
 
     @Column(name = "telefone", length = 30)
     private String telefone;
-
-    // So' preenchido quando nivelPermissao == PROFISSIONAL_SAUDE (regra
-    // validada no UsuarioService, coluna criada na migracao deste card).
-    @Enumerated(EnumType.STRING)
-    @Column(name = "especialidade")
-    private EspecialidadeSaude especialidade;
 
     @Column(name = "ativo", nullable = false)
     @Builder.Default
