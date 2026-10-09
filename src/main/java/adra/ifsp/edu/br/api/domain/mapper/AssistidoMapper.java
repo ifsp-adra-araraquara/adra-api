@@ -3,6 +3,8 @@ package adra.ifsp.edu.br.api.domain.mapper;
 import adra.ifsp.edu.br.api.domain.dto.assistido.AssistidoRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.assistido.AssistidoResponseDTO;
 import adra.ifsp.edu.br.api.domain.model.Assistido;
+import adra.ifsp.edu.br.api.domain.model.AssistidoResponsavel;
+import adra.ifsp.edu.br.api.domain.service.IndicadorFrequencia;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
@@ -34,6 +36,14 @@ public class AssistidoMapper {
     }
 
     public AssistidoResponseDTO paraDTO(Assistido entidade) {
+        return paraDTO(entidade, null, null);
+    }
+
+    /**
+     * Linha da listagem: além do cadastro, o responsável principal (ou
+     * {@code null}) e os indicadores de frequência (ou {@code null}).
+     */
+    public AssistidoResponseDTO paraDTO(Assistido entidade, AssistidoResponsavel responsavel, IndicadorFrequencia frequencia) {
         Long turmaId = entidade.getTurma() != null ? entidade.getTurma().getTurmaId() : null;
         String nomeTurma = entidade.getTurma() != null ? entidade.getTurma().getNomeTurma() : null;
 
@@ -54,7 +64,14 @@ public class AssistidoMapper {
                 entidade.getTotalAdvertenciasAtivas(),
                 entidade.getTotalSuspensoes(),
                 entidade.getCriadoEm(),
-                entidade.getAtualizadoEm()
+                entidade.getAtualizadoEm(),
+                responsavel != null ? responsavel.getResponsavel().getNomeCompleto() : null,
+                responsavel != null ? responsavel.getParentesco() : null,
+                responsavel != null ? responsavel.getResponsavel().getTelefone() : null,
+                frequencia != null ? frequencia.percentual() : null,
+                frequencia != null ? frequencia.totalAulas() : null,
+                frequencia != null ? frequencia.faltasConsecutivas() : null,
+                frequencia != null ? frequencia.emAcompanhamento() : null
         );
     }
 }

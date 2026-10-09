@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import adra.ifsp.edu.br.api.domain.dto.PaginaDTO;
+import adra.ifsp.edu.br.api.domain.dto.assistido.AssistidoContagemDTO;
 import adra.ifsp.edu.br.api.domain.dto.assistido.AssistidoRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.assistido.AssistidoResponseDTO;
 import adra.ifsp.edu.br.api.domain.dto.assistido.AssistidoStatusRequestDTO;
@@ -45,10 +46,23 @@ public class AssistidoController {
     public ResponseEntity<PaginaDTO<AssistidoResponseDTO>> listar(
             @RequestParam(required = false) String busca,
             @RequestParam(required = false) Long turmaId,
+            @RequestParam(required = false) Long oficinaId,
             @RequestParam(required = false) StatusGeral status,
+            @RequestParam(defaultValue = "false") boolean emAcompanhamento,
             @RequestParam(defaultValue = "0") int pagina,
             @RequestParam(defaultValue = "20") int tamanho) {
-        return ResponseEntity.ok(assistidoService.listarPaginado(busca, turmaId, status, pagina, tamanho));
+        return ResponseEntity.ok(assistidoService.listarPaginado(
+                busca, turmaId, oficinaId, status, emAcompanhamento, pagina, tamanho));
+    }
+
+    /** Totais das abas da listagem (Todos / Ativos / Inativos / Em acompanhamento). */
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'COORDENADOR', 'SOCIOPEDAGOGICO', 'OFICINEIRO')")
+    @GetMapping("/contagem")
+    public ResponseEntity<AssistidoContagemDTO> contar(
+            @RequestParam(required = false) String busca,
+            @RequestParam(required = false) Long turmaId,
+            @RequestParam(required = false) Long oficinaId) {
+        return ResponseEntity.ok(assistidoService.contar(busca, turmaId, oficinaId));
     }
 
     /**

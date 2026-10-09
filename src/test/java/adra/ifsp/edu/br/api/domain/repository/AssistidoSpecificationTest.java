@@ -77,4 +77,15 @@ class AssistidoSpecificationTest {
         assistido.setDataSaida(dataSaida);
         return assistido;
     }
+
+    @Test
+    @DisplayName("Busca trata como CPF só termos com dígitos e pontuação de CPF")
+    void detectaTermoDeCpf() {
+        assertTrue(AssistidoSpecification.pareceCpf("123"));
+        assertTrue(AssistidoSpecification.pareceCpf("123.456.789-00"));
+        assertFalse(AssistidoSpecification.pareceCpf("Maria 2"));
+        assertFalse(AssistidoSpecification.pareceCpf("Maria"));
+        assertFalse(AssistidoSpecification.pareceCpf("..."));
+        assertEquals("12345678900", AssistidoSpecification.apenasDigitos("123.456.789-00"));
+    }
 }
