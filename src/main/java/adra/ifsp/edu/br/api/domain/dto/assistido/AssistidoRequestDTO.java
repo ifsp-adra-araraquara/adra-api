@@ -1,11 +1,11 @@
 package adra.ifsp.edu.br.api.domain.dto.assistido;
 
 import adra.ifsp.edu.br.api.domain.dto.vinculo.VinculoFamiliarComResponsavelRequestDTO;
+import adra.ifsp.edu.br.api.domain.validation.ValidCpf;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Past;
-import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 import java.time.LocalDate;
@@ -22,8 +22,8 @@ public record AssistidoRequestDTO(
         LocalDate dataNascimento,
 
         // CPF opcional e NAO unico (definido explicitamente no card) - so
-        // validamos o formato quando informado.
-        @Pattern(regexp = "^$|\\d{11}", message = "CPF deve conter 11 digitos numericos")
+        // validamos quando informado.
+        @ValidCpf(message = "CPF invalido")
         String cpf,
 
         // Se nao informado, o service assume LocalDate.now().

@@ -21,7 +21,6 @@ public class UsuarioMapper {
                 .authUid(authUid)
                 .cargoFuncao(dto.cargoFuncao())
                 .telefone(dto.telefone())
-                .especialidade(dto.especialidade())
                 .ativo(true)
                 .build();
     }
@@ -32,7 +31,6 @@ public class UsuarioMapper {
         entidade.setEmail(dto.email());
         entidade.setCargoFuncao(dto.cargoFuncao());
         entidade.setTelefone(dto.telefone());
-        entidade.setEspecialidade(dto.especialidade());
     }
 
     public UsuarioResponseDTO paraDTO(Usuario entidade) {
@@ -45,7 +43,6 @@ public class UsuarioMapper {
                 entidade.getNomeCompleto(),
                 entidade.getEmail(),
                 entidade.getNivelPermissao().getNome(),
-                entidade.getEspecialidade(),
                 entidade.getCargoFuncao(),
                 entidade.getTelefone(),
                 entidade.isAtivo(),

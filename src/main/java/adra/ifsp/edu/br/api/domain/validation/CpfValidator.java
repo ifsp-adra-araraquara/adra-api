@@ -7,7 +7,10 @@ public class CpfValidator implements ConstraintValidator<ValidCpf, String> {
 
     @Override
     public boolean isValid(String cpf, ConstraintValidatorContext context) {
-        if (cpf == null || !cpf.matches("\\d{11}")) {
+        if (cpf == null || cpf.isBlank()) {
+            return true;
+        }
+        if (!cpf.matches("\\d{11}")) {
             return false;
         }
         if (cpf.chars().distinct().count() == 1) {
