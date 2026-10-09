@@ -33,4 +33,12 @@ public interface PresencaRepository extends JpaRepository<Presenca, Long> {
     /** US-71: quais destas aulas já têm ao menos uma presença lançada. */
     @Query("SELECT DISTINCT p.aula.aulaId FROM Presenca p WHERE p.aula.aulaId IN :aulaIds")
     Set<Long> findAulaIdsComPresenca(@Param("aulaIds") Collection<Long> aulaIds);
+
+    /**
+     * Faltas (FALTA/FALTA_JUSTIFICADA) de vários assistidos num conjunto de
+     * aulas, numa query só — usado pra calcular faltas consecutivas e
+     * histórico de frequência sem 1 query por aluno/aula (modelo esparso:
+     * ausência de linha aqui = presente).
+     */
+    List<Presenca> findByAulaInAndAssistidoIn(Collection<Aula> aulas, Collection<Assistido> assistidos);
 }

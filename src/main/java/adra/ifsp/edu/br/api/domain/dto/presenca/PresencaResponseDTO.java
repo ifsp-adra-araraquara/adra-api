@@ -6,6 +6,7 @@ import adra.ifsp.edu.br.api.domain.model.FaltaJustificada;
 import adra.ifsp.edu.br.api.domain.model.Presenca;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 public record PresencaResponseDTO(
         Long presencaId,
@@ -24,7 +25,14 @@ public record PresencaResponseDTO(
         Long atualizadoPorId,
         String atualizadoPorNome,
         LocalDateTime criadoEm,
-        LocalDateTime atualizadoEm
+        LocalDateTime atualizadoEm,
+        // Últimos dias (mais recente primeiro, janela fixa pequena — ver
+        // PresencaService) do mesmo aluno na turma, só preenchido na resposta
+        // de GET /api/chamadas/aula/{id} (buscarPorAula). Alimenta a "faixa de
+        // dias" no roster da chamada — o limiar de alerta de faltas seguidas é
+        // calculado no front a partir desta lista, não duplicado aqui. Vazia
+        // nos outros usos deste DTO (registrarChamada, atualizarPresenca).
+        List<PresencaHistoricoDTO> historicoRecente
 ) {
 
     /** Presenca sem falta justificada associada (status FALTA). */
@@ -41,7 +49,7 @@ public record PresencaResponseDTO(
     public static PresencaResponseDTO presente(Long aulaId, Long assistidoId, String nomeCompleto) {
         return new PresencaResponseDTO(
                 null, aulaId, assistidoId, nomeCompleto, StatusPresenca.PRESENTE, null, null,
-                null, null, null, null, null, null
+                null, null, null, null, null, null, List.of()
         );
     }
 
@@ -59,7 +67,17 @@ public record PresencaResponseDTO(
                 presenca.getAtualizadoPor() != null ? presenca.getAtualizadoPor().getUsuarioId() : null,
                 presenca.getAtualizadoPor() != null ? presenca.getAtualizadoPor().getNomeCompleto() : null,
                 presenca.getCriadoEm(),
-                presenca.getAtualizadoEm()
+                presenca.getAtualizadoEm(),
+                List.of()
+        );
+    }
+
+    /** Mesmo DTO com `historicoRecente` preenchido — usado só por `buscarPorAula`. */
+    public PresencaResponseDTO comHistoricoRecente(List<PresencaHistoricoDTO> historicoRecente) {
+        return new PresencaResponseDTO(
+                presencaId, aulaId, assistidoId, nomeCompleto, statusPresenca, motivoFalta, observacao,
+                criadoPorId, criadoPorNome, atualizadoPorId, atualizadoPorNome, criadoEm, atualizadoEm,
+                historicoRecente
         );
     }
 }

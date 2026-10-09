@@ -1,5 +1,7 @@
 package adra.ifsp.edu.br.api.web.controller;
 
+import adra.ifsp.edu.br.api.domain.dto.presenca.FrequenciaAulaDTO;
+import adra.ifsp.edu.br.api.domain.dto.presenca.GradeFrequenciaTurmaDTO;
 import adra.ifsp.edu.br.api.domain.dto.presenca.PresencaRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.presenca.PresencaResponseDTO;
 import adra.ifsp.edu.br.api.domain.service.PresencaService;
@@ -45,6 +47,18 @@ public class ChamadaController {
     @GetMapping("/assistido/{idAssistido}")
     public ResponseEntity<List<PresencaResponseDTO>> buscarPorAssistido(@PathVariable Long idAssistido) {
         return ResponseEntity.ok(presencaService.buscarPorAssistido(idAssistido));
+    }
+
+    /** Aba "Chamadas" do cadastro do assistido — histórico de frequência completo (US novo, ver PresencaService). */
+    @GetMapping("/assistido/{idAssistido}/frequencia")
+    public ResponseEntity<List<FrequenciaAulaDTO>> buscarFrequenciaAssistido(@PathVariable Long idAssistido) {
+        return ResponseEntity.ok(presencaService.buscarFrequenciaAssistido(idAssistido));
+    }
+
+    /** "Ver grade da turma" a partir da chamada — grade turma × dias, carregada só sob demanda. */
+    @GetMapping("/turma/{idTurma}/grade")
+    public ResponseEntity<GradeFrequenciaTurmaDTO> buscarGradeFrequenciaTurma(@PathVariable Long idTurma) {
+        return ResponseEntity.ok(presencaService.buscarGradeFrequenciaTurma(idTurma));
     }
 
     @PutMapping("/{id}")
