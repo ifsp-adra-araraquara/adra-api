@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 
 public interface TurmaAlunosRepository extends JpaRepository<TurmaAlunos, Long> {
@@ -18,6 +19,9 @@ public interface TurmaAlunosRepository extends JpaRepository<TurmaAlunos, Long> 
 
     /** Histórico completo de vínculos do assistido (turmas atuais e passadas) — aba "Turmas" no modal do assistido. */
     List<TurmaAlunos> findByAssistidoOrderByDataEntradaDesc(Assistido assistido);
+
+    /** Todos os vínculos (atuais e passados) de vários assistidos — indicadores da listagem. */
+    List<TurmaAlunos> findByAssistidoIn(Collection<Assistido> assistidos);
 
     /** Quem está vinculado ativamente à turma HOJE — usado no "+ Vincular alunos" da tela de turmas. */
     List<TurmaAlunos> findByTurmaAndStatusAndDataSaidaIsNull(Turma turma, StatusGeral status);

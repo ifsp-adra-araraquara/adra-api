@@ -1,6 +1,7 @@
 package adra.ifsp.edu.br.api.domain.service;
 
 import adra.ifsp.edu.br.api.domain.dto.PaginaDTO;
+import adra.ifsp.edu.br.api.domain.dto.assistido.AssistidoContagemDTO;
 import adra.ifsp.edu.br.api.domain.dto.assistido.AssistidoRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.assistido.AssistidoResponseDTO;
 import adra.ifsp.edu.br.api.domain.dto.assistido.AssistidoStatusRequestDTO;
@@ -46,6 +47,7 @@ public class AssistidoService {
 
     private final AssistidoRepository assistidoRepository;
     private final AssistidoMapper assistidoMapper;
+    private final AssistidoIndicadoresService indicadoresService;
     private final TurmaRepository turmaRepository;
     private final ResponsavelRepository responsavelRepository;
     private final AuditoriaService auditoriaService;
@@ -108,13 +110,61 @@ public class AssistidoService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Listagem paginada com responsável principal e indicadores de frequência
+     * por linha. {@code emAcompanhamento=true} lista só ativos em acompanhamento
+     * (ver {@link IndicadorFrequencia}) — como é um valor calculado, esse filtro
+     * calcula os indicadores de todos os ativos do recorte e pagina em memória.
+     */
     @Transactional(readOnly = true)
-    public PaginaDTO<AssistidoResponseDTO> listarPaginado(String busca, Long turmaId, StatusGeral status, int pagina, int tamanho) {
-        Pageable pageable = PageRequest.of(pagina, tamanho, Sort.by(Sort.Direction.ASC, "nomeCompleto"));
-        Specification<Assistido> spec = AssistidoSpecification.comFiltros(busca, turmaId, status);
-        Page<AssistidoResponseDTO> page = assistidoRepository.findAll(spec, pageable)
-                .map(assistidoMapper::paraDTO);
-        return PaginaDTO.de(page);
+    public PaginaDTO<AssistidoResponseDTO> listarPaginado(String busca, Long turmaId, Long oficinaId, StatusGeral status,
+                                                          boolean emAcompanhamento, int pagina, int tamanho) {
+        Sort porNome = Sort.by(Sort.Direction.ASC, "nomeCompleto");
+
+        if (emAcompanhamento) {
+            Specification<Assistido> spec = AssistidoSpecification.comFiltros(busca, turmaId, oficinaId, StatusGeral.ATIVO);
+            List<Assistido> ativos = assistidoRepository.findAll(spec, porNome);
+            Map<Long, IndicadorFrequencia> frequencias = indicadoresService.frequencias(ativos);
+            List<Assistido> filtrados = ativos.stream()
+                    .filter(a -> frequencias.get(a.getAssistidoId()).emAcompanhamento())
+                    .toList();
+
+            int inicio = Math.min(pagina * tamanho, filtrados.size());
+            int fim = Math.min(inicio + tamanho, filtrados.size());
+            List<Assistido> fatia = filtrados.subList(inicio, fim);
+            return new PaginaDTO<>(
+                    paraLinhas(fatia, frequencias),
+                    pagina,
+                    tamanho,
+                    filtrados.size(),
+                    (int) Math.ceil(filtrados.size() / (double) tamanho)
+            );
+        }
+
+        Specification<Assistido> spec = AssistidoSpecification.comFiltros(busca, turmaId, oficinaId, status);
+        Page<Assistido> page = assistidoRepository.findAll(spec, PageRequest.of(pagina, tamanho, porNome));
+        List<AssistidoResponseDTO> linhas = paraLinhas(page.getContent(), indicadoresService.frequencias(page.getContent()));
+        return new PaginaDTO<>(linhas, page.getNumber(), page.getSize(), page.getTotalElements(), page.getTotalPages());
+    }
+
+    /** Totais das abas (Todos / Ativos / Inativos / Em acompanhamento) para o recorte de busca, turma e oficina. */
+    @Transactional(readOnly = true)
+    public AssistidoContagemDTO contar(String busca, Long turmaId, Long oficinaId) {
+        long todos = assistidoRepository.count(AssistidoSpecification.comFiltros(busca, turmaId, oficinaId, null));
+        List<Assistido> ativos = assistidoRepository.findAll(
+                AssistidoSpecification.comFiltros(busca, turmaId, oficinaId, StatusGeral.ATIVO));
+        long emAcompanhamento = indicadoresService.frequencias(ativos).values().stream()
+                .filter(IndicadorFrequencia::emAcompanhamento)
+                .count();
+        long inativos = assistidoRepository.count(AssistidoSpecification.comFiltros(busca, turmaId, oficinaId, StatusGeral.INATIVO));
+        return new AssistidoContagemDTO(todos, ativos.size(), inativos, emAcompanhamento);
+    }
+
+    private List<AssistidoResponseDTO> paraLinhas(List<Assistido> assistidos, Map<Long, IndicadorFrequencia> frequencias) {
+        Map<Long, AssistidoResponsavel> responsaveis = indicadoresService.responsaveisPrincipais(assistidos);
+        return assistidos.stream()
+                .map(a -> assistidoMapper.paraDTO(a, responsaveis.get(a.getAssistidoId()), frequencias.get(a.getAssistidoId())))
+                .toList();
     }
 
     @Transactional(readOnly = true)

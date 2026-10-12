@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -45,4 +46,7 @@ public interface AulaRepository extends JpaRepository<Aula, Long>, JpaSpecificat
     /** Aulas realizadas de uma turma num período — usado pra montar o histórico de frequência de um assistido. */
     List<Aula> findByTurmaAndStatusAulaAndDataAulaBetweenOrderByDataAulaAsc(
             Turma turma, StatusAula statusAula, LocalDate dataInicio, LocalDate dataFim);
+
+    /** Aulas de várias turmas num status, numa query só — indicadores de frequência da listagem de assistidos. */
+    List<Aula> findByTurmaInAndStatusAula(Collection<Turma> turmas, StatusAula statusAula);
 }

@@ -22,6 +22,14 @@ public record AssistidoResponseDTO(
         Integer totalAdvertenciasAtivas,
         Integer totalSuspensoes,
         OffsetDateTime criadoEm,
-        OffsetDateTime atualizadoEm
+        OffsetDateTime atualizadoEm,
+        // Indicadores da listagem (GET /api/assistidos) — null nos demais endpoints.
+        String responsavelNome,
+        String responsavelParentesco,
+        String responsavelTelefone,
+        Integer frequenciaPercentual,
+        Integer totalAulas,
+        Integer faltasConsecutivas,
+        Boolean emAcompanhamento
 ) {
 }
