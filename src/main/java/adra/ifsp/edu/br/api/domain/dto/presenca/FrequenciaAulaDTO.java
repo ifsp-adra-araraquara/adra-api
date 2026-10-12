@@ -12,6 +12,7 @@ import java.time.LocalDate;
  * /api/chamadas/aula/{id}.
  */
 public record FrequenciaAulaDTO(
+        Long aulaId,
         LocalDate dataAula,
         String nomeTurma,
         StatusPresenca statusPresenca

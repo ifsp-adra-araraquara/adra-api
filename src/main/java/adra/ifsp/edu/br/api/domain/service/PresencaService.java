@@ -359,7 +359,7 @@ public class PresencaService {
 
             for (Aula aula : aulasDoVinculo) {
                 StatusPresenca status = statusPorAulaId.getOrDefault(aula.getAulaId(), StatusPresenca.PRESENTE);
-                resultado.add(new FrequenciaAulaDTO(aula.getDataAula(), vinculo.getTurma().getNomeTurma(), status));
+                resultado.add(new FrequenciaAulaDTO(aula.getAulaId(), aula.getDataAula(), vinculo.getTurma().getNomeTurma(), status));
             }
         }
 
