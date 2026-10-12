@@ -6,6 +6,7 @@ import adra.ifsp.edu.br.api.domain.model.Assistido;
 import adra.ifsp.edu.br.api.domain.model.AssistidoResponsavel;
 import adra.ifsp.edu.br.api.domain.service.IndicadorFrequencia;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 
 import java.time.LocalDate;
 
@@ -16,7 +17,7 @@ public class AssistidoMapper {
         return Assistido.builder()
                 .nomeCompleto(dto.nomeCompleto())
                 .dataNascimento(dto.dataNascimento())
-                .cpf(dto.cpf())
+                .cpf(cpfOuNulo(dto.cpf()))
                 .dataEntrada(dto.dataEntrada() != null ? dto.dataEntrada() : LocalDate.now())
                 .necessidadesEspecificas(dto.necessidadesEspecificas())
                 .observacoes(dto.observacoes())
@@ -27,7 +28,7 @@ public class AssistidoMapper {
     public void atualizarEntidade(Assistido entidade, AssistidoRequestDTO dto) {
         entidade.setNomeCompleto(dto.nomeCompleto());
         entidade.setDataNascimento(dto.dataNascimento());
-        entidade.setCpf(dto.cpf());
+        entidade.setCpf(cpfOuNulo(dto.cpf()));
         if (dto.dataEntrada() != null) {
             entidade.setDataEntrada(dto.dataEntrada());
         }
@@ -73,5 +74,9 @@ public class AssistidoMapper {
                 frequencia != null ? frequencia.faltasConsecutivas() : null,
                 frequencia != null ? frequencia.emAcompanhamento() : null
         );
+    }
+
+    private String cpfOuNulo(String cpf) {
+        return StringUtils.hasText(cpf) ? cpf : null;
     }
 }

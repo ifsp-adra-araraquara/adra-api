@@ -1,6 +1,5 @@
 package adra.ifsp.edu.br.api.exception;
 
-import adra.ifsp.edu.br.api.domain.dto.comum.AlertaDuplicidadeDTO;
 import adra.ifsp.edu.br.api.domain.dto.comum.ErroRespostaDTO;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
@@ -57,16 +56,6 @@ public class GlobalExceptionHandler {
                 ErroRespostaDTO.de(409, "Regra de negocio violada", ex.getMessage(), request.getRequestURI()));
     }
 
-    /**
-     * 409 com corpo especifico contendo os possiveis duplicados, para o
-     * front decidir se reenvia com confirmarApesarDeDuplicidade=true.
-     */
-    @ExceptionHandler(DuplicidadeProvavelException.class)
-    public ResponseEntity<AlertaDuplicidadeDTO> tratarDuplicidade(DuplicidadeProvavelException ex) {
-        return ResponseEntity.status(HttpStatus.CONFLICT)
-                .body(new AlertaDuplicidadeDTO(ex.getMessage(), ex.getPossiveisDuplicados()));
-    }
-
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErroRespostaDTO> tratarValidacao(MethodArgumentNotValidException ex,
                                                              HttpServletRequest request) {
@@ -110,8 +99,7 @@ public class GlobalExceptionHandler {
 
     /**
      * 409 com o responsavel existente no corpo, para o front oferecer
-     * reaproveitar o registro em vez de permitir duplicidade (diferente de
-     * DuplicidadeProvavelException: aqui nao ha "confirmar mesmo assim").
+     * reaproveitar o registro em vez de permitir duplicidade.
      */
     @ExceptionHandler(CpfDuplicadoException.class)
     public ResponseEntity<AlertaCpfDuplicadoDTO> tratarCpfDuplicado(CpfDuplicadoException ex) {

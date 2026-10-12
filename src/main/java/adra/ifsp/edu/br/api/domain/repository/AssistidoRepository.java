@@ -9,15 +9,18 @@ import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 public interface AssistidoRepository extends JpaRepository<Assistido, Long>, JpaSpecificationExecutor<Assistido> {
 
     /**
-     * Usado no alerta de duplicidade provavel do card "Cadastrar assistido":
-     * mesmo nome completo (case-insensitive) + mesma data de nascimento.
+     * Usado na checagem de duplicidade do cadastro: mesmo nome completo
+     * (case-insensitive) + mesma data de nascimento.
      * Ao editar, exclua o proprio id do resultado no service.
      */
     List<Assistido> findByNomeCompletoIgnoreCaseAndDataNascimento(String nomeCompleto, LocalDate dataNascimento);
+
+    Optional<Assistido> findByCpf(String cpf);
 
     /**
      * Usado pra montar a contagem de "Alunos" nas telas de turma

@@ -20,8 +20,10 @@ import adra.ifsp.edu.br.api.domain.dto.assistido.AssistidoContagemDTO;
 import adra.ifsp.edu.br.api.domain.dto.assistido.AssistidoRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.assistido.AssistidoResponseDTO;
 import adra.ifsp.edu.br.api.domain.dto.assistido.AssistidoStatusRequestDTO;
+import adra.ifsp.edu.br.api.domain.dto.assistido.ResultadoLinhaLoteDTO;
 import adra.ifsp.edu.br.api.domain.dto.turma.VinculoTurmaAssistidoResponseDTO;
 import adra.ifsp.edu.br.api.domain.enums.StatusGeral;
+import adra.ifsp.edu.br.api.domain.service.AssistidoLoteService;
 import adra.ifsp.edu.br.api.domain.service.AssistidoService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -33,12 +35,26 @@ import org.springframework.security.access.prepost.PreAuthorize;
 public class AssistidoController {
 
     private final AssistidoService assistidoService;
+    private final AssistidoLoteService assistidoLoteService;
 
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'COORDENADOR')")
+    @PreAuthorize("hasAnyRole('COORDENADOR', 'SOCIOPEDAGOGICO')")
     @PostMapping
     public ResponseEntity<AssistidoResponseDTO> cadastrar(@Valid @RequestBody AssistidoRequestDTO dto) {
         AssistidoResponseDTO criado = assistidoService.cadastrar(dto);
         return ResponseEntity.created(URI.create("/api/assistidos/" + criado.assistidoId())).body(criado);
+    }
+
+    // Sem @Valid no corpo: cada linha e' validada no service para o lote seguir com as demais.
+    @PreAuthorize("hasAnyRole('COORDENADOR', 'SOCIOPEDAGOGICO')")
+    @PostMapping("/lote/validar")
+    public ResponseEntity<List<ResultadoLinhaLoteDTO>> validarLote(@RequestBody List<AssistidoRequestDTO> itens) {
+        return ResponseEntity.ok(assistidoLoteService.validar(itens));
+    }
+
+    @PreAuthorize("hasAnyRole('COORDENADOR', 'SOCIOPEDAGOGICO')")
+    @PostMapping("/lote")
+    public ResponseEntity<List<ResultadoLinhaLoteDTO>> cadastrarLote(@RequestBody List<AssistidoRequestDTO> itens) {
+        return ResponseEntity.ok(assistidoLoteService.cadastrar(itens));
     }
 
     @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'COORDENADOR', 'SOCIOPEDAGOGICO', 'OFICINEIRO')")
@@ -69,7 +85,7 @@ public class AssistidoController {
      * Endpoint leve para o alerta NAO BLOQUEANTE de duplicidade por nome
      * e data de nascimento no formulario do front (CA-A02.2).
      */
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'COORDENADOR')")
+    @PreAuthorize("hasAnyRole('COORDENADOR', 'SOCIOPEDAGOGICO')")
     @GetMapping("/verificar-duplicidade")
     public ResponseEntity<Map<String, Object>> verificarDuplicidade(
             @RequestParam(required = false) String nomeCompleto,

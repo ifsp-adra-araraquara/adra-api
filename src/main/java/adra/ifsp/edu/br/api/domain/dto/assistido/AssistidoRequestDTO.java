@@ -21,8 +21,7 @@ public record AssistidoRequestDTO(
         @Past(message = "Data de nascimento deve estar no passado")
         LocalDate dataNascimento,
 
-        // CPF opcional e NAO unico (definido explicitamente no card) - so
-        // validamos quando informado.
+        // CPF opcional e unico quando informado.
         @ValidCpf(message = "CPF invalido")
         String cpf,
 
@@ -37,10 +36,6 @@ public record AssistidoRequestDTO(
 
         // Lista de responsaveis com dados de vinculo para cadastro inline
         @Valid
-        List<VinculoFamiliarComResponsavelRequestDTO> responsaveis,
-
-        // Flag de confirmacao do alerta de duplicidade provavel (mesmo nome +
-        // nascimento). Default false: primeira tentativa sempre verifica.
-        boolean confirmarApesarDeDuplicidade
+        List<VinculoFamiliarComResponsavelRequestDTO> responsaveis
 ) {
 }
