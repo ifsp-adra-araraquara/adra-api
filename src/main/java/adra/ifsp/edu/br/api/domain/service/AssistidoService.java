@@ -22,7 +22,6 @@ import adra.ifsp.edu.br.api.domain.repository.AssistidoSpecification;
 import adra.ifsp.edu.br.api.domain.repository.ResponsavelRepository;
 import adra.ifsp.edu.br.api.domain.repository.TurmaAlunosRepository;
 import adra.ifsp.edu.br.api.domain.repository.TurmaRepository;
-import adra.ifsp.edu.br.api.exception.DuplicidadeProvavelException;
 import adra.ifsp.edu.br.api.exception.EntidadeNaoEncontradaException;
 import adra.ifsp.edu.br.api.exception.RegraNegocioException;
 import lombok.RequiredArgsConstructor;
@@ -33,11 +32,13 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -55,9 +56,7 @@ public class AssistidoService {
     private final TurmaAlunosRepository turmaAlunosRepository;
 
     public AssistidoResponseDTO cadastrar(AssistidoRequestDTO dto) {
-        if (!dto.confirmarApesarDeDuplicidade()) {
-            verificarDuplicidade(dto.nomeCompleto(), dto.dataNascimento(), null);
-        }
+        verificarDuplicidade(dto, null);
 
         // CA-A02.3: Validar pelo menos um responsável
         if (dto.responsaveis() == null || dto.responsaveis().isEmpty()) {
@@ -185,9 +184,7 @@ public class AssistidoService {
     public AssistidoResponseDTO atualizar(Long id, AssistidoRequestDTO dto) {
         Assistido assistido = buscarEntidadePorId(id);
 
-        if (!dto.confirmarApesarDeDuplicidade()) {
-            verificarDuplicidade(dto.nomeCompleto(), dto.dataNascimento(), id);
-        }
+        verificarDuplicidade(dto, id);
 
         Map<String, Object> valorAnterior = Map.of(
                 "nomeCompleto", assistido.getNomeCompleto(),
@@ -261,17 +258,36 @@ public class AssistidoService {
                 .orElseThrow(() -> new EntidadeNaoEncontradaException("Assistido nao encontrado: id " + id));
     }
 
-    private void verificarDuplicidade(String nomeCompleto, LocalDate dataNascimento, Long idEmEdicao) {
-        List<AssistidoResponseDTO> duplicados = assistidoRepository
-                .findByNomeCompletoIgnoreCaseAndDataNascimento(nomeCompleto, dataNascimento)
-                .stream()
-                .filter(a -> idEmEdicao == null || !a.getAssistidoId().equals(idEmEdicao))
-                .map(assistidoMapper::paraDTO)
-                .collect(Collectors.toList());
-
-        if (!duplicados.isEmpty()) {
-            throw new DuplicidadeProvavelException(duplicados);
+    /** CPF repetido bloqueia; mesmo nome + nascimento so passa se os dois tiverem CPFs diferentes. */
+    @Transactional(readOnly = true)
+    public Optional<String> motivoDuplicidade(AssistidoRequestDTO dto, Long idEmEdicao) {
+        if (StringUtils.hasText(dto.cpf())) {
+            Optional<Assistido> mesmoCpf = assistidoRepository.findByCpf(dto.cpf())
+                    .filter(a -> !a.getAssistidoId().equals(idEmEdicao));
+            if (mesmoCpf.isPresent()) {
+                return Optional.of("CPF ja cadastrado para o assistido " + mesmoCpf.get().getNomeCompleto());
+            }
         }
+
+        boolean mesmaPessoa = assistidoRepository
+                .findByNomeCompletoIgnoreCaseAndDataNascimento(dto.nomeCompleto(), dto.dataNascimento())
+                .stream()
+                .filter(a -> !a.getAssistidoId().equals(idEmEdicao))
+                .anyMatch(a -> !cpfsDiferentes(a.getCpf(), dto.cpf()));
+        if (mesmaPessoa) {
+            return Optional.of("Ja existe assistido com mesmo nome e data de nascimento");
+        }
+        return Optional.empty();
+    }
+
+    static boolean cpfsDiferentes(String cpf, String outroCpf) {
+        return StringUtils.hasText(cpf) && StringUtils.hasText(outroCpf) && !cpf.equals(outroCpf);
+    }
+
+    private void verificarDuplicidade(AssistidoRequestDTO dto, Long idEmEdicao) {
+        motivoDuplicidade(dto, idEmEdicao).ifPresent(motivo -> {
+            throw new RegraNegocioException(motivo);
+        });
     }
 
     /**
