@@ -106,14 +106,14 @@ public class AssistidoController {
         return ResponseEntity.ok(assistidoService.buscarPorId(id));
     }
 
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'COORDENADOR')")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'COORDENADOR', 'SOCIOPEDAGOGICO')")
     @PutMapping("/{id}")
     public ResponseEntity<AssistidoResponseDTO> atualizar(@PathVariable Long id,
                                                             @Valid @RequestBody AssistidoRequestDTO dto) {
         return ResponseEntity.ok(assistidoService.atualizar(id, dto));
     }
 
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'COORDENADOR')")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'COORDENADOR', 'SOCIOPEDAGOGICO')")
     @PatchMapping("/{id}/status")
     public ResponseEntity<AssistidoResponseDTO> alterarStatus(@PathVariable Long id,
                                                                 @Valid @RequestBody AssistidoStatusRequestDTO dto) {
@@ -121,7 +121,7 @@ public class AssistidoController {
     }
 
     /** Aba "Turmas" do modal do assistido — histórico de vínculos (turma_aluno), só pro coordenador. */
-    @PreAuthorize("hasRole('COORDENADOR')")
+    @PreAuthorize("hasAnyRole('COORDENADOR', 'SOCIOPEDAGOGICO')")
     @GetMapping("/{id}/turmas")
     public ResponseEntity<List<VinculoTurmaAssistidoResponseDTO>> listarHistoricoTurmas(@PathVariable Long id) {
         return ResponseEntity.ok(assistidoService.listarHistoricoTurmas(id));
