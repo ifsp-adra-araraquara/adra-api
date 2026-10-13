@@ -32,6 +32,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
@@ -53,6 +54,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  */
 @SpringBootTest
 @ActiveProfiles("stage")
+@TestPropertySource(properties = "spring.flyway.enabled=false")
 @Transactional
 @Tag("stage")
 class ChamadaFluxoDesligamentoStageIT {

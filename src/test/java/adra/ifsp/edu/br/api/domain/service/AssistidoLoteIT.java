@@ -31,6 +31,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Import(AssistidoLoteIT.ContainerConfig.class)
 @TestPropertySource(properties = {
         "spring.jpa.hibernate.ddl-auto=create-drop",
+        "spring.flyway.enabled=false",
         "spring.jpa.properties.hibernate.default_schema=adra",
         "adra.brevo.api-key=dummy-teste",
         "adra.brevo.remetente-email=teste@teste.local",
@@ -121,7 +122,7 @@ class AssistidoLoteIT {
 
     private AssistidoRequestDTO assistido(String nome, LocalDate nascimento, String cpf,
                                           VinculoFamiliarComResponsavelRequestDTO responsavel) {
-        return new AssistidoRequestDTO(nome, nascimento, cpf, null, null, null, null, List.of(responsavel));
+        return new AssistidoRequestDTO(nome, nascimento, cpf, null, null, null, null, List.of(responsavel), null);
     }
 
     private VinculoFamiliarComResponsavelRequestDTO responsavel(String nome, String cpf) {

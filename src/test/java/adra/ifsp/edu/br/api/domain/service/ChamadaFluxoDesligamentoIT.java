@@ -67,6 +67,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @Import(ChamadaFluxoDesligamentoIT.ContainerConfig.class)
 @TestPropertySource(properties = {
         "spring.jpa.hibernate.ddl-auto=create-drop",
+        "spring.flyway.enabled=false",
         "spring.jpa.properties.hibernate.default_schema=adra",
         "adra.brevo.api-key=dummy-teste",
         "adra.brevo.remetente-email=teste@teste.local",
