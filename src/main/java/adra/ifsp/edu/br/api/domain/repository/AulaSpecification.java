@@ -1,5 +1,6 @@
 package adra.ifsp.edu.br.api.domain.repository;
 
+import adra.ifsp.edu.br.api.domain.enums.StatusAula;
 import adra.ifsp.edu.br.api.domain.model.Aula;
 import org.springframework.data.jpa.domain.Specification;
 
@@ -76,6 +77,19 @@ public class AulaSpecification {
             }
             return criteriaBuilder.equal(root.get("dataAula"), dataAula);
         };
+    }
+
+    /**
+     * US-71: aulas que deveriam ter chamada — já aconteceram (data até
+     * `hoje`) e não foram canceladas/remarcadas. Inclui PLANEJADA além de
+     * REALIZADA porque é a própria chamada que marca a aula como REALIZADA;
+     * uma aula esquecida continua PLANEJADA e é justamente a pendente.
+     */
+    public static Specification<Aula> filtroAulaComChamadaEsperada(LocalDate hoje) {
+        return (root, query, criteriaBuilder) -> criteriaBuilder.and(
+                root.get("statusAula").in(StatusAula.PLANEJADA, StatusAula.REALIZADA),
+                criteriaBuilder.lessThanOrEqualTo(root.get("dataAula"), hoje)
+        );
     }
 
     public static Specification<Aula> comFiltros(Long turmaId, String nomeTurma, String titulo) {

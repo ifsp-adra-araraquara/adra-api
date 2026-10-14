@@ -7,6 +7,7 @@ import jakarta.persistence.criteria.Predicate;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.text.Normalizer;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
@@ -25,11 +26,35 @@ public class AssistidoSpecification {
         return DIACRITICAL_MARKS.matcher(nfd).replaceAll("").toLowerCase().trim();
     }
 
+    /**
+     * CA-70.1/CA-70.2: elegibilidade de um assistido pra chamada de uma aula
+     * numa data especifica. Ativo sempre elegivel; desligado so continua
+     * elegivel pra aulas ANTERIORES a data_saida (historico preservado).
+     * Fronteira decidida no CA-70.1: "data_saida <= data_aula nao aparece",
+     * ou seja o proprio dia da saida ja NAO e elegivel (comparacao estrita,
+     * isAfter). Repare que isso e diferente do ">=" usado no dataSaida do
+     * vinculo turma_aluno (TurmaAlunosRepository) — sao regras de negocio
+     * distintas, uma por assistido (saida do programa) e outra por vinculo
+     * (troca de turma, fora do escopo desta US).
+     */
+    public static boolean elegivelParaChamada(Assistido assistido, LocalDate dataAula) {
+        if (assistido.getStatus() == StatusGeral.ATIVO) {
+            return true;
+        }
+        LocalDate dataSaida = assistido.getDataSaida();
+        return dataSaida != null && dataSaida.isAfter(dataAula);
+    }
+
     public static Specification<Assistido> comFiltros(String busca, Long turmaId, StatusGeral status) {
+        return comFiltros(busca, turmaId, null, status);
+    }
+
+    public static Specification<Assistido> comFiltros(String busca, Long turmaId, Long oficinaId, StatusGeral status) {
         return (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
 
-            // CA-A03.1: Busca por parte do nome ignorando acentos e caixa
+            // CA-A03.1: Busca por parte do nome ignorando acentos e caixa — ou
+            // pelos dígitos do CPF, independente da máscara gravada.
             if (busca != null && !busca.isBlank()) {
                 String termoNormalizado = "%" + removerAcentos(busca) + "%";
                 Expression<String> nomeSemAcento = cb.function(
@@ -37,12 +62,32 @@ public class AssistidoSpecification {
                         String.class,
                         cb.lower(root.get("nomeCompleto"))
                 );
-                predicates.add(cb.like(nomeSemAcento, termoNormalizado));
+                Predicate porNome = cb.like(nomeSemAcento, termoNormalizado);
+
+                String digitos = apenasDigitos(busca);
+                if (!pareceCpf(busca)) {
+                    predicates.add(porNome);
+                } else {
+                    Expression<String> cpfDigitos = cb.function(
+                            "regexp_replace",
+                            String.class,
+                            root.get("cpf"),
+                            cb.literal("[^0-9]"),
+                            cb.literal(""),
+                            cb.literal("g")
+                    );
+                    predicates.add(cb.or(porNome, cb.like(cpfDigitos, "%" + digitos + "%")));
+                }
             }
 
             // CA-A03.2: Filtro por turma
             if (turmaId != null) {
                 predicates.add(cb.equal(root.get("turma").get("turmaId"), turmaId));
+            }
+
+            // Filtro por oficina (via turma atual do assistido)
+            if (oficinaId != null) {
+                predicates.add(cb.equal(root.get("turma").get("oficina").get("oficinaId"), oficinaId));
             }
 
             // CA-A03.2: Filtro por status
@@ -52,5 +97,14 @@ public class AssistidoSpecification {
 
             return cb.and(predicates.toArray(new Predicate[0]));
         };
+    }
+
+    /** Termo só com dígitos e pontuação de CPF (ex.: "123", "123.456"): também busca no CPF. */
+    public static boolean pareceCpf(String texto) {
+        return texto != null && !apenasDigitos(texto).isEmpty() && texto.strip().matches("[\\d.\\-\\s]+");
+    }
+
+    public static String apenasDigitos(String texto) {
+        return texto == null ? "" : texto.replaceAll("\\D", "");
     }
 }

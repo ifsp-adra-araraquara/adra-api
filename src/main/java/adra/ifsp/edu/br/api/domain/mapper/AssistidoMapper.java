@@ -3,7 +3,10 @@ package adra.ifsp.edu.br.api.domain.mapper;
 import adra.ifsp.edu.br.api.domain.dto.assistido.AssistidoRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.assistido.AssistidoResponseDTO;
 import adra.ifsp.edu.br.api.domain.model.Assistido;
+import adra.ifsp.edu.br.api.domain.model.AssistidoResponsavel;
+import adra.ifsp.edu.br.api.domain.service.IndicadorFrequencia;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 
 import java.time.LocalDate;
 
@@ -14,7 +17,7 @@ public class AssistidoMapper {
         return Assistido.builder()
                 .nomeCompleto(dto.nomeCompleto())
                 .dataNascimento(dto.dataNascimento())
-                .cpf(dto.cpf())
+                .cpf(cpfOuNulo(dto.cpf()))
                 .dataEntrada(dto.dataEntrada() != null ? dto.dataEntrada() : LocalDate.now())
                 .necessidadesEspecificas(dto.necessidadesEspecificas())
                 .observacoes(dto.observacoes())
@@ -25,7 +28,7 @@ public class AssistidoMapper {
     public void atualizarEntidade(Assistido entidade, AssistidoRequestDTO dto) {
         entidade.setNomeCompleto(dto.nomeCompleto());
         entidade.setDataNascimento(dto.dataNascimento());
-        entidade.setCpf(dto.cpf());
+        entidade.setCpf(cpfOuNulo(dto.cpf()));
         if (dto.dataEntrada() != null) {
             entidade.setDataEntrada(dto.dataEntrada());
         }
@@ -34,6 +37,14 @@ public class AssistidoMapper {
     }
 
     public AssistidoResponseDTO paraDTO(Assistido entidade) {
+        return paraDTO(entidade, null, null);
+    }
+
+    /**
+     * Linha da listagem: além do cadastro, o responsável principal (ou
+     * {@code null}) e os indicadores de frequência (ou {@code null}).
+     */
+    public AssistidoResponseDTO paraDTO(Assistido entidade, AssistidoResponsavel responsavel, IndicadorFrequencia frequencia) {
         Long turmaId = entidade.getTurma() != null ? entidade.getTurma().getTurmaId() : null;
         String nomeTurma = entidade.getTurma() != null ? entidade.getTurma().getNomeTurma() : null;
 
@@ -54,7 +65,18 @@ public class AssistidoMapper {
                 entidade.getTotalAdvertenciasAtivas(),
                 entidade.getTotalSuspensoes(),
                 entidade.getCriadoEm(),
-                entidade.getAtualizadoEm()
+                entidade.getAtualizadoEm(),
+                responsavel != null ? responsavel.getResponsavel().getNomeCompleto() : null,
+                responsavel != null ? responsavel.getParentesco() : null,
+                responsavel != null ? responsavel.getResponsavel().getTelefone() : null,
+                frequencia != null ? frequencia.percentual() : null,
+                frequencia != null ? frequencia.totalAulas() : null,
+                frequencia != null ? frequencia.faltasConsecutivas() : null,
+                frequencia != null ? frequencia.emAcompanhamento() : null
         );
+    }
+
+    private String cpfOuNulo(String cpf) {
+        return StringUtils.hasText(cpf) ? cpf : null;
     }
 }

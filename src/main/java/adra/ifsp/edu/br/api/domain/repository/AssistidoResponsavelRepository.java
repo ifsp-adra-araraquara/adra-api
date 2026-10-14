@@ -4,6 +4,9 @@ import adra.ifsp.edu.br.api.domain.model.AssistidoResponsavel;
 import adra.ifsp.edu.br.api.domain.model.AssistidoResponsavelId;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -22,4 +25,8 @@ public interface AssistidoResponsavelRepository extends JpaRepository<AssistidoR
      * tanto na criacao quanto na edicao do vinculo.
      */
     boolean existsByIdAssistidoIdAndResponsavelPrincipalTrueAndIdResponsavelIdNot(Long assistidoId, Long responsavelId);
+
+    /** Vínculos de vários assistidos com o responsável já carregado (sem N+1) — coluna "Responsável" da listagem. */
+    @Query("SELECT ar FROM AssistidoResponsavel ar JOIN FETCH ar.responsavel WHERE ar.assistido.assistidoId IN :assistidoIds")
+    List<AssistidoResponsavel> findComResponsavelByAssistidoIds(@Param("assistidoIds") Collection<Long> assistidoIds);
 }

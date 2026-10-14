@@ -1,6 +1,5 @@
 package adra.ifsp.edu.br.api.exception;
 
-import adra.ifsp.edu.br.api.domain.dto.comum.AlertaDuplicidadeDTO;
 import adra.ifsp.edu.br.api.domain.dto.comum.ErroRespostaDTO;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
@@ -8,6 +7,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -56,16 +56,6 @@ public class GlobalExceptionHandler {
                 ErroRespostaDTO.de(409, "Regra de negocio violada", ex.getMessage(), request.getRequestURI()));
     }
 
-    /**
-     * 409 com corpo especifico contendo os possiveis duplicados, para o
-     * front decidir se reenvia com confirmarApesarDeDuplicidade=true.
-     */
-    @ExceptionHandler(DuplicidadeProvavelException.class)
-    public ResponseEntity<AlertaDuplicidadeDTO> tratarDuplicidade(DuplicidadeProvavelException ex) {
-        return ResponseEntity.status(HttpStatus.CONFLICT)
-                .body(new AlertaDuplicidadeDTO(ex.getMessage(), ex.getPossiveisDuplicados()));
-    }
-
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErroRespostaDTO> tratarValidacao(MethodArgumentNotValidException ex,
                                                              HttpServletRequest request) {
@@ -76,6 +66,14 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
                 ErroRespostaDTO.de(400, "Dados invalidos", "Um ou mais campos estao invalidos",
                         request.getRequestURI(), detalhes));
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ErroRespostaDTO> tratarCorpoInvalido(HttpMessageNotReadableException ex,
+                                                               HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
+                ErroRespostaDTO.de(400, "Dados invalidos", "Um ou mais campos possuem valor invalido",
+                        request.getRequestURI()));
     }
 
     /** Rede de seguranca: se alguma constraint do banco (ex.: indice unico) escapar da validacao preventiva do service. */
@@ -101,8 +99,7 @@ public class GlobalExceptionHandler {
 
     /**
      * 409 com o responsavel existente no corpo, para o front oferecer
-     * reaproveitar o registro em vez de permitir duplicidade (diferente de
-     * DuplicidadeProvavelException: aqui nao ha "confirmar mesmo assim").
+     * reaproveitar o registro em vez de permitir duplicidade.
      */
     @ExceptionHandler(CpfDuplicadoException.class)
     public ResponseEntity<AlertaCpfDuplicadoDTO> tratarCpfDuplicado(CpfDuplicadoException ex) {

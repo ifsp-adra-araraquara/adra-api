@@ -42,7 +42,10 @@ public class AulaController {
         return ResponseEntity.ok(aulaService.cadastrarVariasAulas(criacaoAulas));
     }
 
-    @PreAuthorize("hasRole('COORDENADOR')")
+    // CA-65.3: quem faz a chamada (sociopedagógico) é quem marca a aula como
+    // REALIZADA nesse fluxo — precisa poder chamar esse PATCH pontual de
+    // status também, não só o coordenador.
+    @PreAuthorize("hasAnyRole('SOCIOPEDAGOGICO', 'COORDENADOR')")
     @PatchMapping("/{id}")
     public ResponseEntity<AulaResponseDTO> atualizarStatus(
             @PathVariable Long id,
@@ -96,6 +99,20 @@ public class AulaController {
         return ResponseEntity.ok(
                 aulaService.listarComDetalhesComFiltros(turmaId, oficinaId, dataInicio, dataFim, nomeTurma, titulo, dataAula)
         );
+    }
+
+    /**
+     * US-71: painel do coordenador com o status de lançamento da chamada
+     * ("LANCADA"/"PENDENTE") de cada aula do período, sem abrir aula por aula.
+     */
+    @PreAuthorize("hasRole('COORDENADOR')")
+    @GetMapping("/status-chamada")
+    public ResponseEntity<List<AulaStatusChamadaResponseDTO>> listarStatusChamada(
+            @RequestParam(name = "turma_id", required = false) Long turmaId,
+            @RequestParam(name = "data_inicio", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dataInicio,
+            @RequestParam(name = "data_fim", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dataFim
+    ) {
+        return ResponseEntity.ok(aulaService.listarStatusChamada(turmaId, dataInicio, dataFim));
     }
 
     @PreAuthorize("hasAnyRole('OFICINEIRO', 'SOCIOPEDAGOGICO', 'COORDENADOR')")

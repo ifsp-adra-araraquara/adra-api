@@ -21,7 +21,7 @@ public class VinculoFamiliarController {
 
     private final VinculoFamiliarService vinculoFamiliarService;
 
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'COORDENADOR')")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'COORDENADOR', 'SOCIOPEDAGOGICO')")
     @PostMapping
     public ResponseEntity<VinculoFamiliarResponseDTO> vincular(@PathVariable Long assistidoId,
                                                                  @Valid @RequestBody VinculoFamiliarRequestDTO dto) {
@@ -30,7 +30,7 @@ public class VinculoFamiliarController {
         return ResponseEntity.created(local).body(criado);
     }
 
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'COORDENADOR')")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'COORDENADOR', 'SOCIOPEDAGOGICO')")
     @PostMapping("/cadastrar-vincular")
     public ResponseEntity<VinculoFamiliarResponseDTO> cadastrarVincular(
             @PathVariable Long assistidoId,
@@ -47,7 +47,7 @@ public class VinculoFamiliarController {
         return ResponseEntity.ok(vinculoFamiliarService.listarPorAssistido(assistidoId));
     }
 
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'COORDENADOR')")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'COORDENADOR', 'SOCIOPEDAGOGICO')")
     @PutMapping("/{responsavelId}")
     public ResponseEntity<VinculoFamiliarResponseDTO> atualizar(@PathVariable Long assistidoId,
                                                                   @PathVariable Long responsavelId,

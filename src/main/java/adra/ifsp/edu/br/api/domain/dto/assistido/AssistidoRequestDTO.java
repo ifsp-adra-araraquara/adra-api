@@ -2,11 +2,11 @@ package adra.ifsp.edu.br.api.domain.dto.assistido;
 
 import adra.ifsp.edu.br.api.domain.dto.vinculo.VinculoFamiliarComResponsavelRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.vinculo.VinculoFamiliarRequestDTO;
+import adra.ifsp.edu.br.api.domain.validation.ValidCpf;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Past;
-import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 import java.time.LocalDate;
@@ -22,9 +22,8 @@ public record AssistidoRequestDTO(
         @Past(message = "Data de nascimento deve estar no passado")
         LocalDate dataNascimento,
 
-        // CPF opcional e NAO unico (definido explicitamente no card) - so
-        // validamos o formato quando informado.
-        @Pattern(regexp = "^$|\\d{11}", message = "CPF deve conter 11 digitos numericos")
+        // CPF opcional e unico quando informado.
+        @ValidCpf(message = "CPF invalido")
         String cpf,
 
         // Se nao informado, o service assume LocalDate.now().
@@ -46,10 +45,6 @@ public record AssistidoRequestDTO(
         // significa "esta chamada nao gerencia responsaveis existentes".
         // Um vinculo existente que NAO aparecer aqui e' desvinculado.
         @Valid
-        List<VinculoFamiliarRequestDTO> responsaveisVinculados,
-
-        // Flag de confirmacao do alerta de duplicidade provavel (mesmo nome +
-        // nascimento). Default false: primeira tentativa sempre verifica.
-        boolean confirmarApesarDeDuplicidade
+        List<VinculoFamiliarRequestDTO> responsaveisVinculados
 ) {
 }

@@ -1,9 +1,7 @@
 package adra.ifsp.edu.br.api.domain.service;
 
-import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 
 import org.springframework.data.domain.PageRequest;
@@ -18,7 +16,6 @@ import adra.ifsp.edu.br.api.domain.dto.usuario.UsuarioResponseDTO;
 import adra.ifsp.edu.br.api.domain.dto.usuario.UsuarioStatusRequestDTO;
 import adra.ifsp.edu.br.api.domain.repository.UsuarioSpecification;
 import adra.ifsp.edu.br.api.domain.enums.AcaoSistema;
-import adra.ifsp.edu.br.api.domain.enums.EspecialidadeSaude;
 import adra.ifsp.edu.br.api.domain.enums.ModuloSistema;
 import adra.ifsp.edu.br.api.domain.enums.NomeNivelPermissao;
 import adra.ifsp.edu.br.api.domain.mapper.UsuarioMapper;
@@ -35,11 +32,6 @@ import lombok.RequiredArgsConstructor;
 @Transactional
 public class UsuarioService {
 
-    private static final Set<NomeNivelPermissao> PERFIS_DO_MVP = EnumSet.of(
-            NomeNivelPermissao.ADMINISTRADOR,
-            NomeNivelPermissao.COORDENADOR,
-            NomeNivelPermissao.SOCIOPEDAGOGICO);
-
     private final UsuarioRepository usuarioRepository;
     private final NivelPermissaoRepository nivelPermissaoRepository;
     private final UsuarioMapper usuarioMapper;
@@ -47,14 +39,9 @@ public class UsuarioService {
 
     @Transactional(readOnly = true)
     public void validarNovoCadastro(UsuarioRequestDTO dto) {
-        if (!PERFIS_DO_MVP.contains(dto.nivelPermissao())) {
-            throw new RegraNegocioException(
-                    "Perfil fora do escopo do MVP: " + dto.nivelPermissao() + ".");
-        }
         if (usuarioRepository.existsByEmailIgnoreCase(dto.email())) {
             throw new RegraNegocioException("Ja existe um usuario cadastrado com este e-mail.");
         }
-        validarEspecialidade(dto.nivelPermissao(), dto.especialidade());
     }
 
     public UsuarioResponseDTO cadastrar(UsuarioRequestDTO dto, UUID authUid) {
@@ -118,7 +105,6 @@ public class UsuarioService {
         }
 
         NivelPermissao nivelPermissao = buscarNivelPermissao(dto.nivelPermissao());
-        validarEspecialidade(dto.nivelPermissao(), dto.especialidade());
 
         Map<String, Object> valorAnterior = Map.of(
                 "nomeCompleto", usuario.getNomeCompleto(),
@@ -192,21 +178,6 @@ public class UsuarioService {
         return nivelPermissaoRepository.findByNome(nome)
                 .orElseThrow(() -> new EntidadeNaoEncontradaException(
                         "Nivel de permissao '" + nome + "' nao encontrado. Rode a migracao/seed antes de cadastrar usuarios."));
-    }
-
-    /**
-     * Regra do card: especialidade e' obrigatoria QUANDO o nivel for
-     * PROFISSIONAL_SAUDE, e nao se aplica a nenhum outro perfil.
-     */
-    private void validarEspecialidade(NomeNivelPermissao nivel, EspecialidadeSaude especialidade) {
-        if (nivel == NomeNivelPermissao.PROFISSIONAL_SAUDE && especialidade == null) {
-            throw new RegraNegocioException(
-                    "Especialidade e' obrigatoria para usuarios com nivel PROFISSIONAL_SAUDE.");
-        }
-        if (nivel != NomeNivelPermissao.PROFISSIONAL_SAUDE && especialidade != null) {
-            throw new RegraNegocioException(
-                    "Especialidade so' deve ser informada para usuarios com nivel PROFISSIONAL_SAUDE.");
-        }
     }
 
 

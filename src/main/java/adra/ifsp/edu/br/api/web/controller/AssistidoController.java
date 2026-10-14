@@ -16,10 +16,14 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import adra.ifsp.edu.br.api.domain.dto.PaginaDTO;
+import adra.ifsp.edu.br.api.domain.dto.assistido.AssistidoContagemDTO;
 import adra.ifsp.edu.br.api.domain.dto.assistido.AssistidoRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.assistido.AssistidoResponseDTO;
 import adra.ifsp.edu.br.api.domain.dto.assistido.AssistidoStatusRequestDTO;
+import adra.ifsp.edu.br.api.domain.dto.assistido.ResultadoLinhaLoteDTO;
+import adra.ifsp.edu.br.api.domain.dto.turma.VinculoTurmaAssistidoResponseDTO;
 import adra.ifsp.edu.br.api.domain.enums.StatusGeral;
+import adra.ifsp.edu.br.api.domain.service.AssistidoLoteService;
 import adra.ifsp.edu.br.api.domain.service.AssistidoService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -31,12 +35,26 @@ import org.springframework.security.access.prepost.PreAuthorize;
 public class AssistidoController {
 
     private final AssistidoService assistidoService;
+    private final AssistidoLoteService assistidoLoteService;
 
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'COORDENADOR')")
+    @PreAuthorize("hasAnyRole('COORDENADOR', 'SOCIOPEDAGOGICO')")
     @PostMapping
     public ResponseEntity<AssistidoResponseDTO> cadastrar(@Valid @RequestBody AssistidoRequestDTO dto) {
         AssistidoResponseDTO criado = assistidoService.cadastrar(dto);
         return ResponseEntity.created(URI.create("/api/assistidos/" + criado.assistidoId())).body(criado);
+    }
+
+    // Sem @Valid no corpo: cada linha e' validada no service para o lote seguir com as demais.
+    @PreAuthorize("hasAnyRole('COORDENADOR', 'SOCIOPEDAGOGICO')")
+    @PostMapping("/lote/validar")
+    public ResponseEntity<List<ResultadoLinhaLoteDTO>> validarLote(@RequestBody List<AssistidoRequestDTO> itens) {
+        return ResponseEntity.ok(assistidoLoteService.validar(itens));
+    }
+
+    @PreAuthorize("hasAnyRole('COORDENADOR', 'SOCIOPEDAGOGICO')")
+    @PostMapping("/lote")
+    public ResponseEntity<List<ResultadoLinhaLoteDTO>> cadastrarLote(@RequestBody List<AssistidoRequestDTO> itens) {
+        return ResponseEntity.ok(assistidoLoteService.cadastrar(itens));
     }
 
     @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'COORDENADOR', 'SOCIOPEDAGOGICO', 'OFICINEIRO')")
@@ -44,17 +62,30 @@ public class AssistidoController {
     public ResponseEntity<PaginaDTO<AssistidoResponseDTO>> listar(
             @RequestParam(required = false) String busca,
             @RequestParam(required = false) Long turmaId,
+            @RequestParam(required = false) Long oficinaId,
             @RequestParam(required = false) StatusGeral status,
+            @RequestParam(defaultValue = "false") boolean emAcompanhamento,
             @RequestParam(defaultValue = "0") int pagina,
             @RequestParam(defaultValue = "20") int tamanho) {
-        return ResponseEntity.ok(assistidoService.listarPaginado(busca, turmaId, status, pagina, tamanho));
+        return ResponseEntity.ok(assistidoService.listarPaginado(
+                busca, turmaId, oficinaId, status, emAcompanhamento, pagina, tamanho));
+    }
+
+    /** Totais das abas da listagem (Todos / Ativos / Inativos / Em acompanhamento). */
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'COORDENADOR', 'SOCIOPEDAGOGICO', 'OFICINEIRO')")
+    @GetMapping("/contagem")
+    public ResponseEntity<AssistidoContagemDTO> contar(
+            @RequestParam(required = false) String busca,
+            @RequestParam(required = false) Long turmaId,
+            @RequestParam(required = false) Long oficinaId) {
+        return ResponseEntity.ok(assistidoService.contar(busca, turmaId, oficinaId));
     }
 
     /**
      * Endpoint leve para o alerta NAO BLOQUEANTE de duplicidade por nome
      * e data de nascimento no formulario do front (CA-A02.2).
      */
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'COORDENADOR')")
+    @PreAuthorize("hasAnyRole('COORDENADOR', 'SOCIOPEDAGOGICO')")
     @GetMapping("/verificar-duplicidade")
     public ResponseEntity<Map<String, Object>> verificarDuplicidade(
             @RequestParam(required = false) String nomeCompleto,
@@ -75,17 +106,24 @@ public class AssistidoController {
         return ResponseEntity.ok(assistidoService.buscarPorId(id));
     }
 
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'COORDENADOR')")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'COORDENADOR', 'SOCIOPEDAGOGICO')")
     @PutMapping("/{id}")
     public ResponseEntity<AssistidoResponseDTO> atualizar(@PathVariable Long id,
                                                             @Valid @RequestBody AssistidoRequestDTO dto) {
         return ResponseEntity.ok(assistidoService.atualizar(id, dto));
     }
 
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'COORDENADOR')")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'COORDENADOR', 'SOCIOPEDAGOGICO')")
     @PatchMapping("/{id}/status")
     public ResponseEntity<AssistidoResponseDTO> alterarStatus(@PathVariable Long id,
                                                                 @Valid @RequestBody AssistidoStatusRequestDTO dto) {
         return ResponseEntity.ok(assistidoService.alterarStatus(id, dto));
+    }
+
+    /** Aba "Turmas" do modal do assistido — histórico de vínculos (turma_aluno), só pro coordenador. */
+    @PreAuthorize("hasAnyRole('COORDENADOR', 'SOCIOPEDAGOGICO')")
+    @GetMapping("/{id}/turmas")
+    public ResponseEntity<List<VinculoTurmaAssistidoResponseDTO>> listarHistoricoTurmas(@PathVariable Long id) {
+        return ResponseEntity.ok(assistidoService.listarHistoricoTurmas(id));
     }
 }

@@ -3,10 +3,13 @@ package adra.ifsp.edu.br.api.domain.service;
 import adra.ifsp.edu.br.api.domain.dto.aula.AulaComDetalhesResponseDTO;
 import adra.ifsp.edu.br.api.domain.dto.aula.AulaRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.aula.AulaResponseDTO;
+import adra.ifsp.edu.br.api.domain.dto.aula.AulaStatusChamadaResponseDTO;
 import adra.ifsp.edu.br.api.domain.dto.aula.AulaStatusPatchRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.aula.GerarAulasResponseDTO;
 import adra.ifsp.edu.br.api.domain.enums.AcaoSistema;
 import adra.ifsp.edu.br.api.domain.enums.ModuloSistema;
+import adra.ifsp.edu.br.api.domain.enums.StatusAula;
+import adra.ifsp.edu.br.api.domain.enums.StatusChamada;
 import adra.ifsp.edu.br.api.domain.mapper.AulaMapper;
 import adra.ifsp.edu.br.api.domain.model.Aula;
 import adra.ifsp.edu.br.api.domain.model.CriacaoAulas;
@@ -16,6 +19,7 @@ import adra.ifsp.edu.br.api.domain.repository.AulaSpecification;
 import adra.ifsp.edu.br.api.domain.repository.ExcecaoCalendarioRepository;
 import adra.ifsp.edu.br.api.domain.repository.TurmaRepository;
 import adra.ifsp.edu.br.api.exception.EntidadeNaoEncontradaException;
+import adra.ifsp.edu.br.api.exception.RegraNegocioException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
@@ -188,6 +192,36 @@ public class AulaService {
         }
 
         return resultado;
+    }
+
+    /**
+     * US-71: aula REALIZADA tem a chamada lançada (presente é o padrão e não
+     * gera linha); PLANEJADA no passado está pendente. Aulas
+     * canceladas/remarcadas e futuras ficam de fora (CA-71.3).
+     */
+    @Transactional(readOnly = true)
+    public List<AulaStatusChamadaResponseDTO> listarStatusChamada(Long turmaId, LocalDate dataInicio, LocalDate dataFim) {
+        if (dataInicio != null && dataFim != null && dataInicio.isAfter(dataFim)) {
+            throw new RegraNegocioException("A data inicial não pode ser posterior à data final.");
+        }
+
+        Specification<Aula> spec = AulaSpecification.filtroTurmaId(turmaId)
+                .and(AulaSpecification.filtroPeriodo(dataInicio, dataFim))
+                .and(AulaSpecification.filtroAulaComChamadaEsperada(LocalDate.now()));
+
+        List<Aula> aulas = aulaRepository.findAll(spec);
+        if (aulas.isEmpty()) {
+            return List.of();
+        }
+
+        return aulas.stream()
+                .sorted(Comparator.comparing(Aula::getDataAula)
+                        .thenComparing(Aula::getHorarioInicio, Comparator.nullsLast(Comparator.naturalOrder())))
+                .map(aula -> AulaStatusChamadaResponseDTO.fromEntity(
+                        aula,
+                        aula.getStatusAula() == StatusAula.REALIZADA ? StatusChamada.LANCADA : StatusChamada.PENDENTE
+                ))
+                .toList();
     }
 
     public AulaResponseDTO buscarPorId(Long id) {

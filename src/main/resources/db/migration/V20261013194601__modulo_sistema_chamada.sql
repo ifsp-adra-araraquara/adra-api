@@ -1,0 +1,1 @@
+ALTER TYPE adra.modulo_sistema ADD VALUE IF NOT EXISTS 'CHAMADA';
