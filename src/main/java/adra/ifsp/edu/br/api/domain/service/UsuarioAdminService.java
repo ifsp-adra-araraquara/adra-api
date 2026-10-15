@@ -7,8 +7,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.HttpClientErrorException;
 
-import adra.ifsp.edu.br.api.domain.dto.usuario.DefinirSenhaRequestDTO;
+import adra.ifsp.edu.br.api.domain.dto.usuario.RedefinicaoSenhaResponseDTO;
 import adra.ifsp.edu.br.api.domain.dto.usuario.UsuarioRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.usuario.UsuarioResponseDTO;
 import adra.ifsp.edu.br.api.domain.dto.usuario.UsuarioStatusRequestDTO;
@@ -16,20 +17,13 @@ import adra.ifsp.edu.br.api.domain.enums.NomeNivelPermissao;
 import adra.ifsp.edu.br.api.domain.model.Usuario;
 import adra.ifsp.edu.br.api.exception.AcessoNegadoException;
 import adra.ifsp.edu.br.api.exception.RegraNegocioException;
+import adra.ifsp.edu.br.api.infra.EmailService;
 import adra.ifsp.edu.br.api.infra.SupabaseAdminClient;
 import lombok.RequiredArgsConstructor;
 
 /**
  * Fora da transacao e em classe separada de proposito: so' assim enxerga falha
  * de commit e desfaz a identidade ja' criada no Supabase.
- *
- * IMPORTANTE: usuarioService.cadastrar(...) roda em transacao propria (outro
- * bean @Transactional) e ja' commita no banco antes de retornar. Por isso o
- * envio do convite e' tratado em um try/catch SEPARADO: se o e-mail falhar
- * (ex.: Brevo fora do ar, API key invalida), o usuario e a identidade no
- * Supabase Auth ja existem e sao validos -- nao faz sentido desfazer o
- * cadastro inteiro so' porque o e-mail nao saiu. So desfazemos a identidade
- * se a CRIACAO do usuario em si falhar.
  */
 @Service
 @RequiredArgsConstructor
@@ -39,19 +33,15 @@ public class UsuarioAdminService {
 
     private final SupabaseAdminClient supabaseAdminClient;
     private final UsuarioService usuarioService;
-    private final InvitacaoService invitacaoService;
+    private final EmailService emailService;
 
     public UsuarioResponseDTO cadastrar(UsuarioRequestDTO dto) {
         exigirAdministrador();
         usuarioService.validarNovoCadastro(dto);
 
-        UUID authUid = supabaseAdminClient.criarIdentidade(dto.email());
+        UUID authUid = supabaseAdminClient.convidar(dto.email());
 
-        UsuarioResponseDTO criado = cadastrarUsuarioOuDesfazerIdentidade(dto, authUid);
-
-        emitirConviteSemDerrubarCadastro(dto.email(), criado.usuarioId());
-
-        return criado;
+        return cadastrarUsuarioOuDesfazerIdentidade(dto, authUid);
     }
 
     /**
@@ -67,36 +57,46 @@ public class UsuarioAdminService {
         }
     }
 
-    /**
-     * Tenta enviar o convite por e-mail. Se falhar (Brevo indisponivel, API key
-     * invalida, etc.), APENAS loga o erro -- nao desfaz o cadastro nem a
-     * identidade, porque ambos ja sao validos nesse ponto. O admin pode
-     * reenviar o convite depois (ver InvitacaoService/endpoint de reenvio).
-     */
-    private void emitirConviteSemDerrubarCadastro(String email, Long usuarioId) {
+    public void reenviarConvite(Long id) {
+        exigirAdministrador();
+        Usuario usuario = buscarComIdentidade(id);
+
         try {
-            invitacaoService.emitirConvite(email, usuarioId);
-        } catch (RuntimeException e) {
-            log.error(
-                    "Usuario id={} email={} foi cadastrado com sucesso, mas o envio do "
-                    + "convite falhou. O cadastro NAO foi desfeito. Reenvie o convite "
-                    + "manualmente apos corrigir a causa (ex.: BREVO_API_KEY).",
-                    usuarioId, email, e);
+            supabaseAdminClient.convidar(usuario.getEmail());
+        } catch (HttpClientErrorException e) {
+            if (e.getStatusCode().value() == 422) {
+                throw new RegraNegocioException("Este usuario ja confirmou o convite. Use Redefinir senha.");
+            }
+            throw e;
         }
     }
 
-    /** Provisorio: com a US-02 vira excecao; com a US-05, recebe id no lugar do e-mail. */
-    public void definirSenha(DefinirSenhaRequestDTO dto) {
+    /** O link volta mesmo se o e-mail falhar: o admin pode repassa-lo por outro canal. */
+    public RedefinicaoSenhaResponseDTO redefinirSenha(Long id) {
         exigirAdministrador();
+        Usuario usuario = buscarComIdentidade(id);
 
-        Usuario usuario = usuarioService.buscarPorEmail(dto.email());
+        String tokenHash = supabaseAdminClient.gerarTokenRedefinicao(usuario.getEmail());
+
+        boolean emailEnviado = true;
+        try {
+            emailService.enviarRedefinicaoSenha(usuario.getEmail(), tokenHash);
+        } catch (RuntimeException e) {
+            emailEnviado = false;
+            log.error("Falha ao enviar o e-mail de redefinicao de senha do usuario id={}", id, e);
+        }
+
+        usuarioService.registrarRedefinicaoSenha(usuario);
+        return new RedefinicaoSenhaResponseDTO(emailService.linkRedefinicaoSenha(tokenHash), emailEnviado);
+    }
+
+    private Usuario buscarComIdentidade(Long id) {
+        Usuario usuario = usuarioService.buscarEntidadePorId(id);
         if (usuario.getAuthUid() == null) {
             throw new RegraNegocioException(
                     "Usuario sem identidade no provedor de autenticacao. Cadastre-o novamente.");
         }
-
-        supabaseAdminClient.definirSenha(usuario.getAuthUid(), dto.novaSenha());
-        usuarioService.registrarSenhaDefinida(usuario);
+        return usuario;
     }
 
     public UsuarioResponseDTO alterarStatus(Long id, UsuarioStatusRequestDTO dto) {

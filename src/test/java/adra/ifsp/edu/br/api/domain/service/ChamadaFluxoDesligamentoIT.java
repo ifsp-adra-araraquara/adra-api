@@ -69,9 +69,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
         "spring.jpa.hibernate.ddl-auto=create-drop",
         "spring.flyway.enabled=false",
         "spring.jpa.properties.hibernate.default_schema=adra",
-        "adra.brevo.api-key=dummy-teste",
-        "adra.brevo.remetente-email=teste@teste.local",
-        "adra.brevo.remetente-nome=Teste",
         "adra.frontend.url=http://localhost:4200",
         // igual ao "?stringtype=unspecified" da URL real (application-local/
         // stage.properties) — sem isso, o driver manda o "ip" nulo de
