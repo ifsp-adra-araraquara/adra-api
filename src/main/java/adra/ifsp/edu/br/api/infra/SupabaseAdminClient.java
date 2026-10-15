@@ -16,16 +16,17 @@ public class SupabaseAdminClient {
     public SupabaseAdminClient(@Value("${adra.supabase.url}") String url,
                                @Value("${adra.supabase.service-key}") String serviceKey) {
         this.rest = RestClient.builder()
-                .baseUrl(url + "/auth/v1/admin")
+                .baseUrl(url + "/auth/v1")
                 .defaultHeader("apikey", serviceKey)
                 .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + serviceKey)
                 .build();
     }
 
-    public UUID criarIdentidade(String email) {
+    /** Cria a identidade e envia o convite; para quem ainda nao confirmou, so reenvia. */
+    public UUID convidar(String email) {
         Identidade identidade = rest.post()
-                .uri("/users")
-                .body(Map.of("email", email, "email_confirm", true))
+                .uri("/invite")
+                .body(Map.of("email", email))
                 .retrieve()
                 .body(Identidade.class);
 
@@ -34,7 +35,7 @@ public class SupabaseAdminClient {
 
     public void definirSenha(UUID authUid, String senha) {
         rest.put()
-                .uri("/users/{id}", authUid)
+                .uri("/admin/users/{id}", authUid)
                 .body(Map.of("password", senha))
                 .retrieve()
                 .toBodilessEntity();
@@ -42,7 +43,7 @@ public class SupabaseAdminClient {
 
     public void removerIdentidade(UUID authUid) {
         rest.delete()
-                .uri("/users/{id}", authUid)
+                .uri("/admin/users/{id}", authUid)
                 .retrieve()
                 .toBodilessEntity();
     }
@@ -50,7 +51,7 @@ public class SupabaseAdminClient {
     public void alterarStatus(UUID authUid, boolean ativo) {
         String banDuration = ativo ? "none" : "876600h";
         rest.put()
-                .uri("/users/{id}", authUid)
+                .uri("/admin/users/{id}", authUid)
                 .body(Map.of("ban_duration", banDuration))
                 .retrieve()
                 .toBodilessEntity();

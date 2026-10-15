@@ -22,14 +22,6 @@ import lombok.RequiredArgsConstructor;
 /**
  * Fora da transacao e em classe separada de proposito: so' assim enxerga falha
  * de commit e desfaz a identidade ja' criada no Supabase.
- *
- * IMPORTANTE: usuarioService.cadastrar(...) roda em transacao propria (outro
- * bean @Transactional) e ja' commita no banco antes de retornar. Por isso o
- * envio do convite e' tratado em um try/catch SEPARADO: se o e-mail falhar
- * (ex.: Brevo fora do ar, API key invalida), o usuario e a identidade no
- * Supabase Auth ja existem e sao validos -- nao faz sentido desfazer o
- * cadastro inteiro so' porque o e-mail nao saiu. So desfazemos a identidade
- * se a CRIACAO do usuario em si falhar.
  */
 @Service
 @RequiredArgsConstructor
@@ -39,19 +31,14 @@ public class UsuarioAdminService {
 
     private final SupabaseAdminClient supabaseAdminClient;
     private final UsuarioService usuarioService;
-    private final InvitacaoService invitacaoService;
 
     public UsuarioResponseDTO cadastrar(UsuarioRequestDTO dto) {
         exigirAdministrador();
         usuarioService.validarNovoCadastro(dto);
 
-        UUID authUid = supabaseAdminClient.criarIdentidade(dto.email());
+        UUID authUid = supabaseAdminClient.convidar(dto.email());
 
-        UsuarioResponseDTO criado = cadastrarUsuarioOuDesfazerIdentidade(dto, authUid);
-
-        emitirConviteSemDerrubarCadastro(dto.email(), criado.usuarioId());
-
-        return criado;
+        return cadastrarUsuarioOuDesfazerIdentidade(dto, authUid);
     }
 
     /**
@@ -64,24 +51,6 @@ public class UsuarioAdminService {
         } catch (RuntimeException e) {
             desfazerIdentidade(authUid);
             throw e;
-        }
-    }
-
-    /**
-     * Tenta enviar o convite por e-mail. Se falhar (Brevo indisponivel, API key
-     * invalida, etc.), APENAS loga o erro -- nao desfaz o cadastro nem a
-     * identidade, porque ambos ja sao validos nesse ponto. O admin pode
-     * reenviar o convite depois (ver InvitacaoService/endpoint de reenvio).
-     */
-    private void emitirConviteSemDerrubarCadastro(String email, Long usuarioId) {
-        try {
-            invitacaoService.emitirConvite(email, usuarioId);
-        } catch (RuntimeException e) {
-            log.error(
-                    "Usuario id={} email={} foi cadastrado com sucesso, mas o envio do "
-                    + "convite falhou. O cadastro NAO foi desfeito. Reenvie o convite "
-                    + "manualmente apos corrigir a causa (ex.: BREVO_API_KEY).",
-                    usuarioId, email, e);
         }
     }
 
