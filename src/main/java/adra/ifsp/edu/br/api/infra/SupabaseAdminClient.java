@@ -8,6 +8,8 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 @Component
 public class SupabaseAdminClient {
 
@@ -33,12 +35,15 @@ public class SupabaseAdminClient {
         return identidade.id();
     }
 
-    public void definirSenha(UUID authUid, String senha) {
-        rest.put()
-                .uri("/admin/users/{id}", authUid)
-                .body(Map.of("password", senha))
+    /** Nao envia e-mail e invalida o link de redefinicao anterior. */
+    public String gerarTokenRedefinicao(String email) {
+        LinkGerado link = rest.post()
+                .uri("/admin/generate_link")
+                .body(Map.of("type", "recovery", "email", email))
                 .retrieve()
-                .toBodilessEntity();
+                .body(LinkGerado.class);
+
+        return link.hashedToken();
     }
 
     public void removerIdentidade(UUID authUid) {
@@ -58,5 +63,8 @@ public class SupabaseAdminClient {
     }
 
     private record Identidade(UUID id) {
+    }
+
+    private record LinkGerado(@JsonProperty("hashed_token") String hashedToken) {
     }
 }

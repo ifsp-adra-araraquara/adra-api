@@ -7,8 +7,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.HttpClientErrorException;
 
-import adra.ifsp.edu.br.api.domain.dto.usuario.DefinirSenhaRequestDTO;
+import adra.ifsp.edu.br.api.domain.dto.usuario.RedefinicaoSenhaResponseDTO;
 import adra.ifsp.edu.br.api.domain.dto.usuario.UsuarioRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.usuario.UsuarioResponseDTO;
 import adra.ifsp.edu.br.api.domain.dto.usuario.UsuarioStatusRequestDTO;
@@ -16,6 +17,7 @@ import adra.ifsp.edu.br.api.domain.enums.NomeNivelPermissao;
 import adra.ifsp.edu.br.api.domain.model.Usuario;
 import adra.ifsp.edu.br.api.exception.AcessoNegadoException;
 import adra.ifsp.edu.br.api.exception.RegraNegocioException;
+import adra.ifsp.edu.br.api.infra.EmailService;
 import adra.ifsp.edu.br.api.infra.SupabaseAdminClient;
 import lombok.RequiredArgsConstructor;
 
@@ -31,6 +33,7 @@ public class UsuarioAdminService {
 
     private final SupabaseAdminClient supabaseAdminClient;
     private final UsuarioService usuarioService;
+    private final EmailService emailService;
 
     public UsuarioResponseDTO cadastrar(UsuarioRequestDTO dto) {
         exigirAdministrador();
@@ -54,18 +57,46 @@ public class UsuarioAdminService {
         }
     }
 
-    /** Provisorio: com a US-02 vira excecao; com a US-05, recebe id no lugar do e-mail. */
-    public void definirSenha(DefinirSenhaRequestDTO dto) {
+    public void reenviarConvite(Long id) {
         exigirAdministrador();
+        Usuario usuario = buscarComIdentidade(id);
 
-        Usuario usuario = usuarioService.buscarPorEmail(dto.email());
+        try {
+            supabaseAdminClient.convidar(usuario.getEmail());
+        } catch (HttpClientErrorException e) {
+            if (e.getStatusCode().value() == 422) {
+                throw new RegraNegocioException("Este usuario ja confirmou o convite. Use Redefinir senha.");
+            }
+            throw e;
+        }
+    }
+
+    /** O link volta mesmo se o e-mail falhar: o admin pode repassa-lo por outro canal. */
+    public RedefinicaoSenhaResponseDTO redefinirSenha(Long id) {
+        exigirAdministrador();
+        Usuario usuario = buscarComIdentidade(id);
+
+        String tokenHash = supabaseAdminClient.gerarTokenRedefinicao(usuario.getEmail());
+
+        boolean emailEnviado = true;
+        try {
+            emailService.enviarRedefinicaoSenha(usuario.getEmail(), tokenHash);
+        } catch (RuntimeException e) {
+            emailEnviado = false;
+            log.error("Falha ao enviar o e-mail de redefinicao de senha do usuario id={}", id, e);
+        }
+
+        usuarioService.registrarRedefinicaoSenha(usuario);
+        return new RedefinicaoSenhaResponseDTO(emailService.linkRedefinicaoSenha(tokenHash), emailEnviado);
+    }
+
+    private Usuario buscarComIdentidade(Long id) {
+        Usuario usuario = usuarioService.buscarEntidadePorId(id);
         if (usuario.getAuthUid() == null) {
             throw new RegraNegocioException(
                     "Usuario sem identidade no provedor de autenticacao. Cadastre-o novamente.");
         }
-
-        supabaseAdminClient.definirSenha(usuario.getAuthUid(), dto.novaSenha());
-        usuarioService.registrarSenhaDefinida(usuario);
+        return usuario;
     }
 
     public UsuarioResponseDTO alterarStatus(Long id, UsuarioStatusRequestDTO dto) {

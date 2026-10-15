@@ -152,21 +152,15 @@ public class UsuarioService {
         return usuarioMapper.paraDTO(usuario);
     }
 
-    @Transactional(readOnly = true)
-    public Usuario buscarPorEmail(String email) {
-        return usuarioRepository.findByEmailIgnoreCase(email)
-                .orElseThrow(() -> new EntidadeNaoEncontradaException("Usuario nao encontrado: " + email));
-    }
-
-    public void registrarSenhaDefinida(Usuario usuario) {
+    public void registrarRedefinicaoSenha(Usuario usuario) {
         auditoriaService.registrar(
                 ModuloSistema.USUARIOS,
                 "usuario",
                 usuario.getUsuarioId(),
                 AcaoSistema.EDITAR,
                 null,
-                Map.of("senhaRedefinida", true),
-                "Senha definida pelo Administrador");
+                Map.of("linkRedefinicaoSenhaGerado", true),
+                "Link de redefinicao de senha gerado pelo Administrador");
     }
 
     Usuario buscarEntidadePorId(Long id) {

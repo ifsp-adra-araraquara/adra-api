@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import adra.ifsp.edu.br.api.domain.dto.PaginaDTO;
-import adra.ifsp.edu.br.api.domain.dto.usuario.DefinirSenhaRequestDTO;
+import adra.ifsp.edu.br.api.domain.dto.usuario.RedefinicaoSenhaResponseDTO;
 import adra.ifsp.edu.br.api.domain.dto.usuario.UsuarioRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.usuario.UsuarioResponseDTO;
 import adra.ifsp.edu.br.api.domain.dto.usuario.UsuarioStatusRequestDTO;
@@ -42,10 +42,16 @@ public class UsuarioController {
     }
 
     @PreAuthorize("hasRole('ADMINISTRADOR')")
-    @PutMapping("/senha")
-    public ResponseEntity<Void> definirSenha(@Valid @RequestBody DefinirSenhaRequestDTO dto) {
-        usuarioAdminService.definirSenha(dto);
+    @PostMapping("/{id}/convite")
+    public ResponseEntity<Void> reenviarConvite(@PathVariable Long id) {
+        usuarioAdminService.reenviarConvite(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    @PostMapping("/{id}/redefinicao-senha")
+    public ResponseEntity<RedefinicaoSenhaResponseDTO> redefinirSenha(@PathVariable Long id) {
+        return ResponseEntity.ok(usuarioAdminService.redefinirSenha(id));
     }
 
     @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'COORDENADOR')")
