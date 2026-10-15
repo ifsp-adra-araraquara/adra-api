@@ -25,6 +25,9 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-oauth2-resource-server'
 	implementation 'org.springframework.boot:spring-boot-starter-validation'
 	implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+	implementation 'net.coobird:thumbnailator:0.4.20'                 // redimensionar/recortar
+	implementation 'com.twelvemonkeys.imageio:imageio-webp:3.12.0'    // ImageIO não lê WebP sozinho
+	implementation 'com.twelvemonkeys.imageio:imageio-jpeg:3.12.0'
 	compileOnly 'org.projectlombok:lombok'
 	developmentOnly 'org.springframework.boot:spring-boot-devtools'
 	runtimeOnly 'org.flywaydb:flyway-database-postgresql'

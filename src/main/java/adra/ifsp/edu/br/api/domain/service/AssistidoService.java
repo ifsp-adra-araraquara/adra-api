@@ -9,10 +9,9 @@ import adra.ifsp.edu.br.api.domain.dto.responsavel.ResponsavelRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.turma.VinculoTurmaAssistidoResponseDTO;
 import adra.ifsp.edu.br.api.domain.dto.vinculo.VinculoFamiliarComResponsavelRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.vinculo.VinculoFamiliarRequestDTO;
-import adra.ifsp.edu.br.api.domain.enums.AcaoSistema;
-import adra.ifsp.edu.br.api.domain.enums.ModuloSistema;
-import adra.ifsp.edu.br.api.domain.enums.StatusGeral;
+import adra.ifsp.edu.br.api.domain.enums.*;
 import adra.ifsp.edu.br.api.domain.mapper.AssistidoMapper;
+import adra.ifsp.edu.br.api.exception.ArquivoInvalidoException;
 import adra.ifsp.edu.br.api.domain.model.Assistido;
 import adra.ifsp.edu.br.api.domain.model.AssistidoResponsavel;
 import adra.ifsp.edu.br.api.domain.model.AssistidoResponsavelId;
@@ -38,6 +37,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -53,7 +53,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Transactional
 public class AssistidoService {
-
+    private final ArquivoService arquivoService;
     private final AssistidoRepository assistidoRepository;
     private final AssistidoMapper assistidoMapper;
     private final AssistidoIndicadoresService indicadoresService;
@@ -491,5 +491,29 @@ public class AssistidoService {
                 .build();
 
         return responsavelRepository.save(responsavel);
+    }
+
+    private static final int MAXIMO_DOCUMENTOS_IDENTIDADE = 1;
+
+    /** Cadastro + foto de perfil + RG/CPF (obrigatórios), tudo na mesma transação. */
+    public AssistidoResponseDTO cadastrarComArquivos(AssistidoRequestDTO dto, MultipartFile foto,
+                                                     List<MultipartFile> documentos) {
+        List<MultipartFile> docs = documentos == null ? List.of()
+                : documentos.stream().filter(d -> d != null && !d.isEmpty()).toList();
+        // valida antes de criar o assistido, pra não gastar insert/upload à toa
+        if (docs.isEmpty()) {
+            throw new ArquivoInvalidoException("Envie a foto do RG ou CPF do assistido.");
+        }
+        if (docs.size() > MAXIMO_DOCUMENTOS_IDENTIDADE) {
+            throw new ArquivoInvalidoException("Envie apenas um arquivo do RG ou CPF.");
+        }
+
+        AssistidoResponseDTO criado = cadastrar(dto);
+        Long id = criado.assistidoId();
+        arquivoService.salvar(EntidadeArquivo.ASSISTIDO, id, CategoriaArquivo.FOTO_PERFIL, foto);
+        for (MultipartFile documento : docs) {
+            arquivoService.salvar(EntidadeArquivo.ASSISTIDO, id, CategoriaArquivo.DOCUMENTO_IDENTIDADE, documento);
+        }
+        return criado;
     }
 }
