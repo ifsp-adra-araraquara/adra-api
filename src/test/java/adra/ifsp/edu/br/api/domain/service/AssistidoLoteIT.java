@@ -122,10 +122,14 @@ class AssistidoLoteIT {
 
     private AssistidoRequestDTO assistido(String nome, LocalDate nascimento, String cpf,
                                           VinculoFamiliarComResponsavelRequestDTO responsavel) {
-        return new AssistidoRequestDTO(nome, nascimento, cpf, null, null, null, null, List.of(responsavel), null);
+        return new AssistidoRequestDTO(nome, nascimento, cpf, null, null, null, null,
+                null, null, null, null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null, null, null, null,
+                List.of(responsavel), null);
     }
 
     private VinculoFamiliarComResponsavelRequestDTO responsavel(String nome, String cpf) {
-        return new VinculoFamiliarComResponsavelRequestDTO(nome, null, cpf, null, null, null, null, "Mae", true, false, false);
+        return new VinculoFamiliarComResponsavelRequestDTO(nome, null, cpf, null, null, null, null,
+                null, null, null, null, "Mae", true, false, false);
     }
 }

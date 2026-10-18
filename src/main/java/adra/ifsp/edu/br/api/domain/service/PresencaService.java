@@ -1,5 +1,8 @@
 package adra.ifsp.edu.br.api.domain.service;
 
+import adra.ifsp.edu.br.api.domain.repository.AssistidoResponsavelRepository;
+import adra.ifsp.edu.br.api.domain.model.AssistidoResponsavel;
+import adra.ifsp.edu.br.api.domain.dto.presenca.AutorizadoRetiradaDTO;
 import adra.ifsp.edu.br.api.domain.dto.presenca.FrequenciaAulaDTO;
 import adra.ifsp.edu.br.api.domain.dto.presenca.GradeAlunoDTO;
 import adra.ifsp.edu.br.api.domain.dto.presenca.GradeFrequenciaTurmaDTO;
@@ -57,6 +60,8 @@ import java.util.stream.Collectors;
 @Transactional
 public class PresencaService {
 
+    private final AssistidoResponsavelRepository assistidoResponsavelRepository;
+    private final AssistidoIndicadoresService indicadoresService;
     private final PresencaRepository presencaRepository;
     private final AulaRepository aulaRepository;
     private final AssistidoRepository assistidoRepository;
@@ -165,9 +170,7 @@ public class PresencaService {
                 .map(assistidoId -> {
                     PresencaRequestDTO dto = dtoPorAssistidoId.get(assistidoId);
                     if (dto.statusPresenca() == StatusPresenca.PRESENTE) {
-                        return PresencaResponseDTO.presente(
-                                idAula, assistidoId, assistidosPorId.get(assistidoId).getNomeCompleto()
-                        );
+                        return PresencaResponseDTO.presente(idAula, assistidosPorId.get(assistidoId));
                     }
                     return presencaMapper.paraDTO(salvasPorAssistidoId.get(assistidoId));
                 })
@@ -204,7 +207,7 @@ public class PresencaService {
                             "statusPresenca", "PRESENTE"),
                     "Registro de presença (sem linha — presente)"
             );
-            return PresencaResponseDTO.presente(aula.getAulaId(), assistido.getAssistidoId(), assistido.getNomeCompleto());
+            return PresencaResponseDTO.presente(aula.getAulaId(), assistido);
         }
 
         Usuario usuarioLogado = usuarioAutenticadoService.getUsuarioAtual();
@@ -262,9 +265,31 @@ public class PresencaService {
         Map<Long, List<PresencaHistoricoDTO>> historicoPorAssistido =
                 buscarHistoricoRecente(aula, assistidosDoRoster);
 
+        Map<Long, IndicadorFrequencia> frequencias = indicadoresService.frequencias(assistidosDoRoster);
+        int aulasPrevistas = (int) aulaRepository.countByTurmaAndStatusAulaNot(aula.getTurma(), StatusAula.CANCELADA);
+
+        // Quem pode buscar cada aluno (1 query para o roster todo); principal primeiro.
+        Map<Long, List<AutorizadoRetiradaDTO>> autorizadosPorAssistido = assistidosDoRoster.isEmpty()
+                ? Map.of()
+                : assistidoResponsavelRepository.findComResponsavelByAssistidoIds(
+                                assistidosDoRoster.stream().map(Assistido::getAssistidoId).toList()).stream()
+                        .filter(AssistidoResponsavel::isAutorizadoRetirada)
+                        .sorted(Comparator.comparing(AssistidoResponsavel::isResponsavelPrincipal).reversed()
+                                .thenComparing(v -> v.getResponsavel().getNomeCompleto()))
+                        .collect(Collectors.groupingBy(
+                                v -> v.getAssistido().getAssistidoId(),
+                                Collectors.mapping(v -> new AutorizadoRetiradaDTO(
+                                        v.getResponsavel().getNomeCompleto(),
+                                        v.getParentesco(),
+                                        v.getResponsavel().getTelefone()), Collectors.toList())));
+
         return chamada.stream()
-                .map(dto -> dto.comHistoricoRecente(
-                        historicoPorAssistido.getOrDefault(dto.assistidoId(), List.of())))
+                .map(dto -> {
+                    IndicadorFrequencia freq = frequencias.getOrDefault(dto.assistidoId(), IndicadorFrequencia.SEM_AULAS);
+                    return dto.comHistoricoRecente(historicoPorAssistido.getOrDefault(dto.assistidoId(), List.of()))
+                            .comFrequencia(freq.percentual(), freq.totalAulas(), aulasPrevistas)
+                            .comAutorizadosRetirada(autorizadosPorAssistido.getOrDefault(dto.assistidoId(), List.of()));
+                })
                 .toList();
     }
 
@@ -437,7 +462,7 @@ public class PresencaService {
         if (dto.statusPresenca() == StatusPresenca.PRESENTE) {
             Long aulaId = presenca.getAula().getAulaId();
             Long assistidoId = presenca.getAssistido().getAssistidoId();
-            String nomeCompleto = presenca.getAssistido().getNomeCompleto();
+            Assistido assistidoDaPresenca = presenca.getAssistido();
 
             presencaRepository.delete(presenca);
 
@@ -448,7 +473,7 @@ public class PresencaService {
                     "Atualização de presença (virou presente — linha removida)"
             );
 
-            return PresencaResponseDTO.presente(aulaId, assistidoId, nomeCompleto);
+            return PresencaResponseDTO.presente(aulaId, assistidoDaPresenca);
         }
 
         Map<String, Object> valorAnterior = Map.of("statusPresenca", presenca.getStatusPresenca().name());

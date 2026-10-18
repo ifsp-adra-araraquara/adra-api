@@ -11,6 +11,7 @@ import adra.ifsp.edu.br.api.domain.dto.vinculo.VinculoFamiliarComResponsavelRequ
 import adra.ifsp.edu.br.api.domain.dto.vinculo.VinculoFamiliarRequestDTO;
 import adra.ifsp.edu.br.api.domain.enums.*;
 import adra.ifsp.edu.br.api.domain.mapper.AssistidoMapper;
+import adra.ifsp.edu.br.api.domain.mapper.ResponsavelMapper;
 import adra.ifsp.edu.br.api.exception.ArquivoInvalidoException;
 import adra.ifsp.edu.br.api.domain.model.Assistido;
 import adra.ifsp.edu.br.api.domain.model.AssistidoResponsavel;
@@ -18,6 +19,7 @@ import adra.ifsp.edu.br.api.domain.model.AssistidoResponsavelId;
 import adra.ifsp.edu.br.api.domain.model.AssistidoTurmaHistorico;
 import adra.ifsp.edu.br.api.domain.model.Responsavel;
 import adra.ifsp.edu.br.api.domain.model.Turma;
+import adra.ifsp.edu.br.api.domain.model.TurmaAlunos;
 import adra.ifsp.edu.br.api.domain.repository.AssistidoRepository;
 import adra.ifsp.edu.br.api.domain.repository.AssistidoSpecification;
 import adra.ifsp.edu.br.api.domain.repository.AssistidoTurmaHistoricoRepository;
@@ -56,6 +58,8 @@ public class AssistidoService {
     private final ArquivoService arquivoService;
     private final AssistidoRepository assistidoRepository;
     private final AssistidoMapper assistidoMapper;
+    private final ResponsavelMapper responsavelMapper;
+    private final ElegibilidadeService elegibilidadeService;
     private final AssistidoIndicadoresService indicadoresService;
     private final TurmaRepository turmaRepository;
     private final ResponsavelRepository responsavelRepository;
@@ -65,6 +69,9 @@ public class AssistidoService {
     private final TurmaAlunosRepository turmaAlunosRepository;
 
     public AssistidoResponseDTO cadastrar(AssistidoRequestDTO dto) {
+        validarDadosComplementares(dto);
+        // Regra de corte so na entrada: familia ja atendida nao e' barrada ao editar.
+        elegibilidadeService.validarRendaFamiliar(dto.rendaFamiliar());
         verificarDuplicidade(dto, null);
 
         // CA-A02.3: Validar pelo menos um responsável
@@ -150,7 +157,7 @@ public class AssistidoService {
             int fim = Math.min(inicio + tamanho, filtrados.size());
             List<Assistido> fatia = filtrados.subList(inicio, fim);
             return new PaginaDTO<>(
-                    paraLinhas(fatia, frequencias),
+                    paraLinhas(fatia, frequencias, turmaId),
                     pagina,
                     tamanho,
                     filtrados.size(),
@@ -160,7 +167,7 @@ public class AssistidoService {
 
         Specification<Assistido> spec = AssistidoSpecification.comFiltros(busca, turmaId, oficinaId, status);
         Page<Assistido> page = assistidoRepository.findAll(spec, PageRequest.of(pagina, tamanho, porNome));
-        List<AssistidoResponseDTO> linhas = paraLinhas(page.getContent(), indicadoresService.frequencias(page.getContent()));
+        List<AssistidoResponseDTO> linhas = paraLinhas(page.getContent(), indicadoresService.frequencias(page.getContent()), turmaId);
         return new PaginaDTO<>(linhas, page.getNumber(), page.getSize(), page.getTotalElements(), page.getTotalPages());
     }
 
@@ -177,10 +184,26 @@ public class AssistidoService {
         return new AssistidoContagemDTO(todos, ativos.size(), inativos, emAcompanhamento);
     }
 
-    private List<AssistidoResponseDTO> paraLinhas(List<Assistido> assistidos, Map<Long, IndicadorFrequencia> frequencias) {
+    private List<AssistidoResponseDTO> paraLinhas(List<Assistido> assistidos, Map<Long, IndicadorFrequencia> frequencias,
+                                                  Long turmaId) {
         Map<Long, AssistidoResponsavel> responsaveis = indicadoresService.responsaveisPrincipais(assistidos);
+
+        // Filtro por turma: vínculo mais recente de cada assistido nessa turma (entrada/saída).
+        Map<Long, TurmaAlunos> periodoNaTurma = new java.util.HashMap<>();
+        if (turmaId != null && !assistidos.isEmpty()) {
+            for (TurmaAlunos v : turmaAlunosRepository.findByTurma_TurmaIdAndAssistidoIn(turmaId, assistidos)) {
+                periodoNaTurma.merge(v.getAssistido().getAssistidoId(), v,
+                        (a, b) -> a.getDataEntrada().isAfter(b.getDataEntrada()) ? a : b);
+            }
+        }
+
         return assistidos.stream()
-                .map(a -> assistidoMapper.paraDTO(a, responsaveis.get(a.getAssistidoId()), frequencias.get(a.getAssistidoId())))
+                .map(a -> {
+                    AssistidoResponseDTO dto = assistidoMapper.paraDTO(
+                            a, responsaveis.get(a.getAssistidoId()), frequencias.get(a.getAssistidoId()));
+                    TurmaAlunos periodo = periodoNaTurma.get(a.getAssistidoId());
+                    return periodo == null ? dto : dto.comPeriodoNaTurma(periodo.getDataEntrada(), periodo.getDataSaida());
+                })
                 .toList();
     }
 
@@ -208,6 +231,7 @@ public class AssistidoService {
     public AssistidoResponseDTO atualizar(Long id, AssistidoRequestDTO dto) {
         Assistido assistido = buscarEntidadePorId(id);
 
+        validarDadosComplementares(dto);
         verificarDuplicidade(dto, id);
 
         Map<String, Object> valorAnterior = Map.of(
@@ -470,27 +494,30 @@ public class AssistidoService {
     }
 
     private Responsavel criarNovoResponsavel(VinculoFamiliarComResponsavelRequestDTO dto) {
-        ResponsavelRequestDTO responsavelDTO = new ResponsavelRequestDTO(
-                dto.nomeCompleto(),
-                dto.dataNascimento(),
-                dto.cpf(),
-                dto.telefone(),
-                dto.email(),
-                dto.endereco(),
-                dto.observacoes()
-        );
-
-        Responsavel responsavel = Responsavel.builder()
-                .nomeCompleto(responsavelDTO.nomeCompleto())
-                .dataNascimento(responsavelDTO.dataNascimento())
-                .cpf(responsavelDTO.cpf())
-                .telefone(responsavelDTO.telefone())
-                .email(responsavelDTO.email())
-                .endereco(responsavelDTO.endereco())
-                .observacoes(responsavelDTO.observacoes())
-                .build();
-
+        Responsavel responsavel = responsavelMapper.paraNovaEntidade(dto.paraResponsavelRequest());
         return responsavelRepository.save(responsavel);
+    }
+
+    /**
+     * Problema de saúde / PCD marcados exigem a descrição ("Qual?"). Quando o
+     * indicador vem desmarcado, o mapper descarta a descrição.
+     */
+    private void validarDadosComplementares(AssistidoRequestDTO dto) {
+        if (Boolean.TRUE.equals(dto.possuiProblemaSaude()) && !StringUtils.hasText(dto.problemaSaude())) {
+            throw new RegraNegocioException("Informe qual e' o problema de saude do assistido");
+        }
+        if (Boolean.TRUE.equals(dto.pcd()) && !StringUtils.hasText(dto.deficiencia())) {
+            throw new RegraNegocioException("Informe qual e' a deficiencia do assistido");
+        }
+        if (Boolean.TRUE.equals(dto.recebeProgramaTransferencia())) {
+            Set<ProgramaTransferencia> programas = dto.programasTransferencia();
+            if (programas == null || programas.isEmpty()) {
+                throw new RegraNegocioException("Informe qual programa de transferencia de renda a familia recebe");
+            }
+            if (programas.contains(ProgramaTransferencia.OUTRO) && !StringUtils.hasText(dto.programaTransferenciaOutro())) {
+                throw new RegraNegocioException("Informe o nome do outro programa de transferencia de renda");
+            }
+        }
     }
 
     private static final int MAXIMO_DOCUMENTOS_IDENTIDADE = 1;
@@ -498,6 +525,9 @@ public class AssistidoService {
     /** Cadastro + foto de perfil + RG/CPF (obrigatórios), tudo na mesma transação. */
     public AssistidoResponseDTO cadastrarComArquivos(AssistidoRequestDTO dto, MultipartFile foto,
                                                      List<MultipartFile> documentos) {
+        if (!Boolean.TRUE.equals(dto.aceiteLgpd())) {
+            throw new RegraNegocioException("O aceite do termo de uso de dados (LGPD) e' obrigatorio para o cadastro");
+        }
         List<MultipartFile> docs = documentos == null ? List.of()
                 : documentos.stream().filter(d -> d != null && !d.isEmpty()).toList();
         // valida antes de criar o assistido, pra não gastar insert/upload à toa

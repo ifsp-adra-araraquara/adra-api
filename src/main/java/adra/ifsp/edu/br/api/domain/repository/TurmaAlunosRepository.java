@@ -60,4 +60,6 @@ public interface TurmaAlunosRepository extends JpaRepository<TurmaAlunos, Long> 
                 .filter(vinculo -> AssistidoSpecification.elegivelParaChamada(vinculo.getAssistido(), data))
                 .toList();
     }
+
+    List<TurmaAlunos> findByTurma_TurmaIdAndAssistidoIn(Long turmaId, Collection<Assistido> assistidos);
 }

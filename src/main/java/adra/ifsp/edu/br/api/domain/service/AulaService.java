@@ -63,10 +63,12 @@ public class AulaService {
         Turma turma = turmaRepository.findById(criacaoAulas.getTurmaId())
                 .orElseThrow(() -> new EntidadeNaoEncontradaException("Turma não encontrada: id " + criacaoAulas.getTurmaId()));
 
-        Set<LocalDate> datasExcecao = excecaoCalendarioRepository.findDatasExcecaoBetween(
+        // Dias sem aula: os cadastrados pela ADRA + feriados nacionais.
+        Set<LocalDate> datasExcecao = new java.util.HashSet<>(excecaoCalendarioRepository.findDatasExcecaoBetween(
                 criacaoAulas.getDataInicio(),
                 criacaoAulas.getDataFim()
-        );
+        ));
+        datasExcecao.addAll(FeriadosNacionais.entre(criacaoAulas.getDataInicio(), criacaoAulas.getDataFim()));
 
         LocalDate dataAtual = criacaoAulas.getDataInicio();
         List<Aula> novasAulas = new ArrayList<>();

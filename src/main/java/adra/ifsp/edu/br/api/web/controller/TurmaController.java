@@ -14,6 +14,8 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import adra.ifsp.edu.br.api.domain.dto.historico.OficineiroHistoricoDTO;
+import adra.ifsp.edu.br.api.domain.service.HistoricoOficineiroService;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -24,6 +26,14 @@ import java.util.List;
 public class TurmaController {
 
     private final TurmaService turmaService;
+    private final HistoricoOficineiroService historicoOficineiroService;
+
+    /** Quem foi o oficineiro responsável e em qual período (mais recente primeiro). */
+    @PreAuthorize("hasAnyRole('SOCIOPEDAGOGICO', 'COORDENADOR')")
+    @GetMapping("/{id}/oficineiros-historico")
+    public ResponseEntity<List<OficineiroHistoricoDTO>> historicoOficineiros(@PathVariable Long id) {
+        return ResponseEntity.ok(historicoOficineiroService.listarPorTurma(id));
+    }
 
     @PreAuthorize("hasAnyRole('SOCIOPEDAGOGICO', 'COORDENADOR')")
     @GetMapping

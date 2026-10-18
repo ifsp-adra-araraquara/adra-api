@@ -67,6 +67,15 @@ public class Aula {
     @Column(name = "observacoes", columnDefinition = "TEXT")
     private String observacoes;
 
+    /**
+     * Quem deu (ou vai dar) esta aula. Fica gravado na aula para o histórico não
+     * mudar quando a turma troca de oficineiro: aulas passadas mantêm o antigo,
+     * só as planejadas de hoje em diante passam para o novo.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "oficineiro_id")
+    private Usuario oficineiro;
+
     @Column(name = "criado_em", nullable = false, updatable = false)
     private LocalDateTime criadoEm;
 
@@ -80,6 +89,10 @@ public class Aula {
         this.atualizadoEm = agora;
         if (this.statusAula == null) {
             this.statusAula = StatusAula.PLANEJADA;
+        }
+        // Toda aula nasce com o oficineiro atual da turma.
+        if (this.oficineiro == null && this.turma != null) {
+            this.oficineiro = this.turma.getOficineiroResponsavel();
         }
     }
 

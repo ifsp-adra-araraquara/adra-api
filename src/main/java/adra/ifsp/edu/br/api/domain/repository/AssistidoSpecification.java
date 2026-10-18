@@ -2,8 +2,11 @@ package adra.ifsp.edu.br.api.domain.repository;
 
 import adra.ifsp.edu.br.api.domain.enums.StatusGeral;
 import adra.ifsp.edu.br.api.domain.model.Assistido;
+import adra.ifsp.edu.br.api.domain.model.TurmaAlunos;
 import jakarta.persistence.criteria.Expression;
 import jakarta.persistence.criteria.Predicate;
+import jakarta.persistence.criteria.Root;
+import jakarta.persistence.criteria.Subquery;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.text.Normalizer;
@@ -80,9 +83,17 @@ public class AssistidoSpecification {
                 }
             }
 
-            // CA-A03.2: Filtro por turma
+            // CA-A03.2: Filtro por turma — quem está OU já esteve na turma
+            // (vínculo em turma_aluno), para a lista mostrar entrada e saída.
             if (turmaId != null) {
-                predicates.add(cb.equal(root.get("turma").get("turmaId"), turmaId));
+                Subquery<Long> vinculo = query.subquery(Long.class);
+                Root<TurmaAlunos> ta = vinculo.from(TurmaAlunos.class);
+                vinculo.select(ta.get("assistido").get("assistidoId"))
+                        .where(cb.equal(ta.get("turma").get("turmaId"), turmaId),
+                               cb.equal(ta.get("assistido").get("assistidoId"), root.get("assistidoId")));
+                predicates.add(cb.or(
+                        cb.equal(root.get("turma").get("turmaId"), turmaId),
+                        cb.exists(vinculo)));
             }
 
             // Filtro por oficina (via turma atual do assistido)

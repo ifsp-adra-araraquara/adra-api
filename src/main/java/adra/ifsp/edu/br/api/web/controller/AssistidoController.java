@@ -13,11 +13,13 @@ import adra.ifsp.edu.br.api.domain.dto.assistido.AssistidoContagemDTO;
 import adra.ifsp.edu.br.api.domain.dto.assistido.AssistidoRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.assistido.AssistidoResponseDTO;
 import adra.ifsp.edu.br.api.domain.dto.assistido.AssistidoStatusRequestDTO;
+import adra.ifsp.edu.br.api.domain.dto.assistido.ElegibilidadeDTO;
 import adra.ifsp.edu.br.api.domain.dto.assistido.ResultadoLinhaLoteDTO;
 import adra.ifsp.edu.br.api.domain.dto.turma.VinculoTurmaAssistidoResponseDTO;
 import adra.ifsp.edu.br.api.domain.enums.StatusGeral;
 import adra.ifsp.edu.br.api.domain.service.AssistidoLoteService;
 import adra.ifsp.edu.br.api.domain.service.AssistidoService;
+import adra.ifsp.edu.br.api.domain.service.ElegibilidadeService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -30,6 +32,14 @@ public class AssistidoController {
 
     private final AssistidoService assistidoService;
     private final AssistidoLoteService assistidoLoteService;
+    private final ElegibilidadeService elegibilidadeService;
+
+    /** Critérios de entrada (ex.: limite de renda familiar) para o formulário avisar antes de salvar. */
+    @PreAuthorize("hasAnyRole('COORDENADOR', 'SOCIOPEDAGOGICO')")
+    @GetMapping("/elegibilidade")
+    public ResponseEntity<ElegibilidadeDTO> elegibilidade() {
+        return ResponseEntity.ok(elegibilidadeService.criterios());
+    }
 
 //    @PreAuthorize("hasAnyRole('COORDENADOR', 'SOCIOPEDAGOGICO')")
 //    @PostMapping
