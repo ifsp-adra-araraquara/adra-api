@@ -21,16 +21,15 @@ import net.coobird.thumbnailator.geometry.Positions;
 
 /**
  * Nunca confia no front: descobre o tipo pelos bytes (não pelo Content-Type),
- * barra imagem gigante antes de decodificar e recomprime o que vier fora do padrão.
+ * barra imagem gigante antes de decodificar e recomprime toda imagem.
  *
- * Imagem que já chega como o front manda (WebP dentro do limite) é guardada como veio.
- * O resto vira JPEG — o Java não grava WebP sem biblioteca nativa.
+ * Toda imagem vira JPEG (o re-encode descarta EXIF/GPS) — o Java não grava WebP sem biblioteca nativa.
  */
 @Component
 public class ProcessadorArquivo {
 
-    /** Acima disso nem decodifica (proteção contra "image bomb" estourando a memória). */
-    private static final int LADO_MAXIMO_ENTRADA = 10_000;
+    /** Acima disso nem decodifica (proteção contra "image bomb" estourando a memória): ~64 MB decodificada. */
+    private static final long PIXELS_MAXIMOS_ENTRADA = 4096L * 4096;
     private static final float QUALIDADE_JPEG = 0.8f;
 
     public record ArquivoProcessado(byte[] conteudo, String mimeType, String extensao) {
@@ -53,7 +52,7 @@ public class ProcessadorArquivo {
 
         ArquivoProcessado processado = "application/pdf".equals(tipoReal)
                 ? new ArquivoProcessado(original, tipoReal, "pdf") // PDF já é compactado por dentro
-                : processarImagem(original, tipoReal, categoria);
+                : processarImagem(original, categoria);
 
         if (processado.conteudo().length > categoria.getTamanhoMaximoBytes()) {
             throw new ArquivoInvalidoException("Arquivo muito grande para " + categoria + ".");
@@ -61,35 +60,19 @@ public class ProcessadorArquivo {
         return processado;
     }
 
-    private ArquivoProcessado processarImagem(byte[] original, String tipo, CategoriaArquivo categoria) {
+    private ArquivoProcessado processarImagem(byte[] original, CategoriaArquivo categoria) {
         Dimensao d = lerDimensoes(original);
-        if (d.largura() > LADO_MAXIMO_ENTRADA || d.altura() > LADO_MAXIMO_ENTRADA) {
+        if ((long) d.largura() * d.altura() > PIXELS_MAXIMOS_ENTRADA) {
             throw new ArquivoInvalidoException("Imagem com dimensoes muito grandes.");
         }
 
         int ladoMaximo = categoria.getLadoMaximoPx();
-        boolean quadrado = categoria == CategoriaArquivo.FOTO_PERFIL;
-
-        boolean jaOtimizada = "image/webp".equals(tipo)
-                && Math.max(d.largura(), d.altura()) <= ladoMaximo
-                && (!quadrado || d.largura() == d.altura());
-        if (jaOtimizada) {
-            return new ArquivoProcessado(original, tipo, "webp");
-        }
 
         try {
-            BufferedImage imagem = ImageIO.read(new ByteArrayInputStream(original));
-            if (imagem == null) {
-                throw new ArquivoInvalidoException("Nao foi possivel ler a imagem.");
-            }
+            // Lê do stream (decodifica uma vez só), que respeita a rotação EXIF da foto do celular.
+            Thumbnails.Builder<?> builder = Thumbnails.of(new ByteArrayInputStream(original));
 
-            // Com transparência (PNG): achata em fundo branco, senão o JPEG fica preto.
-            // Sem transparência: lê do stream, que respeita a rotação EXIF da foto do celular.
-            Thumbnails.Builder<?> builder = imagem.getColorModel().hasAlpha()
-                    ? Thumbnails.of(comFundoBranco(imagem))
-                    : Thumbnails.of(new ByteArrayInputStream(original));
-
-            if (quadrado) {
+            if (categoria == CategoriaArquivo.FOTO_PERFIL) {
                 int lado = Math.min(ladoMaximo, Math.min(d.largura(), d.altura()));
                 builder = builder.size(lado, lado).crop(Positions.CENTER);
             } else if (Math.max(d.largura(), d.altura()) > ladoMaximo) {
@@ -98,9 +81,14 @@ public class ProcessadorArquivo {
                 builder = builder.scale(1.0); // nunca amplia
             }
 
+            // Achata transparência em fundo branco, senão o JPEG fica preto.
+            BufferedImage reduzida = comFundoBranco(builder.asBufferedImage());
+
             ByteArrayOutputStream saida = new ByteArrayOutputStream();
-            builder.outputFormat("jpg")
-                    .outputQuality(QUALIDADE_JPEG) // o re-encode também descarta o EXIF (GPS)
+            Thumbnails.of(reduzida)
+                    .scale(1.0)
+                    .outputFormat("jpg")
+                    .outputQuality(QUALIDADE_JPEG)
                     .toOutputStream(saida);
             return new ArquivoProcessado(saida.toByteArray(), "image/jpeg", "jpg");
         } catch (IOException e) {

@@ -125,7 +125,7 @@ public class GlobalExceptionHandler {
                                                                HttpServletRequest request) {
         return ResponseEntity.status(HttpStatus.CONTENT_TOO_LARGE).body(
                 ErroRespostaDTO.de(413, "Arquivo muito grande",
-                        "O arquivo excede o limite de 10 MB.", request.getRequestURI()));
+                        "O arquivo excede o limite de 3 MB.", request.getRequestURI()));
     }
 
     @ExceptionHandler(MissingServletRequestPartException.class)

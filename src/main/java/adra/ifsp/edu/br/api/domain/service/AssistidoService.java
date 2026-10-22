@@ -197,10 +197,12 @@ public class AssistidoService {
             }
         }
 
+        boolean somenteResumo = usuarioAtualTemPapel("ROLE_OFICINEIRO");
         return assistidos.stream()
                 .map(a -> {
                     AssistidoResponseDTO dto = assistidoMapper.paraDTO(
                             a, responsaveis.get(a.getAssistidoId()), frequencias.get(a.getAssistidoId()));
+                    if (somenteResumo) return dto.resumo();
                     TurmaAlunos periodo = periodoNaTurma.get(a.getAssistidoId());
                     return periodo == null ? dto : dto.comPeriodoNaTurma(periodo.getDataEntrada(), periodo.getDataSaida());
                 })
@@ -320,7 +322,7 @@ public class AssistidoService {
             throw new RegraNegocioException("O assistido deve manter pelo menos um responsavel vinculado");
         }
 
-        if (!paraRemover.isEmpty() && !usuarioAtualEhAdministrador()) {
+        if (!paraRemover.isEmpty() && !usuarioAtualTemPapel("ROLE_ADMINISTRADOR")) {
             throw new AcessoNegadoException("Somente o administrador pode remover um responsavel vinculado");
         }
 
@@ -371,10 +373,10 @@ public class AssistidoService {
         }
     }
 
-    private boolean usuarioAtualEhAdministrador() {
+    private boolean usuarioAtualTemPapel(String papel) {
         var autenticacao = SecurityContextHolder.getContext().getAuthentication();
         return autenticacao != null && autenticacao.getAuthorities().stream()
-                .anyMatch(autoridade -> autoridade.getAuthority().equals("ROLE_ADMINISTRADOR"));
+                .anyMatch(autoridade -> autoridade.getAuthority().equals(papel));
     }
 
     /** Muda o status (ex.: encerrar vinculo com a instituicao) - fluxo separado da edicao cadastral. */
