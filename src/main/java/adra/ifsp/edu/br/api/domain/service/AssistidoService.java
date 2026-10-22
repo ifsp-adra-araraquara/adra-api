@@ -68,7 +68,7 @@ public class AssistidoService {
     private final VinculoTurmaService vinculoTurmaService;
     private final TurmaAlunosRepository turmaAlunosRepository;
 
-    public AssistidoResponseDTO cadastrar(AssistidoRequestDTO dto) {
+    AssistidoResponseDTO cadastrar(AssistidoRequestDTO dto) {
         validarDadosComplementares(dto);
         // Regra de corte so na entrada: familia ja atendida nao e' barrada ao editar.
         elegibilidadeService.validarRendaFamiliar(dto.rendaFamiliar());
@@ -524,12 +524,9 @@ public class AssistidoService {
 
     private static final int MAXIMO_DOCUMENTOS_IDENTIDADE = 1;
 
-    /** Cadastro + foto de perfil + RG/CPF (obrigatórios), tudo na mesma transação. */
+    /** Cadastro + RG/CPF (obrigatório) + foto de perfil (opcional), tudo na mesma transação. */
     public AssistidoResponseDTO cadastrarComArquivos(AssistidoRequestDTO dto, MultipartFile foto,
                                                      List<MultipartFile> documentos) {
-        if (!Boolean.TRUE.equals(dto.aceiteLgpd())) {
-            throw new RegraNegocioException("O aceite do termo de uso de dados (LGPD) e' obrigatorio para o cadastro");
-        }
         List<MultipartFile> docs = documentos == null ? List.of()
                 : documentos.stream().filter(d -> d != null && !d.isEmpty()).toList();
         // valida antes de criar o assistido, pra não gastar insert/upload à toa
@@ -542,7 +539,9 @@ public class AssistidoService {
 
         AssistidoResponseDTO criado = cadastrar(dto);
         Long id = criado.assistidoId();
-        arquivoService.salvar(EntidadeArquivo.ASSISTIDO, id, CategoriaArquivo.FOTO_PERFIL, foto);
+        if (foto != null && !foto.isEmpty()) {
+            arquivoService.salvar(EntidadeArquivo.ASSISTIDO, id, CategoriaArquivo.FOTO_PERFIL, foto);
+        }
         for (MultipartFile documento : docs) {
             arquivoService.salvar(EntidadeArquivo.ASSISTIDO, id, CategoriaArquivo.DOCUMENTO_IDENTIDADE, documento);
         }
