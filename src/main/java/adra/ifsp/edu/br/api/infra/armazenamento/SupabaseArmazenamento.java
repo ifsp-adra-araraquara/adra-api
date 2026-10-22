@@ -1,6 +1,7 @@
 package adra.ifsp.edu.br.api.infra.armazenamento;
 
 import java.net.URI;
+import java.net.http.HttpClient;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
@@ -9,6 +10,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
@@ -28,7 +30,13 @@ public class SupabaseArmazenamento implements ArmazenamentoArquivos {
                                  @Value("${adra.arquivos.supabase.bucket}") String bucket) {
         this.storageUrl = url + "/storage/v1";
         this.bucket = bucket;
+
+        JdkClientHttpRequestFactory fabrica = new JdkClientHttpRequestFactory(
+                HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build());
+        fabrica.setReadTimeout(Duration.ofSeconds(30));
+
         this.rest = RestClient.builder()
+                .requestFactory(fabrica)
                 .baseUrl(storageUrl)
                 .defaultHeader("apikey", serviceKey)
                 .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + serviceKey)

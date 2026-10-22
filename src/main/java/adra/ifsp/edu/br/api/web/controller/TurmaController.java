@@ -151,7 +151,7 @@ public class TurmaController {
         return ResponseEntity.ok(turmaService.vincularAlunos(id, dto));
     }
 
-    @PreAuthorize("hasAnyRole('OFICINEIRO', 'SOCIOPEDAGOGICO', 'COORDENADOR')")
+    @PreAuthorize("hasAnyRole('SOCIOPEDAGOGICO', 'COORDENADOR')")
     @GetMapping("/{id}/alunos")
     public ResponseEntity<List<AssistidoResponseDTO>> listarAlunosVinculados(@PathVariable Long id) {
         return ResponseEntity.ok(turmaService.listarAlunosVinculados(id));

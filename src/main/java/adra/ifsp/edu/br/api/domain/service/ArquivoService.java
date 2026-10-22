@@ -30,8 +30,6 @@ import adra.ifsp.edu.br.api.domain.enums.ProvedorArmazenamento;
 import adra.ifsp.edu.br.api.domain.model.Arquivo;
 import adra.ifsp.edu.br.api.domain.repository.ArquivoRepository;
 import adra.ifsp.edu.br.api.domain.repository.AssistidoRepository;
-import adra.ifsp.edu.br.api.domain.repository.ResponsavelRepository;
-import adra.ifsp.edu.br.api.domain.repository.UsuarioRepository;
 import adra.ifsp.edu.br.api.exception.ArquivoInvalidoException;
 import adra.ifsp.edu.br.api.exception.EntidadeNaoEncontradaException;
 import adra.ifsp.edu.br.api.infra.armazenamento.ArmazenamentoArquivos;
@@ -46,8 +44,6 @@ public class ArquivoService {
 
     private final ArquivoRepository arquivoRepository;
     private final AssistidoRepository assistidoRepository;
-    private final ResponsavelRepository responsavelRepository;
-    private final UsuarioRepository usuarioRepository;
     private final ProcessadorArquivo processador;
     private final List<ArmazenamentoArquivos> armazenamentos;
     private final UsuarioAutenticadoService usuarioAutenticadoService;
@@ -166,12 +162,10 @@ public class ArquivoService {
         if (entidadeTipo == null || entidadeId == null) {
             throw new ArquivoInvalidoException("Informe a quem o arquivo pertence.");
         }
-        boolean existe = switch (entidadeTipo) {
-            case ASSISTIDO -> assistidoRepository.existsById(entidadeId);
-            case RESPONSAVEL -> responsavelRepository.existsById(entidadeId);
-            case USUARIO -> usuarioRepository.existsById(entidadeId);
-        };
-        if (!existe) {
+        if (entidadeTipo != EntidadeArquivo.ASSISTIDO) {
+            throw new ArquivoInvalidoException("Arquivos so podem ser enviados para assistidos.");
+        }
+        if (!assistidoRepository.existsById(entidadeId)) {
             throw new EntidadeNaoEncontradaException(entidadeTipo + " nao encontrado: id " + entidadeId);
         }
     }

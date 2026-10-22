@@ -41,17 +41,10 @@ public class AssistidoController {
         return ResponseEntity.ok(elegibilidadeService.criterios());
     }
 
-//    @PreAuthorize("hasAnyRole('COORDENADOR', 'SOCIOPEDAGOGICO')")
-//    @PostMapping
-//    public ResponseEntity<AssistidoResponseDTO> cadastrar(@Valid @RequestBody AssistidoRequestDTO dto) {
-//        AssistidoResponseDTO criado = assistidoService.cadastrar(dto);
-//        return ResponseEntity.created(URI.create("/api/assistidos/" + criado.assistidoId())).body(criado);
-//    }
-
     @PreAuthorize("hasAnyRole('COORDENADOR', 'SOCIOPEDAGOGICO')")
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<AssistidoResponseDTO> cadastrar(@Valid @RequestPart("dados") AssistidoRequestDTO dto,
-                                                          @RequestPart("foto") MultipartFile foto,
+                                                          @RequestPart(value = "foto", required = false) MultipartFile foto,
                                                           @RequestPart("documentos") List<MultipartFile> documentos) {
         AssistidoResponseDTO criado = assistidoService.cadastrarComArquivos(dto, foto, documentos);
         return ResponseEntity.created(URI.create("/api/assistidos/" + criado.assistidoId())).body(criado);
@@ -62,12 +55,6 @@ public class AssistidoController {
     @PostMapping("/lote/validar")
     public ResponseEntity<List<ResultadoLinhaLoteDTO>> validarLote(@RequestBody List<AssistidoRequestDTO> itens) {
         return ResponseEntity.ok(assistidoLoteService.validar(itens));
-    }
-
-    @PreAuthorize("hasAnyRole('COORDENADOR', 'SOCIOPEDAGOGICO')")
-    @PostMapping("/lote")
-    public ResponseEntity<List<ResultadoLinhaLoteDTO>> cadastrarLote(@RequestBody List<AssistidoRequestDTO> itens) {
-        return ResponseEntity.ok(assistidoLoteService.cadastrar(itens));
     }
 
     @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'COORDENADOR', 'SOCIOPEDAGOGICO', 'OFICINEIRO')")
