@@ -45,6 +45,17 @@ Stage e produção leem os segredos de `.env.stage` e `.env.prod`. Copie de
 `.env.example`; eles não vão para o git. Variável de ambiente do sistema ganha
 do arquivo, que é como CI e deploy injetam os valores.
 
+## E-mails
+
+O Supabase Auth envia o convite e o "esqueci a senha". A API só envia a
+redefinição pedida pelo Administrador, porque precisa devolver o mesmo link
+para ele copiar. Os dois saem pelo SMTP do Brevo e usam os mesmos templates,
+em `src/main/resources/templates`.
+
+Local, tudo cai no Mailpit: `http://localhost:54324`. Em stage e produção o
+Supabase não lê o `config.toml`: mudou um template, cole o HTML no painel em
+Authentication → Emails → Templates.
+
 ## Banco
 
 Quem cria e atualiza o schema é o Flyway, sozinho, toda vez que a API sobe. Os

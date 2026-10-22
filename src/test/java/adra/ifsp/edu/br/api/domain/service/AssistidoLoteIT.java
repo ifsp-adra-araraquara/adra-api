@@ -33,9 +33,6 @@ import static org.assertj.core.api.Assertions.assertThat;
         "spring.jpa.hibernate.ddl-auto=create-drop",
         "spring.flyway.enabled=false",
         "spring.jpa.properties.hibernate.default_schema=adra",
-        "adra.brevo.api-key=dummy-teste",
-        "adra.brevo.remetente-email=teste@teste.local",
-        "adra.brevo.remetente-nome=Teste",
         "adra.frontend.url=http://localhost:4200",
         "spring.datasource.hikari.data-source-properties.stringtype=unspecified"
 })
