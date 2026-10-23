@@ -4,30 +4,26 @@ import java.net.URI;
 import java.util.List;
 import java.util.Map;
 
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PatchMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import adra.ifsp.edu.br.api.domain.dto.PaginaDTO;
 import adra.ifsp.edu.br.api.domain.dto.assistido.AssistidoContagemDTO;
 import adra.ifsp.edu.br.api.domain.dto.assistido.AssistidoRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.assistido.AssistidoResponseDTO;
 import adra.ifsp.edu.br.api.domain.dto.assistido.AssistidoStatusRequestDTO;
+import adra.ifsp.edu.br.api.domain.dto.assistido.ElegibilidadeDTO;
 import adra.ifsp.edu.br.api.domain.dto.assistido.ResultadoLinhaLoteDTO;
 import adra.ifsp.edu.br.api.domain.dto.turma.VinculoTurmaAssistidoResponseDTO;
 import adra.ifsp.edu.br.api.domain.enums.StatusGeral;
 import adra.ifsp.edu.br.api.domain.service.AssistidoLoteService;
 import adra.ifsp.edu.br.api.domain.service.AssistidoService;
+import adra.ifsp.edu.br.api.domain.service.ElegibilidadeService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api/assistidos")
@@ -36,11 +32,21 @@ public class AssistidoController {
 
     private final AssistidoService assistidoService;
     private final AssistidoLoteService assistidoLoteService;
+    private final ElegibilidadeService elegibilidadeService;
+
+    /** Critérios de entrada (ex.: limite de renda familiar) para o formulário avisar antes de salvar. */
+    @PreAuthorize("hasAnyRole('COORDENADOR', 'SOCIOPEDAGOGICO')")
+    @GetMapping("/elegibilidade")
+    public ResponseEntity<ElegibilidadeDTO> elegibilidade() {
+        return ResponseEntity.ok(elegibilidadeService.criterios());
+    }
 
     @PreAuthorize("hasAnyRole('COORDENADOR', 'SOCIOPEDAGOGICO')")
-    @PostMapping
-    public ResponseEntity<AssistidoResponseDTO> cadastrar(@Valid @RequestBody AssistidoRequestDTO dto) {
-        AssistidoResponseDTO criado = assistidoService.cadastrar(dto);
+    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<AssistidoResponseDTO> cadastrar(@Valid @RequestPart("dados") AssistidoRequestDTO dto,
+                                                          @RequestPart(value = "foto", required = false) MultipartFile foto,
+                                                          @RequestPart("documentos") List<MultipartFile> documentos) {
+        AssistidoResponseDTO criado = assistidoService.cadastrarComArquivos(dto, foto, documentos);
         return ResponseEntity.created(URI.create("/api/assistidos/" + criado.assistidoId())).body(criado);
     }
 
@@ -49,12 +55,6 @@ public class AssistidoController {
     @PostMapping("/lote/validar")
     public ResponseEntity<List<ResultadoLinhaLoteDTO>> validarLote(@RequestBody List<AssistidoRequestDTO> itens) {
         return ResponseEntity.ok(assistidoLoteService.validar(itens));
-    }
-
-    @PreAuthorize("hasAnyRole('COORDENADOR', 'SOCIOPEDAGOGICO')")
-    @PostMapping("/lote")
-    public ResponseEntity<List<ResultadoLinhaLoteDTO>> cadastrarLote(@RequestBody List<AssistidoRequestDTO> itens) {
-        return ResponseEntity.ok(assistidoLoteService.cadastrar(itens));
     }
 
     @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'COORDENADOR', 'SOCIOPEDAGOGICO', 'OFICINEIRO')")

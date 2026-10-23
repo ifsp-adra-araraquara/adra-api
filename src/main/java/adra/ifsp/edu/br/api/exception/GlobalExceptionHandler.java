@@ -13,9 +13,11 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import adra.ifsp.edu.br.api.domain.dto.comum.AlertaCpfDuplicadoDTO;
-
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import java.util.List;
 import java.util.UUID;
+
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -24,7 +26,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(EntidadeNaoEncontradaException.class)
     public ResponseEntity<ErroRespostaDTO> tratarNaoEncontrado(EntidadeNaoEncontradaException ex,
-                                                                 HttpServletRequest request) {
+                                                               HttpServletRequest request) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(
                 ErroRespostaDTO.de(404, "Nao encontrado", ex.getMessage(), request.getRequestURI()));
     }
@@ -35,10 +37,12 @@ public class GlobalExceptionHandler {
                 ErroRespostaDTO.de(403, "Acesso negado", ex.getMessage(), request.getRequestURI()));
     }
 
-    /** @PreAuthorize nega lancando isso desde o Spring Security 6.3 (nao mais AccessDeniedException direto). */
+    /**
+     * @PreAuthorize nega lancando isso desde o Spring Security 6.3 (nao mais AccessDeniedException direto).
+     */
     @ExceptionHandler(AuthorizationDeniedException.class)
     public ResponseEntity<ErroRespostaDTO> tratarAutorizacaoNegada(AuthorizationDeniedException ex,
-                                                                     HttpServletRequest request) {
+                                                                   HttpServletRequest request) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(
                 ErroRespostaDTO.de(403, "Acesso negado", "Voce nao tem permissao para executar esta acao.",
                         request.getRequestURI()));
@@ -58,7 +62,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErroRespostaDTO> tratarValidacao(MethodArgumentNotValidException ex,
-                                                             HttpServletRequest request) {
+                                                           HttpServletRequest request) {
         List<String> detalhes = ex.getBindingResult().getFieldErrors().stream()
                 .map(erro -> erro.getField() + ": " + erro.getDefaultMessage())
                 .toList();
@@ -76,10 +80,12 @@ public class GlobalExceptionHandler {
                         request.getRequestURI()));
     }
 
-    /** Rede de seguranca: se alguma constraint do banco (ex.: indice unico) escapar da validacao preventiva do service. */
+    /**
+     * Rede de seguranca: se alguma constraint do banco (ex.: indice unico) escapar da validacao preventiva do service.
+     */
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ErroRespostaDTO> tratarIntegridade(DataIntegrityViolationException ex,
-                                                               HttpServletRequest request) {
+                                                             HttpServletRequest request) {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(
                 ErroRespostaDTO.de(409, "Violacao de integridade",
                         "A operacao viola uma restricao de integridade do banco de dados.",
@@ -105,5 +111,39 @@ public class GlobalExceptionHandler {
     public ResponseEntity<AlertaCpfDuplicadoDTO> tratarCpfDuplicado(CpfDuplicadoException ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(new AlertaCpfDuplicadoDTO(ex.getMessage(), ex.getResponsavelExistente()));
-        }
+    }
+
+    @ExceptionHandler(ArquivoInvalidoException.class)
+    public ResponseEntity<ErroRespostaDTO> tratarArquivoInvalido(ArquivoInvalidoException ex,
+                                                                 HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
+                ErroRespostaDTO.de(400, "Arquivo invalido", ex.getMessage(), request.getRequestURI()));
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ErroRespostaDTO> tratarArquivoGrande(MaxUploadSizeExceededException ex,
+                                                               HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.CONTENT_TOO_LARGE).body(
+                ErroRespostaDTO.de(413, "Arquivo muito grande",
+                        "O arquivo excede o limite de 3 MB.", request.getRequestURI()));
+    }
+
+    @ExceptionHandler(MissingServletRequestPartException.class)
+    public ResponseEntity<ErroRespostaDTO> tratarParteAusente(MissingServletRequestPartException ex,
+                                                              HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
+                ErroRespostaDTO.de(400, "Dados invalidos",
+                        "Parte obrigatoria ausente: " + ex.getRequestPartName(), request.getRequestURI()));
+    }
+
+    @ExceptionHandler(ArmazenamentoException.class)
+    public ResponseEntity<ErroRespostaDTO> tratarArmazenamento(ArmazenamentoException ex,
+                                                               HttpServletRequest request) {
+        String correlacao = UUID.randomUUID().toString().substring(0, 8);
+        log.error("Falha no storage [{}] em {}", correlacao, request.getRequestURI(), ex);
+        return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(
+                ErroRespostaDTO.de(502, "Falha no armazenamento",
+                        "Nao foi possivel salvar o arquivo agora. Tente novamente. Codigo " + correlacao,
+                        request.getRequestURI()));
+    }
 }

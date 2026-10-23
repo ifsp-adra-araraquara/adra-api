@@ -43,6 +43,7 @@ public class TurmaService {
     private final AssistidoMapper assistidoMapper;
     private final TurmaAlunosRepository turmaAlunosRepository;
     private final VinculoTurmaService vinculoTurmaService;
+    private final HistoricoOficineiroService historicoOficineiroService;
 
     /**
      * Igual a minhasTurmas, mas ja traz o nome da oficina e a quantidade de
@@ -79,6 +80,7 @@ public class TurmaService {
     public TurmaResponseDTO cadastrar(TurmaRequestDTO dto) {
         Turma turma = turmaMapper.paraNovaEntidade(dto);
         turma = turmaRepository.save(turma);
+        historicoOficineiroService.registrar(turma);
 
         auditoriaService.registrar(
                 ModuloSistema.TURMAS,
@@ -113,6 +115,7 @@ public class TurmaService {
 
         Turma turma = turmaMapper.paraNovaEntidadeComHorario(dto);
         turma = turmaRepository.save(turma);
+        historicoOficineiroService.registrar(turma);
 
         auditoriaService.registrar(
                 ModuloSistema.TURMAS,
@@ -185,6 +188,7 @@ public class TurmaService {
 
         turmaMapper.atualizarEntidade(turma, dto);
         turma = turmaRepository.save(turma);
+        historicoOficineiroService.registrar(turma);
 
         auditoriaService.registrar(
                 ModuloSistema.TURMAS,

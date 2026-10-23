@@ -85,15 +85,7 @@ public class VinculoFamiliarService {
     public VinculoFamiliarResponseDTO cadastrarResponsavelEVincular(
             Long assistidoId,
             VinculoFamiliarComResponsavelRequestDTO dto) {
-        ResponsavelRequestDTO responsavelDto = new ResponsavelRequestDTO(
-                dto.nomeCompleto(),
-                dto.dataNascimento(),
-                dto.cpf(),
-                dto.telefone(),
-                dto.email(),
-                dto.endereco(),
-                dto.observacoes()
-        );
+        ResponsavelRequestDTO responsavelDto = dto.paraResponsavelRequest();
 
         ResponsavelResponseDTO responsavelCriado = responsavelService.cadastrar(responsavelDto);
 

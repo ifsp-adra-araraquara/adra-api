@@ -1,5 +1,7 @@
 package adra.ifsp.edu.br.api.domain.model;
 
+import adra.ifsp.edu.br.api.domain.enums.Escolaridade;
+import adra.ifsp.edu.br.api.domain.enums.EstadoCivil;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -9,6 +11,7 @@ import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
@@ -48,8 +51,23 @@ public class Responsavel {
     @Column(name = "email", length = 255)
     private String email;
 
-    @Column(name = "endereco", columnDefinition = "text")
-    private String endereco;
+    @Embedded
+    private Endereco endereco;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "escolaridade", length = 30)
+    private Escolaridade escolaridade;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "estado_civil", length = 20)
+    private EstadoCivil estadoCivil;
+
+    @Column(name = "profissao", length = 120)
+    private String profissao;
+
+    /** Renda mensal individual, em reais. */
+    @Column(name = "renda", precision = 12, scale = 2)
+    private BigDecimal renda;
 
     @Column(name = "observacoes", columnDefinition = "text")
     private String observacoes;

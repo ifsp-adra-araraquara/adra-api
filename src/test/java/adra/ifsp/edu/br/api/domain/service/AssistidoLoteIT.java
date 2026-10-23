@@ -3,9 +3,12 @@ package adra.ifsp.edu.br.api.domain.service;
 import adra.ifsp.edu.br.api.domain.dto.assistido.AssistidoRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.assistido.ResultadoLinhaLoteDTO;
 import adra.ifsp.edu.br.api.domain.dto.vinculo.VinculoFamiliarComResponsavelRequestDTO;
+import adra.ifsp.edu.br.api.domain.enums.ProvedorArmazenamento;
 import adra.ifsp.edu.br.api.domain.enums.StatusLinhaLote;
 import adra.ifsp.edu.br.api.domain.repository.AssistidoRepository;
 import adra.ifsp.edu.br.api.domain.repository.ResponsavelRepository;
+import adra.ifsp.edu.br.api.exception.ArquivoInvalidoException;
+import adra.ifsp.edu.br.api.infra.armazenamento.ArmazenamentoArquivos;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -15,17 +18,29 @@ import org.springframework.boot.testcontainers.service.connection.ServiceConnect
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.time.LocalDate;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
-// Sem @Transactional: o lote depende de uma transacao por assistido, e o teste precisa exercitar isso.
+// Sem @Transactional: cada cadastro grava na propria transacao, e o teste precisa exercitar isso.
 @SpringBootTest
 @Testcontainers
 @Import(AssistidoLoteIT.ContainerConfig.class)
@@ -39,7 +54,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class AssistidoLoteIT {
 
     private static final String CPF_MAE_IRMAOS = "52998224725";
-    private static final String CPF_RESPONSAVEL_INVALIDA = "11144477735";
+    private static final String CPF_RESPONSAVEL_SEM_DOCUMENTO = "11144477735";
     private static final String CPF_RESPONSAVEL_EXISTENTE = "39053344705";
     private static final String CPF_ASSISTIDO_EXISTENTE = "12345678909";
     private static final String CPF_ASSISTIDO_HOMONIMO = "98765432100";
@@ -60,6 +75,9 @@ class AssistidoLoteIT {
     @Autowired private ResponsavelRepository responsavelRepository;
     @Autowired private JdbcTemplate jdbcTemplate;
 
+    @MockitoBean private ArmazenamentoArquivos storage;
+    @MockitoBean private UsuarioAutenticadoService usuarioAutenticadoService;
+
     @BeforeEach
     void definirDefaultsDoBanco() {
         jdbcTemplate.execute("alter table adra.assistido alter column criado_em set default now()");
@@ -68,27 +86,33 @@ class AssistidoLoteIT {
         jdbcTemplate.execute("alter table adra.responsavel alter column atualizado_em set default now()");
         jdbcTemplate.execute("alter table adra.assistido_responsavel alter column criado_em set default now()");
         jdbcTemplate.execute("alter table adra.log_auditoria alter column data_hora set default now()");
+        when(storage.provedor()).thenReturn(ProvedorArmazenamento.SUPABASE);
     }
 
     @Test
-    @DisplayName("Cadastra as linhas validas, devolve a invalida e cria uma vez o responsavel comum aos irmaos")
-    void cadastraParcialmenteReaproveitandoResponsavel() {
+    @DisplayName("Cadastra irmaos com documento e foto opcional, cria uma vez o responsavel comum e recusa sem documento")
+    void cadastraComArquivosReaproveitandoResponsavel() throws IOException {
         VinculoFamiliarComResponsavelRequestDTO mae = responsavel("Maria Irmaos", CPF_MAE_IRMAOS);
 
-        List<ResultadoLinhaLoteDTO> resultados = assistidoLoteService.cadastrar(List.of(
-                assistido("Ana Irmaos", LocalDate.of(2015, 5, 3), mae),
-                assistido("Bia Irmaos", LocalDate.of(2017, 8, 10), mae),
-                assistido("", LocalDate.of(2016, 1, 1), responsavel("Joao Invalida", CPF_RESPONSAVEL_INVALIDA))));
+        assistidoService.cadastrarComArquivos(assistido("Ana Irmaos", LocalDate.of(2015, 5, 3), mae),
+                imagem("foto"), List.of(imagem("documentos")));
+        assistidoService.cadastrarComArquivos(assistido("Bia Irmaos", LocalDate.of(2017, 8, 10), mae),
+                null, List.of(imagem("documentos")));
+        long assistidosAntes = assistidoRepository.count();
 
-        assertThat(resultados).extracting(ResultadoLinhaLoteDTO::status)
-                .containsExactly(StatusLinhaLote.CRIADA, StatusLinhaLote.CRIADA, StatusLinhaLote.INVALIDA);
-        assertThat(resultados.get(2).erros()).anyMatch(erro -> erro.startsWith("nomeCompleto:"));
+        AssistidoRequestDTO semDocumento = assistido("Caio Sem Documento", LocalDate.of(2016, 1, 1),
+                responsavel("Joao Sem Documento", CPF_RESPONSAVEL_SEM_DOCUMENTO));
+        assertThatThrownBy(() -> assistidoService.cadastrarComArquivos(semDocumento, imagem("foto"), List.of()))
+                .isInstanceOf(ArquivoInvalidoException.class);
 
         Long maeId = responsavelRepository.findByCpf(CPF_MAE_IRMAOS).orElseThrow().getResponsavelId();
         Integer vinculosDaMae = jdbcTemplate.queryForObject(
                 "select count(*) from adra.assistido_responsavel where responsavel_id = ?", Integer.class, maeId);
         assertThat(vinculosDaMae).isEqualTo(2);
-        assertThat(responsavelRepository.findByCpf(CPF_RESPONSAVEL_INVALIDA)).isEmpty();
+        assertThat(jdbcTemplate.queryForObject("select count(*) from adra.arquivo", Integer.class)).isEqualTo(3);
+        verify(storage, times(3)).salvar(any(), any(), eq("image/jpeg"));
+        assertThat(assistidoRepository.count()).isEqualTo(assistidosAntes);
+        assertThat(responsavelRepository.findByCpf(CPF_RESPONSAVEL_SEM_DOCUMENTO)).isEmpty();
     }
 
     @Test
@@ -119,10 +143,20 @@ class AssistidoLoteIT {
 
     private AssistidoRequestDTO assistido(String nome, LocalDate nascimento, String cpf,
                                           VinculoFamiliarComResponsavelRequestDTO responsavel) {
-        return new AssistidoRequestDTO(nome, nascimento, cpf, null, null, null, null, List.of(responsavel), null);
+        return new AssistidoRequestDTO(nome, nascimento, cpf, null, null, null, null,
+                null, null, null, null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null, null, null, null,
+                List.of(responsavel), null);
+    }
+
+    private static MockMultipartFile imagem(String parte) throws IOException {
+        ByteArrayOutputStream png = new ByteArrayOutputStream();
+        ImageIO.write(new BufferedImage(8, 8, BufferedImage.TYPE_INT_RGB), "png", png);
+        return new MockMultipartFile(parte, parte + ".png", "image/png", png.toByteArray());
     }
 
     private VinculoFamiliarComResponsavelRequestDTO responsavel(String nome, String cpf) {
-        return new VinculoFamiliarComResponsavelRequestDTO(nome, null, cpf, null, null, null, null, "Mae", true, false, false);
+        return new VinculoFamiliarComResponsavelRequestDTO(nome, null, cpf, null, null, null, null,
+                null, null, null, null, "Mae", true, false, false);
     }
 }

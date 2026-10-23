@@ -27,6 +27,7 @@ public class OficinaService {
     private final OficinaRepository oficinaRepository;
     private final OficinaMapper oficinaMapper;
     private final AuditoriaService auditoriaService;
+    private final HistoricoOficineiroService historicoOficineiroService;
 
     public List<OficinaResponseDTO> minhasOficinas(Long idOficineiro) {
         List<Oficina> oficinas = oficinaRepository.findByOficineiroResponsavelUsuarioId(idOficineiro);
@@ -43,6 +44,7 @@ public class OficinaService {
     public OficinaResponseDTO cadastrar(OficinaRequestDTO dto) {
         Oficina oficina = oficinaMapper.paraNovaEntidade(dto);
         oficina = oficinaRepository.save(oficina);
+        historicoOficineiroService.registrar(oficina);
 
         auditoriaService.registrar(
                 ModuloSistema.OFICINAS,
@@ -106,6 +108,7 @@ public class OficinaService {
         oficinaMapper.atualizarEntidade(oficina, dto);
 
         oficina = oficinaRepository.save(oficina);
+        historicoOficineiroService.registrar(oficina);
 
         Map<String, Object> valorNovo = new HashMap<>();
         valorNovo.put("nomeOficina", oficina.getNomeOficina());

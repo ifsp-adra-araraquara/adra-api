@@ -21,7 +21,7 @@ public class ExcecaoCalendarioController {
 
     @PreAuthorize("hasRole('COORDENADOR')")
     @PostMapping
-    public ResponseEntity<ExcecaoCalendarioResponseDTO> cadastrar(
+    public ResponseEntity<List<ExcecaoCalendarioResponseDTO>> cadastrar(
             @Valid @RequestBody ExcecaoCalendarioRequestDTO dto
     ) {
         return ResponseEntity.status(HttpStatus.CREATED).body(excecaoCalendarioService.cadastrar(dto));

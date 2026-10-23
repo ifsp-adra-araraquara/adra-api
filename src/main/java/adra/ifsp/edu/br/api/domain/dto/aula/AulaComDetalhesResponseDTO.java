@@ -33,8 +33,7 @@ public record AulaComDetalhesResponseDTO(
                 aula.getAulaId(),
                 aula.getTurma() != null ? aula.getTurma().getTurmaId() : null,
                 aula.getTurma() != null ? aula.getTurma().getNomeTurma() : null,
-                aula.getTurma() != null && aula.getTurma().getOficineiroResponsavel() != null 
-                        ? aula.getTurma().getOficineiroResponsavel().getNomeCompleto() : null,
+                nomeOficineiroDaAula(aula),
                 quantidadeAlunos,
                 aula.getTitulo(),
                 aula.getDescricao(),
@@ -50,5 +49,14 @@ public record AulaComDetalhesResponseDTO(
                 aula.getCriadoEm(),
                 aula.getAtualizadoEm()
         );
+    }
+
+    /** Oficineiro gravado na aula; aulas sem esse dado (antigas) caem no da turma. */
+    private static String nomeOficineiroDaAula(Aula aula) {
+        if (aula.getOficineiro() != null) {
+            return aula.getOficineiro().getNomeCompleto();
+        }
+        return aula.getTurma() != null && aula.getTurma().getOficineiroResponsavel() != null
+                ? aula.getTurma().getOficineiroResponsavel().getNomeCompleto() : null;
     }
 }

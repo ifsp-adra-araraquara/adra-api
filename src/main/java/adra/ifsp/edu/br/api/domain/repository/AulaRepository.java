@@ -2,6 +2,8 @@ package adra.ifsp.edu.br.api.domain.repository;
 
 import adra.ifsp.edu.br.api.domain.model.Aula;
 import adra.ifsp.edu.br.api.domain.model.Turma;
+import adra.ifsp.edu.br.api.domain.model.Usuario;
+import org.springframework.data.jpa.repository.Modifying;
 import adra.ifsp.edu.br.api.domain.enums.StatusAula;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
@@ -49,4 +51,26 @@ public interface AulaRepository extends JpaRepository<Aula, Long>, JpaSpecificat
 
     /** Aulas de várias turmas num status, numa query só — indicadores de frequência da listagem de assistidos. */
     List<Aula> findByTurmaInAndStatusAula(Collection<Turma> turmas, StatusAula statusAula);
+
+    /** Total de aulas da turma que não foram canceladas (realizadas + planejadas + remarcadas). */
+    long countByTurmaAndStatusAulaNot(Turma turma, StatusAula statusAula);
+
+    List<Aula> findByDataAulaBetweenAndStatusAula(LocalDate inicio, LocalDate fim, StatusAula statusAula);
+
+    /**
+     * Troca de oficineiro da turma: as aulas ainda não dadas (planejadas ou
+     * remarcadas) a partir de `aPartirDe` passam para o novo. Realizadas e
+     * passadas ficam com quem deu a aula.
+     */
+    @Modifying(flushAutomatically = true, clearAutomatically = false)
+    @Query("""
+            UPDATE Aula a SET a.oficineiro = :oficineiro
+             WHERE a.turma = :turma
+               AND a.dataAula >= :aPartirDe
+               AND a.statusAula IN (adra.ifsp.edu.br.api.domain.enums.StatusAula.PLANEJADA,
+                                    adra.ifsp.edu.br.api.domain.enums.StatusAula.REMARCADA)
+            """)
+    int reatribuirOficineiroAulasFuturas(@Param("turma") Turma turma,
+                                        @Param("oficineiro") Usuario oficineiro,
+                                        @Param("aPartirDe") LocalDate aPartirDe);
 }

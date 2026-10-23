@@ -1,16 +1,13 @@
 package adra.ifsp.edu.br.api.domain.service;
 
 import adra.ifsp.edu.br.api.domain.dto.assistido.AssistidoRequestDTO;
-import adra.ifsp.edu.br.api.domain.dto.assistido.AssistidoResponseDTO;
 import adra.ifsp.edu.br.api.domain.dto.assistido.ResultadoLinhaLoteDTO;
 import adra.ifsp.edu.br.api.domain.dto.vinculo.VinculoFamiliarComResponsavelRequestDTO;
 import adra.ifsp.edu.br.api.domain.model.Responsavel;
 import adra.ifsp.edu.br.api.domain.repository.ResponsavelRepository;
-import adra.ifsp.edu.br.api.exception.EntidadeNaoEncontradaException;
 import adra.ifsp.edu.br.api.exception.RegraNegocioException;
 import jakarta.validation.Validator;
 import lombok.RequiredArgsConstructor;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -22,12 +19,11 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-// Sem @Transactional na classe: cada assistido grava na propria transacao do AssistidoService.
 @Service
 @RequiredArgsConstructor
 public class AssistidoLoteService {
 
-    private static final int LIMITE_LINHAS = 500;
+    private static final int LIMITE_LINHAS = 50;
 
     private final AssistidoService assistidoService;
     private final ResponsavelRepository responsavelRepository;
@@ -45,16 +41,6 @@ public class AssistidoLoteService {
         return resultados;
     }
 
-    public List<ResultadoLinhaLoteDTO> cadastrar(List<AssistidoRequestDTO> itens) {
-        verificarTamanho(itens);
-
-        List<ResultadoLinhaLoteDTO> resultados = new ArrayList<>();
-        for (int indice = 0; indice < itens.size(); indice++) {
-            resultados.add(cadastrarLinha(indice, itens));
-        }
-        return resultados;
-    }
-
     private ResultadoLinhaLoteDTO validarLinha(int indice, List<AssistidoRequestDTO> itens, Map<String, String> existentes) {
         AssistidoRequestDTO item = itens.get(indice);
         Map<String, String> existentesDaLinha = cpfsResponsaveis(item).stream()
@@ -67,23 +53,6 @@ public class AssistidoLoteService {
             return ResultadoLinhaLoteDTO.invalida(indice, erros, existentesDaLinha);
         }
         return ResultadoLinhaLoteDTO.valida(indice, existentesDaLinha);
-    }
-
-    private ResultadoLinhaLoteDTO cadastrarLinha(int indice, List<AssistidoRequestDTO> itens) {
-        List<String> erros = errosDaLinha(indice, itens);
-        if (!erros.isEmpty()) {
-            return ResultadoLinhaLoteDTO.invalida(indice, erros, Map.of());
-        }
-
-        try {
-            AssistidoResponseDTO criado = assistidoService.cadastrar(itens.get(indice));
-            return ResultadoLinhaLoteDTO.criada(indice, criado.assistidoId());
-        } catch (RegraNegocioException | EntidadeNaoEncontradaException ex) {
-            return ResultadoLinhaLoteDTO.invalida(indice, List.of(ex.getMessage()), Map.of());
-        } catch (DataIntegrityViolationException ex) {
-            return ResultadoLinhaLoteDTO.invalida(indice,
-                    List.of("A linha viola uma restricao de integridade do banco de dados."), Map.of());
-        }
     }
 
     private List<String> errosDaLinha(int indice, List<AssistidoRequestDTO> itens) {
