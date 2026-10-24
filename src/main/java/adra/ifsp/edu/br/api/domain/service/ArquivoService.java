@@ -5,11 +5,12 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.HexFormat;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 
+import adra.ifsp.edu.br.api.domain.dto.arquivo.AulaArquivoDTO;
+import adra.ifsp.edu.br.api.domain.model.Aula;
+import adra.ifsp.edu.br.api.domain.model.Turma;
+import adra.ifsp.edu.br.api.domain.repository.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -28,8 +29,6 @@ import adra.ifsp.edu.br.api.domain.enums.EntidadeArquivo;
 import adra.ifsp.edu.br.api.domain.enums.ModuloSistema;
 import adra.ifsp.edu.br.api.domain.enums.ProvedorArmazenamento;
 import adra.ifsp.edu.br.api.domain.model.Arquivo;
-import adra.ifsp.edu.br.api.domain.repository.ArquivoRepository;
-import adra.ifsp.edu.br.api.domain.repository.AssistidoRepository;
 import adra.ifsp.edu.br.api.exception.ArquivoInvalidoException;
 import adra.ifsp.edu.br.api.exception.EntidadeNaoEncontradaException;
 import adra.ifsp.edu.br.api.infra.armazenamento.ArmazenamentoArquivos;
@@ -44,6 +43,11 @@ public class ArquivoService {
 
     private final ArquivoRepository arquivoRepository;
     private final AssistidoRepository assistidoRepository;
+    private final UsuarioRepository usuarioRepository;
+    private final ResponsavelRepository responsavelRepository;
+    private final AulaRepository aulaRepository;
+    private final TurmaRepository turmaRepository;
+    private final AcessoTurmaService acessoTurma;
     private final ProcessadorArquivo processador;
     private final List<ArmazenamentoArquivos> armazenamentos;
     private final UsuarioAutenticadoService usuarioAutenticadoService;
@@ -116,8 +120,53 @@ public class ArquivoService {
                 entidadeTipo, entidadeId)
                 : arquivoRepository.findByEntidadeTipoAndEntidadeIdAndCategoriaAndExcluidoEmIsNullOrderByCriadoEmDesc(
                 entidadeTipo, entidadeId, categoria);
+        if (entidadeTipo == EntidadeArquivo.AULA) {
+            arquivos = somenteVisiveisAoUsuario(arquivos);
+        }
         return arquivos.stream().map(ArquivoResponseDTO::de).toList();
     }
+
+    /**
+     * Material de aula: o Oficineiro só enxerga o que ELE enviou;
+     * Coordenação/Sociopedagógico/Admin enxergam tudo (com o nome de quem enviou).
+     */
+    private List<Arquivo> somenteVisiveisAoUsuario(List<Arquivo> arquivos) {
+        if (!acessoTurma.usuarioAtualEhOficineiro()) return arquivos;
+        Long eu = acessoTurma.usuarioIdAtual();
+        return arquivos.stream()
+                .filter(a -> a.getEnviadoPor() != null && a.getEnviadoPor().getUsuarioId().equals(eu))
+                .toList();
+    }
+
+    /**
+     * Aulas da turma que têm material, cada uma com seus arquivos (mais recentes primeiro).
+     * Aula sem material não entra. Uma consulta de arquivos por aula — ok pro volume atual;
+     * se pesar, trocar por uma busca com EntidadeIdIn e agrupar por entidadeId.
+     */
+    @Transactional(readOnly = true)
+    public List<AulaArquivoDTO> listarArquivosPorAula(Long turmaId) {
+        List<AulaArquivoDTO> aulasArquivos = new ArrayList<>();
+
+        Turma turma = turmaRepository.findById(turmaId)
+                .orElseThrow(() -> new EntidadeNaoEncontradaException("Turma nao encontrada: id " + turmaId));
+
+        List<Aula> aulas = aulaRepository.findByTurmaOrderByDataAulaDescHorarioInicioDesc(turma);
+
+        for (Aula aula : aulas) {
+            List<Arquivo> arquivos = arquivoRepository
+                    .findByEntidadeTipoAndEntidadeIdAndCategoriaAndExcluidoEmIsNullOrderByCriadoEmDesc(
+                            EntidadeArquivo.AULA, aula.getAulaId(), CategoriaArquivo.MATERIAL_AULA);
+            arquivos = somenteVisiveisAoUsuario(arquivos);
+
+            if (!arquivos.isEmpty()) {
+                aulasArquivos.add(AulaArquivoDTO.de(aula, arquivos));
+            }
+        }
+        return aulasArquivos;
+    }
+
+
+
 
     @Transactional(readOnly = true)
     public UrlArquivoDTO gerarUrl(Long arquivoId) {
@@ -162,11 +211,24 @@ public class ArquivoService {
         if (entidadeTipo == null || entidadeId == null) {
             throw new ArquivoInvalidoException("Informe a quem o arquivo pertence.");
         }
-        if (entidadeTipo != EntidadeArquivo.ASSISTIDO) {
-            throw new ArquivoInvalidoException("Arquivos so podem ser enviados para assistidos.");
-        }
-        if (!assistidoRepository.existsById(entidadeId)) {
-            throw new EntidadeNaoEncontradaException(entidadeTipo + " nao encontrado: id " + entidadeId);
+        if(entidadeTipo==EntidadeArquivo.ASSISTIDO){
+            if (!assistidoRepository.existsById(entidadeId)) {
+                throw new EntidadeNaoEncontradaException(entidadeTipo + " nao encontrado: id " + entidadeId);
+            }
+        } else if(entidadeTipo==EntidadeArquivo.USUARIO){
+            if (!usuarioRepository.existsById(entidadeId)) {
+                throw new EntidadeNaoEncontradaException(entidadeTipo + " nao encontrado: id " + entidadeId);
+            }
+        } else if(entidadeTipo==EntidadeArquivo.RESPONSAVEL){
+            if (!responsavelRepository.existsById(entidadeId)) {
+                throw new EntidadeNaoEncontradaException(entidadeTipo + " nao encontrado: id " + entidadeId);
+            }
+        } else if(entidadeTipo==EntidadeArquivo.AULA){
+            if (!aulaRepository.existsById(entidadeId)) {
+                throw new EntidadeNaoEncontradaException(entidadeTipo + " nao encontrado: id " + entidadeId);
+            }
+        } else {
+            throw new ArquivoInvalidoException("Arquivos so podem ser enviados para assistidos, responsaveis, usuarios e aulas.");
         }
     }
 

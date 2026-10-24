@@ -15,10 +15,16 @@ public record ArquivoResponseDTO(
         String nomeOriginal,
         String mimeType,
         Long tamanhoBytes,
-        LocalDateTime criadoEm
+        LocalDateTime criadoEm,
+        Long enviadoPorId,
+        String enviadoPorNome
 ) {
+    /** enviadoPor é LAZY: chamar dentro de transação (os métodos do ArquivoService já são). */
     public static ArquivoResponseDTO de(Arquivo a) {
+        var autor = a.getEnviadoPor();
         return new ArquivoResponseDTO(a.getArquivoId(), a.getEntidadeTipo(), a.getEntidadeId(),
-                a.getCategoria(), a.getNomeOriginal(), a.getMimeType(), a.getTamanhoBytes(), a.getCriadoEm());
+                a.getCategoria(), a.getNomeOriginal(), a.getMimeType(), a.getTamanhoBytes(), a.getCriadoEm(),
+                autor != null ? autor.getUsuarioId() : null,
+                autor != null ? autor.getNomeCompleto() : null);
     }
 }
