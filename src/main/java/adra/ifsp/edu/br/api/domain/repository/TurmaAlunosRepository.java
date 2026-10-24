@@ -62,4 +62,22 @@ public interface TurmaAlunosRepository extends JpaRepository<TurmaAlunos, Long> 
     }
 
     List<TurmaAlunos> findByTurma_TurmaIdAndAssistidoIn(Long turmaId, Collection<Assistido> assistidos);
+
+    /**
+     * Vínculos (qualquer status) que cruzam o período — roster da grade
+     * mensal. Não filtra por status ATIVO de propósito: quem trocou de turma
+     * tem o vínculo antigo fechado como INATIVO, mas continua fazendo parte
+     * do histórico dos dias em que esteve aqui.
+     */
+    @Query("""
+            select ta from TurmaAlunos ta
+            join fetch ta.assistido
+            where ta.turma = :turma
+              and ta.dataEntrada <= :fim
+              and (ta.dataSaida is null or ta.dataSaida >= :inicio)
+            """)
+    List<TurmaAlunos> findVinculosNoPeriodo(
+            @Param("turma") Turma turma,
+            @Param("inicio") LocalDate inicio,
+            @Param("fim") LocalDate fim);
 }
