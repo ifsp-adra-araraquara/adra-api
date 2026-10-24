@@ -4,6 +4,7 @@ import adra.ifsp.edu.br.api.domain.enums.StatusGeral;
 import adra.ifsp.edu.br.api.domain.model.Assistido;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -40,4 +41,23 @@ public interface AssistidoRepository extends JpaRepository<Assistido, Long>, Jpa
             GROUP BY a.turma.turmaId
             """)
     List<Object[]> contarAtivosPorTurma(@Param("turmaIds") List<Long> turmaIds, @Param("status") StatusGeral status);
+
+    /**
+     * FT-04: recalcula os contadores disciplinares a partir dos registros não
+     * arquivados. Conta do zero em vez de somar/subtrair, então registrar,
+     * arquivar ou corrigir sempre deixa o valor certo. Os campos são
+     * somente leitura na entidade, por isso o update é nativo.
+     */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(value = """
+            UPDATE adra.assistido SET
+                total_ocorrencias_ativas  = (SELECT count(*) FROM adra.registro_disciplinar r
+                                              WHERE r.assistido_id = :assistidoId AND r.arquivado = false AND r.nivel = 'OCORRENCIA'),
+                total_advertencias_ativas = (SELECT count(*) FROM adra.registro_disciplinar r
+                                              WHERE r.assistido_id = :assistidoId AND r.arquivado = false AND r.nivel = 'ADVERTENCIA'),
+                total_suspensoes          = (SELECT count(*) FROM adra.registro_disciplinar r
+                                              WHERE r.assistido_id = :assistidoId AND r.arquivado = false AND r.nivel = 'SUSPENSAO')
+            WHERE assistido_id = :assistidoId
+            """, nativeQuery = true)
+    void recalcularContadoresDisciplinares(@Param("assistidoId") Long assistidoId);
 }

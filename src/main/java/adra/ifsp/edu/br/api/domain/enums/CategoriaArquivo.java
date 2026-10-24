@@ -31,7 +31,14 @@ public enum CategoriaArquivo {
             Set.of("application/pdf"),
             2*1024*1024,
         1600, false
-    );
+    ),
+
+    /** FT-04: foto/PDF da advertência, suspensão ou comunicado de uniforme assinado pelos pais (dono ASSISTIDO). */
+    DOCUMENTO_DISCIPLINAR_ASSINADO(
+            Set.of("image/webp", "image/jpeg", "image/png", "application/pdf"),
+            10 * 1024 * 1024,
+            1600,              // legível sem pesar
+            false);
 
     private final Set<String> mimeTypesPermitidos;
     private final long tamanhoMaximoBytes;
