@@ -27,6 +27,10 @@ public class Oficina {
     @JoinColumn(name = "oficineiro_id", nullable = false)
     private Usuario oficineiroResponsavel;
 
+    /** Onde a oficina acontece (ex.: "Sala 1", "Quadra"). Opcional. */
+    @Column(name = "local", length = 100)
+    private String local;
+
     @Column(name = "ativo", nullable = false)
     private Boolean ativo = true;
 

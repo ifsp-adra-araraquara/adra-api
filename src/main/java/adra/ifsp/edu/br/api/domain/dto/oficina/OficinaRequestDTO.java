@@ -11,6 +11,9 @@ public record OficinaRequestDTO(
         String nomeOficina,
 
         @NotNull(message = "Informe o oficineiro responsável.")
-        Long oficineiroResponsavelId
+        Long oficineiroResponsavelId,
+
+        @Size(max = 100, message = "O local deve ter no máximo 100 caracteres.")
+        String local
 ) {
 }
