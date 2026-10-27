@@ -2,7 +2,6 @@ package adra.ifsp.edu.br.api.domain.model;
 
 import adra.ifsp.edu.br.api.domain.enums.Turno;
 import jakarta.persistence.*;
-import lombok.Builder;
 import lombok.Data;
 
 import java.time.DayOfWeek;

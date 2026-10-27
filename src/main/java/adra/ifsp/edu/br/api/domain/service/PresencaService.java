@@ -545,7 +545,6 @@ public class PresencaService {
 
         if (dto.statusPresenca() == StatusPresenca.PRESENTE) {
             Long aulaId = presenca.getAula().getAulaId();
-            Long assistidoId = presenca.getAssistido().getAssistidoId();
             Assistido assistidoDaPresenca = presenca.getAssistido();
 
             presencaRepository.delete(presenca);
