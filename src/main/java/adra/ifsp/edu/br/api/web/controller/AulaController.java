@@ -121,6 +121,13 @@ public class AulaController {
         return ResponseEntity.ok(aulaService.buscarPorId(id));
     }
 
+    @PreAuthorize("hasAnyRole('SOCIOPEDAGOGICO', 'COORDENADOR') "
+            + "or (hasRole('OFICINEIRO') and @acessoTurma.podeAcessarAula(#id))")
+    @GetMapping("/{id}/detalhes")
+    public ResponseEntity<AulaComDetalhesResponseDTO> buscarPorIdComDetalhes(@PathVariable Long id) {
+        return ResponseEntity.ok(aulaService.buscarPorIdComDetalhes(id));
+    }
+
     @PreAuthorize("hasAnyRole('OFICINEIRO', 'SOCIOPEDAGOGICO', 'COORDENADOR')")
     @GetMapping("/turma/{idTurma}")
     public ResponseEntity<List<AulaResponseDTO>> buscarPorTurma(@PathVariable Long idTurma) {

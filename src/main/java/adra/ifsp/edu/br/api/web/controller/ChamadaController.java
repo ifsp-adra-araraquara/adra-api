@@ -1,16 +1,18 @@
 package adra.ifsp.edu.br.api.web.controller;
 
 import adra.ifsp.edu.br.api.domain.dto.presenca.FrequenciaAulaDTO;
-import adra.ifsp.edu.br.api.domain.dto.presenca.GradeFrequenciaTurmaDTO;
+import adra.ifsp.edu.br.api.domain.dto.presenca.GradeMensalTurmaDTO;
 import adra.ifsp.edu.br.api.domain.dto.presenca.PresencaRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.presenca.PresencaResponseDTO;
 import adra.ifsp.edu.br.api.domain.service.PresencaService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.YearMonth;
 import java.util.List;
 
 // CA-65.5: só Coordenador e Sociopedagógico lançam/editam chamada.
@@ -61,12 +63,18 @@ public class ChamadaController {
         return ResponseEntity.ok(presencaService.buscarFrequenciaAssistido(idAssistido));
     }
 
-    /** "Ver grade da turma" a partir da chamada — grade turma × dias, carregada só sob demanda. */
+    /**
+     * Grade mensal da turma no formato da planilha (FT-06) — `mes` no formato
+     * yyyy-MM; sem ele, o mês atual.
+     */
     @PreAuthorize("hasAnyRole('COORDENADOR', 'SOCIOPEDAGOGICO') "
             + "or (hasRole('OFICINEIRO') and @acessoTurma.podeAcessarTurma(#idTurma))")
     @GetMapping("/turma/{idTurma}/grade")
-    public ResponseEntity<GradeFrequenciaTurmaDTO> buscarGradeFrequenciaTurma(@PathVariable Long idTurma) {
-        return ResponseEntity.ok(presencaService.buscarGradeFrequenciaTurma(idTurma));
+    public ResponseEntity<GradeMensalTurmaDTO> buscarGradeMensalTurma(
+            @PathVariable Long idTurma,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM") YearMonth mes
+    ) {
+        return ResponseEntity.ok(presencaService.buscarGradeMensalTurma(idTurma, mes != null ? mes : YearMonth.now()));
     }
 
     @PreAuthorize("hasAnyRole('COORDENADOR', 'SOCIOPEDAGOGICO')")
