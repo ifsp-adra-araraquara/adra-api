@@ -152,8 +152,9 @@ public class Assistido {
     @JoinColumn(name = "turma_id")
     private Turma turma;
 
-    // Contadores geridos pelo trigger trg_progressao_disciplinar (modulo de
-    // disciplina, fora do escopo deste card). Nunca escrever por aqui.
+    // Contadores disciplinares: recalculados pelo DisciplinarService
+    // (AssistidoRepository.recalcularContadoresDisciplinares) a cada registro
+    // ou arquivamento. Nunca escrever por aqui.
     @Column(name = "total_ocorrencias_ativas", insertable = false, updatable = false)
     private Integer totalOcorrenciasAtivas;
 

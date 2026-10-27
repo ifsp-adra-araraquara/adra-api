@@ -8,6 +8,7 @@ import java.util.Set;
  */
 public enum CategoriaArquivo {
 
+
     FOTO_PERFIL(
             Set.of("image/webp", "image/jpeg", "image/png"),
             2 * 1024 * 1024,   // 2 MB (o front já manda ~50 KB)
@@ -24,7 +25,20 @@ public enum CategoriaArquivo {
             Set.of("image/webp", "image/jpeg", "image/png", "application/pdf"),
             2 * 1024 * 1024,   // mesmo limite do bucket
             1600,              // legível sem pesar
-            false);            // pode ter mais de um (frente e verso)
+            false),     // pode ter mais de um (frente e verso)
+
+    MATERIAL_AULA(
+            Set.of("application/pdf"),
+            2*1024*1024,
+        1600, false
+    ),
+
+    /** FT-04: foto/PDF da advertência, suspensão ou comunicado de uniforme assinado pelos pais (dono ASSISTIDO). */
+    DOCUMENTO_DISCIPLINAR_ASSINADO(
+            Set.of("image/webp", "image/jpeg", "image/png", "application/pdf"),
+            10 * 1024 * 1024,
+            1600,              // legível sem pesar
+            false);
 
     private final Set<String> mimeTypesPermitidos;
     private final long tamanhoMaximoBytes;

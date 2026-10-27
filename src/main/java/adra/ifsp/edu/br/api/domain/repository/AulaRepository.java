@@ -21,6 +21,8 @@ public interface AulaRepository extends JpaRepository<Aula, Long>, JpaSpecificat
 
     List<Aula> findByTurmaOrderByDataAulaAsc(Turma turma);
 
+    List<Aula> findByTurmaOrderByDataAulaDescHorarioInicioDesc(Turma turma);
+
     Optional<Aula> findByTurmaAndDataAula(Turma turma, LocalDate dataAula);
 
     List<Aula> findByDataAula(LocalDate dataAula);
@@ -28,6 +30,9 @@ public interface AulaRepository extends JpaRepository<Aula, Long>, JpaSpecificat
     List<Aula> findByTurmaAndStatusAula(Turma turma, StatusAula statusAula);
 
     boolean existsByTurmaAndDataAula(Turma turma, LocalDate dataAula);
+
+    /** A aula é de uma turma em que este usuário é o oficineiro responsável? (ver AcessoTurmaService) */
+    boolean existsByAulaIdAndTurmaOficineiroResponsavelUsuarioId(Long aulaId, Long usuarioId);
 
     @Query("SELECT COUNT(a) FROM Assistido a WHERE a.turma.turmaId = :turmaId AND a.status = 'ATIVO'")
     long countAlunosAtivosPorTurma(@Param("turmaId") Long turmaId);
