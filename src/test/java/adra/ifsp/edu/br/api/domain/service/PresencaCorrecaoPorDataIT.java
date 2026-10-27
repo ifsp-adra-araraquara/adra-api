@@ -1,5 +1,6 @@
 package adra.ifsp.edu.br.api.domain.service;
 
+import adra.ifsp.edu.br.api.ContainerPostgresAdra;
 import adra.ifsp.edu.br.api.domain.dto.presenca.PresencaRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.presenca.PresencaResponseDTO;
 import adra.ifsp.edu.br.api.domain.enums.MotivoFalta;
@@ -29,8 +30,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -39,8 +38,6 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.transaction.annotation.Transactional;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.postgresql.PostgreSQLContainer;
-import org.testcontainers.utility.DockerImageName;
 
 import javax.sql.DataSource;
 import java.sql.SQLException;
@@ -61,7 +58,7 @@ import static org.junit.jupiter.params.provider.Arguments.arguments;
  */
 @SpringBootTest
 @Testcontainers
-@Import(PresencaCorrecaoPorDataIT.ContainerConfig.class)
+@Import(ContainerPostgresAdra.class)
 @TestPropertySource(properties = {
         "spring.jpa.hibernate.ddl-auto=create-drop",
         "spring.flyway.enabled=false",
@@ -71,16 +68,6 @@ import static org.junit.jupiter.params.provider.Arguments.arguments;
 })
 @Transactional
 class PresencaCorrecaoPorDataIT {
-
-    @org.springframework.boot.test.context.TestConfiguration(proxyBeanMethods = false)
-    static class ContainerConfig {
-        @Bean
-        @ServiceConnection
-        PostgreSQLContainer postgresContainer() {
-            return new PostgreSQLContainer(DockerImageName.parse("postgres:latest"))
-                    .withInitScript("create-schema-adra.sql");
-        }
-    }
 
     @Autowired private NivelPermissaoRepository nivelPermissaoRepository;
     @Autowired private UsuarioRepository usuarioRepository;
