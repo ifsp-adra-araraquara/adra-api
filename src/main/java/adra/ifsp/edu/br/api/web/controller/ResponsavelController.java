@@ -1,5 +1,6 @@
 package adra.ifsp.edu.br.api.web.controller;
 
+import adra.ifsp.edu.br.api.domain.dto.responsavel.AssistidoVinculadoDTO;
 import adra.ifsp.edu.br.api.domain.dto.responsavel.ResponsavelRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.responsavel.ResponsavelResponseDTO;
 import adra.ifsp.edu.br.api.domain.service.ResponsavelService;
@@ -31,6 +32,13 @@ public class ResponsavelController {
     @GetMapping
     public ResponseEntity<List<ResponsavelResponseDTO>> listar() {
         return ResponseEntity.ok(responsavelService.listar());
+    }
+
+    /** Assistidos ligados a este responsável (ficha do responsável). */
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'COORDENADOR', 'SOCIOPEDAGOGICO')")
+    @GetMapping("/{id}/assistidos")
+    public ResponseEntity<List<AssistidoVinculadoDTO>> listarAssistidos(@PathVariable Long id) {
+        return ResponseEntity.ok(responsavelService.listarAssistidos(id));
     }
 
     @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'COORDENADOR', 'SOCIOPEDAGOGICO')")

@@ -1,6 +1,5 @@
 package adra.ifsp.edu.br.api.config;
 
-import java.time.Duration;
 import java.util.List;
 
 import javax.crypto.spec.SecretKeySpec;
@@ -23,7 +22,6 @@ import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.web.client.RestOperations;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;

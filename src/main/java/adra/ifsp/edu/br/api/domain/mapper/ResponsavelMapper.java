@@ -40,6 +40,10 @@ public class ResponsavelMapper {
     }
 
     public ResponsavelResponseDTO paraDTO(Responsavel entidade) {
+        return paraDTO(entidade, null, null);
+    }
+
+    public ResponsavelResponseDTO paraDTO(Responsavel entidade, Integer totalAssistidos, Integer assistidosAtivos) {
         return new ResponsavelResponseDTO(
                 entidade.getResponsavelId(),
                 entidade.getNomeCompleto(),
@@ -54,7 +58,9 @@ public class ResponsavelMapper {
                 entidade.getProfissao(),
                 entidade.getRenda(),
                 entidade.getCriadoEm(),
-                entidade.getAtualizadoEm()
+                entidade.getAtualizadoEm(),
+                totalAssistidos,
+                assistidosAtivos
         );
     }
 
