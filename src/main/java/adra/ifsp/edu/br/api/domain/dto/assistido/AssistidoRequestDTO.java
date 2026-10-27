@@ -31,7 +31,8 @@ public record AssistidoRequestDTO(
         @Past(message = "Data de nascimento deve estar no passado")
         LocalDate dataNascimento,
 
-        // CPF opcional e unico quando informado.
+        // CPF obrigatorio e unico: toda crianca atendida tem CPF.
+        @NotBlank(message = "CPF e' obrigatorio")
         @ValidCpf(message = "CPF invalido")
         String cpf,
 
