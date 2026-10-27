@@ -55,6 +55,8 @@ class AssistidoLoteIT {
     private static final String CPF_RESPONSAVEL_EXISTENTE = "39053344705";
     private static final String CPF_ASSISTIDO_EXISTENTE = "12345678909";
     private static final String CPF_ASSISTIDO_HOMONIMO = "98765432100";
+    /** CPF ainda não usado; a "Eva" já gravada não tem CPF (cadastro antigo), então o nome + nascimento bloqueia. */
+    private static final String CPF_ASSISTIDO_NOVO = "11122233396";
 
 
     @Autowired private AssistidoLoteService assistidoLoteService;
@@ -115,7 +117,7 @@ class AssistidoLoteIT {
                 assistido("Caio Existente", LocalDate.of(2014, 2, 2), CPF_ASSISTIDO_HOMONIMO,
                         responsavel("Paula Com Outro Nome", CPF_RESPONSAVEL_EXISTENTE)),
                 assistido("Davi Novo", LocalDate.of(2016, 6, 6), CPF_ASSISTIDO_EXISTENTE, paula),
-                assistido("eva existente", LocalDate.of(2013, 3, 3), paula)));
+                assistido("eva existente", LocalDate.of(2013, 3, 3), CPF_ASSISTIDO_NOVO, paula)));
 
         assertThat(resultados).extracting(ResultadoLinhaLoteDTO::status)
                 .containsExactly(StatusLinhaLote.VALIDA, StatusLinhaLote.INVALIDA, StatusLinhaLote.INVALIDA);

@@ -124,6 +124,14 @@ public class AssistidoService {
         return assistidoMapper.paraDTO(buscarEntidadePorId(id));
     }
 
+    /** Primeiro passo do cadastro: se o CPF já existe, o front abre a ficha em vez de cadastrar de novo. */
+    @Transactional(readOnly = true)
+    public AssistidoResponseDTO buscarPorCpf(String cpf) {
+        return assistidoRepository.findByCpf(cpf)
+                .map(assistidoMapper::paraDTO)
+                .orElseThrow(() -> new EntidadeNaoEncontradaException("Assistido nao encontrado para o CPF informado"));
+    }
+
     @Transactional(readOnly = true)
     public List<AssistidoResponseDTO> listar() {
         return assistidoRepository.findAll().stream()
