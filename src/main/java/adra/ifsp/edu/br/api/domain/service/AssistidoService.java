@@ -241,10 +241,9 @@ public class AssistidoService {
         validarDadosComplementares(dto);
         verificarDuplicidade(dto, id);
 
-        Map<String, Object> valorAnterior = Map.of(
-                "nomeCompleto", assistido.getNomeCompleto(),
-                "dataNascimento", assistido.getDataNascimento().toString()
-        );
+        Map<String, Object> valorAnterior = new java.util.HashMap<>();
+        valorAnterior.put("nomeCompleto", assistido.getNomeCompleto());
+        valorAnterior.put("dataNascimento", assistido.getDataNascimento() == null ? null : assistido.getDataNascimento().toString());
 
         assistidoMapper.atualizarEntidade(assistido, dto);
         atualizarTurma(assistido, dto.turmaId());
@@ -253,13 +252,17 @@ public class AssistidoService {
         assistido = assistidoRepository.save(assistido);
         vinculoTurmaService.vincular(assistido, assistido.getTurma());
 
+        Map<String, Object> valorNovo = new java.util.HashMap<>();
+        valorNovo.put("nomeCompleto", assistido.getNomeCompleto());
+        valorNovo.put("dataNascimento", assistido.getDataNascimento() == null ? null : assistido.getDataNascimento().toString());
+
         auditoriaService.registrar(
                 ModuloSistema.ASSISTIDOS,
                 "assistido",
                 assistido.getAssistidoId(),
                 AcaoSistema.EDITAR,
                 valorAnterior,
-                Map.of("nomeCompleto", assistido.getNomeCompleto(), "dataNascimento", assistido.getDataNascimento().toString()),
+                valorNovo,
                 "Atualizacao de dados cadastrais"
         );
 
