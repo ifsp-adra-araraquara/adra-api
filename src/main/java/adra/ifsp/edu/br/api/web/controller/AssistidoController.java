@@ -101,6 +101,12 @@ public class AssistidoController {
     }
 
     @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'COORDENADOR', 'SOCIOPEDAGOGICO')")
+    @GetMapping("/cpf/{cpf}")
+    public ResponseEntity<AssistidoResponseDTO> buscarPorCpf(@PathVariable String cpf) {
+        return ResponseEntity.ok(assistidoService.buscarPorCpf(cpf));
+    }
+
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'COORDENADOR', 'SOCIOPEDAGOGICO')")
     @GetMapping("/{id}")
     public ResponseEntity<AssistidoResponseDTO> buscarPorId(@PathVariable Long id) {
         return ResponseEntity.ok(assistidoService.buscarPorId(id));

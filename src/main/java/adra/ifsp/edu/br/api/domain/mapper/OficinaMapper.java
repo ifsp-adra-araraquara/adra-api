@@ -26,6 +26,7 @@ public class OficinaMapper {
             nova.setOficineiroResponsavel(oficineiro);
         }
 
+        nova.setLocal(textoOuNulo(dto.local()));
         nova.setAtivo(true);
 
         return nova;
@@ -33,6 +34,7 @@ public class OficinaMapper {
 
     public void atualizarEntidade(Oficina oficina, OficinaRequestDTO dto) {
         oficina.setNomeOficina(dto.nomeOficina());
+        oficina.setLocal(textoOuNulo(dto.local()));
 
         if (dto.oficineiroResponsavelId() != null) {
             Usuario oficineiro = usuarioRepository.findById(dto.oficineiroResponsavelId())
@@ -46,7 +48,13 @@ public class OficinaMapper {
                 oficina.getOficinaId(),
                 oficina.getNomeOficina(),
                 oficina.getOficineiroResponsavel() != null ? oficina.getOficineiroResponsavel().getUsuarioId() : null,
+                oficina.getLocal(),
                 oficina.getAtivo()
         );
+    }
+
+    /** Campo em branco vira null, para "sem local" ter uma forma só no banco. */
+    private static String textoOuNulo(String texto) {
+        return texto == null || texto.isBlank() ? null : texto.trim();
     }
 }

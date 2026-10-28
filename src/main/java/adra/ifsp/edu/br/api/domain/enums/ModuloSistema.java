@@ -14,6 +14,7 @@ public enum ModuloSistema {
     CHAMADA,
     PRONTUARIOS,
     DISCIPLINA,
+    PRE_CADASTRO,
     DOCUMENTOS,
     COMUNICADOS,
     RELATORIOS,

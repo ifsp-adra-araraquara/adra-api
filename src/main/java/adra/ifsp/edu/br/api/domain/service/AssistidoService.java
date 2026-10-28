@@ -5,7 +5,6 @@ import adra.ifsp.edu.br.api.domain.dto.assistido.AssistidoContagemDTO;
 import adra.ifsp.edu.br.api.domain.dto.assistido.AssistidoRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.assistido.AssistidoResponseDTO;
 import adra.ifsp.edu.br.api.domain.dto.assistido.AssistidoStatusRequestDTO;
-import adra.ifsp.edu.br.api.domain.dto.responsavel.ResponsavelRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.turma.VinculoTurmaAssistidoResponseDTO;
 import adra.ifsp.edu.br.api.domain.dto.vinculo.VinculoFamiliarComResponsavelRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.vinculo.VinculoFamiliarRequestDTO;
@@ -32,7 +31,6 @@ import adra.ifsp.edu.br.api.exception.RegraNegocioException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -43,7 +41,6 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -125,6 +122,14 @@ public class AssistidoService {
     @Transactional(readOnly = true)
     public AssistidoResponseDTO buscarPorId(Long id) {
         return assistidoMapper.paraDTO(buscarEntidadePorId(id));
+    }
+
+    /** Primeiro passo do cadastro: se o CPF já existe, o front abre a ficha em vez de cadastrar de novo. */
+    @Transactional(readOnly = true)
+    public AssistidoResponseDTO buscarPorCpf(String cpf) {
+        return assistidoRepository.findByCpf(cpf)
+                .map(assistidoMapper::paraDTO)
+                .orElseThrow(() -> new EntidadeNaoEncontradaException("Assistido nao encontrado para o CPF informado"));
     }
 
     @Transactional(readOnly = true)
@@ -236,10 +241,9 @@ public class AssistidoService {
         validarDadosComplementares(dto);
         verificarDuplicidade(dto, id);
 
-        Map<String, Object> valorAnterior = Map.of(
-                "nomeCompleto", assistido.getNomeCompleto(),
-                "dataNascimento", assistido.getDataNascimento().toString()
-        );
+        Map<String, Object> valorAnterior = new java.util.HashMap<>();
+        valorAnterior.put("nomeCompleto", assistido.getNomeCompleto());
+        valorAnterior.put("dataNascimento", assistido.getDataNascimento() == null ? null : assistido.getDataNascimento().toString());
 
         assistidoMapper.atualizarEntidade(assistido, dto);
         atualizarTurma(assistido, dto.turmaId());
@@ -248,13 +252,17 @@ public class AssistidoService {
         assistido = assistidoRepository.save(assistido);
         vinculoTurmaService.vincular(assistido, assistido.getTurma());
 
+        Map<String, Object> valorNovo = new java.util.HashMap<>();
+        valorNovo.put("nomeCompleto", assistido.getNomeCompleto());
+        valorNovo.put("dataNascimento", assistido.getDataNascimento() == null ? null : assistido.getDataNascimento().toString());
+
         auditoriaService.registrar(
                 ModuloSistema.ASSISTIDOS,
                 "assistido",
                 assistido.getAssistidoId(),
                 AcaoSistema.EDITAR,
                 valorAnterior,
-                Map.of("nomeCompleto", assistido.getNomeCompleto(), "dataNascimento", assistido.getDataNascimento().toString()),
+                valorNovo,
                 "Atualizacao de dados cadastrais"
         );
 

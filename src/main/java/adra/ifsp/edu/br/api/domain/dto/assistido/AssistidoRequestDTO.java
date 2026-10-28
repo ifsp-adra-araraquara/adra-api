@@ -27,11 +27,13 @@ public record AssistidoRequestDTO(
         @Size(max = 180, message = "Nome completo deve ter no maximo 180 caracteres")
         String nomeCompleto,
 
-        @NotNull(message = "Data de nascimento e' obrigatoria")
+        // Opcional: importação de planilha pode não ter nascimento confiável
+        // (confirmar com a família depois).
         @Past(message = "Data de nascimento deve estar no passado")
         LocalDate dataNascimento,
 
-        // CPF opcional e unico quando informado.
+        // CPF obrigatorio e unico: toda crianca atendida tem CPF.
+        @NotBlank(message = "CPF e' obrigatorio")
         @ValidCpf(message = "CPF invalido")
         String cpf,
 

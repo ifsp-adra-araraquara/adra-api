@@ -1,11 +1,13 @@
 package adra.ifsp.edu.br.api.domain.service;
 
+import adra.ifsp.edu.br.api.domain.dto.responsavel.AssistidoVinculadoDTO;
 import adra.ifsp.edu.br.api.domain.dto.responsavel.ResponsavelRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.responsavel.ResponsavelResponseDTO;
 import adra.ifsp.edu.br.api.domain.enums.AcaoSistema;
 import adra.ifsp.edu.br.api.domain.enums.ModuloSistema;
 import adra.ifsp.edu.br.api.domain.mapper.ResponsavelMapper;
 import adra.ifsp.edu.br.api.domain.model.Responsavel;
+import adra.ifsp.edu.br.api.domain.repository.AssistidoResponsavelRepository;
 import adra.ifsp.edu.br.api.domain.repository.ResponsavelRepository;
 import adra.ifsp.edu.br.api.exception.CpfDuplicadoException;
 import adra.ifsp.edu.br.api.exception.EntidadeNaoEncontradaException;
@@ -24,6 +26,7 @@ public class ResponsavelService {
 
     private final ResponsavelRepository responsavelRepository;
     private final ResponsavelMapper responsavelMapper;
+    private final AssistidoResponsavelRepository assistidoResponsavelRepository;
     private final AuditoriaService auditoriaService;
 
     public ResponsavelResponseDTO cadastrar(ResponsavelRequestDTO dto) {
@@ -61,9 +64,34 @@ public class ResponsavelService {
 
     @Transactional(readOnly = true)
     public List<ResponsavelResponseDTO> listar() {
+        // 2 consultas no total: os responsáveis e a contagem agrupada de vínculos.
+        Map<Long, long[]> contagens = assistidoResponsavelRepository.contarAssistidosPorResponsavel().stream()
+                .collect(Collectors.toMap(
+                        linha -> (Long) linha[0],
+                        linha -> new long[]{((Number) linha[1]).longValue(), ((Number) linha[2]).longValue()}));
         return responsavelRepository.findAll().stream()
-                .map(responsavelMapper::paraDTO)
+                .map(r -> {
+                    long[] c = contagens.getOrDefault(r.getResponsavelId(), new long[]{0, 0});
+                    return responsavelMapper.paraDTO(r, (int) c[0], (int) c[1]);
+                })
                 .collect(Collectors.toList());
+    }
+
+    /** Seção "Assistidos vinculados" da ficha do responsável. */
+    @Transactional(readOnly = true)
+    public List<AssistidoVinculadoDTO> listarAssistidos(Long responsavelId) {
+        buscarEntidadePorId(responsavelId);
+        return assistidoResponsavelRepository.findComAssistidoByResponsavelId(responsavelId).stream()
+                .map(v -> new AssistidoVinculadoDTO(
+                        v.getAssistido().getAssistidoId(),
+                        v.getAssistido().getNomeCompleto(),
+                        v.getAssistido().getStatus(),
+                        v.getAssistido().getTurma() != null ? v.getAssistido().getTurma().getNomeTurma() : null,
+                        v.getParentesco(),
+                        v.isResponsavelPrincipal(),
+                        v.isContatoEmergencia(),
+                        v.isAutorizadoRetirada()))
+                .toList();
     }
 
     public ResponsavelResponseDTO atualizar(Long id, ResponsavelRequestDTO dto) {

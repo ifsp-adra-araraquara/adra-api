@@ -3,9 +3,7 @@ package adra.ifsp.edu.br.api.domain.repository;
 import adra.ifsp.edu.br.api.domain.model.Presenca;
 import adra.ifsp.edu.br.api.domain.model.Aula;
 import adra.ifsp.edu.br.api.domain.model.Assistido;
-import adra.ifsp.edu.br.api.domain.enums.StatusPresenca;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 

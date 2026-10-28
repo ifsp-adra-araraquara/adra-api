@@ -1,5 +1,6 @@
 package adra.ifsp.edu.br.api.domain.service;
 
+import adra.ifsp.edu.br.api.ContainerPostgresAdra;
 import adra.ifsp.edu.br.api.domain.dto.assistido.AssistidoRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.assistido.ResultadoLinhaLoteDTO;
 import adra.ifsp.edu.br.api.domain.dto.vinculo.VinculoFamiliarComResponsavelRequestDTO;
@@ -14,16 +15,12 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.postgresql.PostgreSQLContainer;
-import org.testcontainers.utility.DockerImageName;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
@@ -43,7 +40,7 @@ import static org.mockito.Mockito.when;
 // Sem @Transactional: cada cadastro grava na propria transacao, e o teste precisa exercitar isso.
 @SpringBootTest
 @Testcontainers
-@Import(AssistidoLoteIT.ContainerConfig.class)
+@Import(ContainerPostgresAdra.class)
 @TestPropertySource(properties = {
         "spring.jpa.hibernate.ddl-auto=create-drop",
         "spring.flyway.enabled=false",
@@ -58,16 +55,9 @@ class AssistidoLoteIT {
     private static final String CPF_RESPONSAVEL_EXISTENTE = "39053344705";
     private static final String CPF_ASSISTIDO_EXISTENTE = "12345678909";
     private static final String CPF_ASSISTIDO_HOMONIMO = "98765432100";
+    /** CPF ainda não usado; a "Eva" já gravada não tem CPF (cadastro antigo), então o nome + nascimento bloqueia. */
+    private static final String CPF_ASSISTIDO_NOVO = "11122233396";
 
-    @org.springframework.boot.test.context.TestConfiguration(proxyBeanMethods = false)
-    static class ContainerConfig {
-        @Bean
-        @ServiceConnection
-        PostgreSQLContainer postgresContainer() {
-            return new PostgreSQLContainer(DockerImageName.parse("postgres:latest"))
-                    .withInitScript("create-schema-adra.sql");
-        }
-    }
 
     @Autowired private AssistidoLoteService assistidoLoteService;
     @Autowired private AssistidoService assistidoService;
@@ -127,7 +117,7 @@ class AssistidoLoteIT {
                 assistido("Caio Existente", LocalDate.of(2014, 2, 2), CPF_ASSISTIDO_HOMONIMO,
                         responsavel("Paula Com Outro Nome", CPF_RESPONSAVEL_EXISTENTE)),
                 assistido("Davi Novo", LocalDate.of(2016, 6, 6), CPF_ASSISTIDO_EXISTENTE, paula),
-                assistido("eva existente", LocalDate.of(2013, 3, 3), paula)));
+                assistido("eva existente", LocalDate.of(2013, 3, 3), CPF_ASSISTIDO_NOVO, paula)));
 
         assertThat(resultados).extracting(ResultadoLinhaLoteDTO::status)
                 .containsExactly(StatusLinhaLote.VALIDA, StatusLinhaLote.INVALIDA, StatusLinhaLote.INVALIDA);

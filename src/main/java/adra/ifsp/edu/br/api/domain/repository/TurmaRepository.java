@@ -1,7 +1,6 @@
 package adra.ifsp.edu.br.api.domain.repository;
 
 import adra.ifsp.edu.br.api.domain.model.Turma;
-import adra.ifsp.edu.br.api.domain.enums.Turno;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
@@ -14,6 +13,9 @@ import java.util.List;
 public interface TurmaRepository extends JpaRepository<Turma, Long>, JpaSpecificationExecutor<Turma> {
     List<Turma> findByOficineiroResponsavelUsuarioId(Long idOficineiro);
     List<Turma> findByOficinaOficinaId(Long idOficina);
+
+    /** Este usuário é o oficineiro responsável pela turma? (ver AcessoTurmaService) */
+    boolean existsByTurmaIdAndOficineiroResponsavelUsuarioId(Long turmaId, Long usuarioId);
 
     @Query("SELECT COUNT(t) > 0 FROM Turma t " +
            "WHERE t.oficineiroResponsavel.usuarioId = :oficineiroId " +

@@ -2,11 +2,14 @@ package adra.ifsp.edu.br.api.domain.service;
 
 import adra.ifsp.edu.br.api.domain.dto.oficina.OficinaRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.oficina.OficinaResponseDTO;
+import adra.ifsp.edu.br.api.domain.dto.oficina.OficinaResumoDTO;
 import adra.ifsp.edu.br.api.domain.enums.AcaoSistema;
 import adra.ifsp.edu.br.api.domain.enums.ModuloSistema;
 import adra.ifsp.edu.br.api.domain.mapper.OficinaMapper;
 import adra.ifsp.edu.br.api.domain.model.Oficina;
 import adra.ifsp.edu.br.api.domain.repository.OficinaRepository;
+import adra.ifsp.edu.br.api.domain.repository.OficinaResumoRepository;
+import adra.ifsp.edu.br.api.domain.repository.OficinaResumoRepository.TurmaDaOficina;
 import adra.ifsp.edu.br.api.domain.repository.OficinaSpecification;
 import adra.ifsp.edu.br.api.exception.EntidadeNaoEncontradaException;
 import lombok.RequiredArgsConstructor;
@@ -14,7 +17,12 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.DayOfWeek;
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -28,6 +36,7 @@ public class OficinaService {
     private final OficinaMapper oficinaMapper;
     private final AuditoriaService auditoriaService;
     private final HistoricoOficineiroService historicoOficineiroService;
+    private final OficinaResumoRepository oficinaResumoRepository;
 
     public List<OficinaResponseDTO> minhasOficinas(Long idOficineiro) {
         List<Oficina> oficinas = oficinaRepository.findByOficineiroResponsavelUsuarioId(idOficineiro);
@@ -73,6 +82,44 @@ public class OficinaService {
     }
 
     /**
+     * Resumo de turmas por oficina para os cards da listagem: dias e
+     * horário e vagas. Uma consulta para todas as oficinas, agrupada aqui.
+     */
+    @Transactional(readOnly = true)
+    public List<OficinaResumoDTO> resumo() {
+        return oficinaResumoRepository.turmasAtivas(LocalDate.now()).stream()
+                .collect(Collectors.groupingBy(TurmaDaOficina::oficinaId))
+                .entrySet().stream()
+                .map(e -> new OficinaResumoDTO(
+                        e.getKey(),
+                        e.getValue().size(),
+                        e.getValue().stream().mapToLong(TurmaDaOficina::alunos).sum(),
+                        e.getValue().stream().mapToInt(t -> t.capacidade() == null ? 0 : t.capacidade()).sum(),
+                        horarios(e.getValue())))
+                .toList();
+    }
+
+    /** Turmas com os mesmos dias e horário viram uma linha só; a mais comum primeiro. */
+    private static List<OficinaResumoDTO.Horario> horarios(List<TurmaDaOficina> turmas) {
+        record Chave(List<DayOfWeek> dias, LocalTime inicio) {
+        }
+        Map<Chave, Long> contagem = turmas.stream()
+                .map(t -> new Chave(dias(t.diasIso()), t.horarioInicio()))
+                .filter(c -> !c.dias().isEmpty() || c.inicio() != null)
+                .collect(Collectors.groupingBy(c -> c, LinkedHashMap::new, Collectors.counting()));
+        return contagem.entrySet().stream()
+                .sorted(Map.Entry.<Chave, Long>comparingByValue().reversed())
+                .map(e -> new OficinaResumoDTO.Horario(e.getKey().dias(), e.getKey().inicio(), e.getValue().intValue()))
+                .toList();
+    }
+
+    /** "1,3,5" (ISO: 1 = segunda) → [MONDAY, WEDNESDAY, FRIDAY]. */
+    private static List<DayOfWeek> dias(String diasIso) {
+        if (diasIso == null || diasIso.isBlank()) return List.of();
+        return Arrays.stream(diasIso.split(",")).map(d -> DayOfWeek.of(Integer.parseInt(d))).sorted().toList();
+    }
+
+    /**
      * Suporte ao alerta NAO BLOQUEANTE de duplicidade por nome (CA de FE):
      * apenas informa se ja existe, o front decide como exibir o aviso e
      * o cadastro nao e' impedido no backend.
@@ -100,6 +147,7 @@ public class OficinaService {
         // qualquer valor null, mesmo que a chave exista.
         Map<String, Object> valorAnterior = new HashMap<>();
         valorAnterior.put("nomeOficina", oficina.getNomeOficina());
+        valorAnterior.put("local", oficina.getLocal());
         valorAnterior.put(
                 "oficineiroResponsavelId",
                 oficina.getOficineiroResponsavel() != null ? oficina.getOficineiroResponsavel().getUsuarioId() : null);
@@ -112,6 +160,7 @@ public class OficinaService {
 
         Map<String, Object> valorNovo = new HashMap<>();
         valorNovo.put("nomeOficina", oficina.getNomeOficina());
+        valorNovo.put("local", oficina.getLocal());
         valorNovo.put(
                 "oficineiroResponsavelId",
                 oficina.getOficineiroResponsavel() != null ? oficina.getOficineiroResponsavel().getUsuarioId() : null);

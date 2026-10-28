@@ -230,6 +230,16 @@ public class AulaService {
         return aulaMapper.paraDTO(buscarEntidadePorId(id));
     }
 
+    /** Tela da chamada (FT-06): uma aula só, já com turma, oficineiro e quantidade de alunos. */
+    @Transactional(readOnly = true)
+    public AulaComDetalhesResponseDTO buscarPorIdComDetalhes(Long id) {
+        Aula aula = buscarEntidadePorId(id);
+        int quantidadeAlunos = aula.getTurma() != null
+                ? (int) aulaRepository.countAlunosAtivosPorTurma(aula.getTurma().getTurmaId())
+                : 0;
+        return aulaMapper.paraDTOComDetalhes(aula, quantidadeAlunos);
+    }
+
     public List<AulaResponseDTO> findByTurma(Long idTurma) {
         Optional<Turma> turma = turmaRepository.findById(idTurma);
 

@@ -2,6 +2,7 @@ package adra.ifsp.edu.br.api.web.controller;
 
 import adra.ifsp.edu.br.api.domain.dto.oficina.OficinaRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.oficina.OficinaResponseDTO;
+import adra.ifsp.edu.br.api.domain.dto.oficina.OficinaResumoDTO;
 import adra.ifsp.edu.br.api.domain.service.OficinaService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -40,6 +41,13 @@ public class OficinaController {
             @RequestParam(required = false) Boolean ativo
     ) {
         return ResponseEntity.ok(oficinaService.listarComFiltros(nome, ativo));
+    }
+
+    /** Números das turmas de cada oficina (dias, horário, vagas) para os cards. */
+    @PreAuthorize("hasAnyRole('SOCIOPEDAGOGICO', 'COORDENADOR')")
+    @GetMapping("/resumo")
+    public ResponseEntity<List<OficinaResumoDTO>> resumo() {
+        return ResponseEntity.ok(oficinaService.resumo());
     }
 
     @PreAuthorize("hasAnyRole('SOCIOPEDAGOGICO', 'COORDENADOR')")

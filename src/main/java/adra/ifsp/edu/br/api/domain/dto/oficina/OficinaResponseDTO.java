@@ -6,6 +6,7 @@ public record OficinaResponseDTO(
         Long oficinaId,
         String nomeOficina,
         Long oficineiroResponsavelId,
+        String local,
         Boolean ativo
 ) {
 
@@ -18,6 +19,7 @@ public record OficinaResponseDTO(
                 oficina.getOficinaId(),
                 oficina.getNomeOficina(),
                 oficina.getOficineiroResponsavel() != null ? oficina.getOficineiroResponsavel().getUsuarioId() : null,
+                oficina.getLocal(),
                 oficina.getAtivo()
         );
     }

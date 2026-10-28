@@ -21,6 +21,8 @@ public interface AulaRepository extends JpaRepository<Aula, Long>, JpaSpecificat
 
     List<Aula> findByTurmaOrderByDataAulaAsc(Turma turma);
 
+    List<Aula> findByTurmaOrderByDataAulaDescHorarioInicioDesc(Turma turma);
+
     Optional<Aula> findByTurmaAndDataAula(Turma turma, LocalDate dataAula);
 
     List<Aula> findByDataAula(LocalDate dataAula);
@@ -28,6 +30,12 @@ public interface AulaRepository extends JpaRepository<Aula, Long>, JpaSpecificat
     List<Aula> findByTurmaAndStatusAula(Turma turma, StatusAula statusAula);
 
     boolean existsByTurmaAndDataAula(Turma turma, LocalDate dataAula);
+
+    /** Todas as aulas da turma no período, qualquer status — grade mensal. */
+    List<Aula> findByTurmaAndDataAulaBetweenOrderByDataAulaAsc(Turma turma, LocalDate inicio, LocalDate fim);
+
+    /** A aula é de uma turma em que este usuário é o oficineiro responsável? (ver AcessoTurmaService) */
+    boolean existsByAulaIdAndTurmaOficineiroResponsavelUsuarioId(Long aulaId, Long usuarioId);
 
     @Query("SELECT COUNT(a) FROM Assistido a WHERE a.turma.turmaId = :turmaId AND a.status = 'ATIVO'")
     long countAlunosAtivosPorTurma(@Param("turmaId") Long turmaId);
@@ -41,9 +49,6 @@ public interface AulaRepository extends JpaRepository<Aula, Long>, JpaSpecificat
      */
     List<Aula> findTop10ByTurmaAndStatusAulaAndDataAulaLessThanOrderByDataAulaDesc(
             Turma turma, StatusAula statusAula, LocalDate dataAula);
-
-    /** Mesma ideia, sem data-âncora — pra grade de frequência da turma (tela separada, não ligada a uma aula específica). */
-    List<Aula> findTop10ByTurmaAndStatusAulaOrderByDataAulaDesc(Turma turma, StatusAula statusAula);
 
     /** Aulas realizadas de uma turma num período — usado pra montar o histórico de frequência de um assistido. */
     List<Aula> findByTurmaAndStatusAulaAndDataAulaBetweenOrderByDataAulaAsc(

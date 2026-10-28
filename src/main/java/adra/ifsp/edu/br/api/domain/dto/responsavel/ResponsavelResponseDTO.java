@@ -22,6 +22,10 @@ public record ResponsavelResponseDTO(
         String profissao,
         BigDecimal renda,
         OffsetDateTime criadoEm,
-        OffsetDateTime atualizadoEm
+        OffsetDateTime atualizadoEm,
+        // Assistidos vinculados (total e quantos estão ativos). Null onde a
+        // contagem não foi pedida (ex.: resposta de cadastro/edição).
+        Integer totalAssistidos,
+        Integer assistidosAtivos
 ) {
 }
