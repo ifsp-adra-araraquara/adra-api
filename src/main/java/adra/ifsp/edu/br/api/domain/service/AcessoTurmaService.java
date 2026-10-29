@@ -1,5 +1,6 @@
 package adra.ifsp.edu.br.api.domain.service;
 
+import adra.ifsp.edu.br.api.domain.enums.CategoriaArquivo;
 import adra.ifsp.edu.br.api.domain.enums.EntidadeArquivo;
 import adra.ifsp.edu.br.api.domain.repository.ArquivoRepository;
 import adra.ifsp.edu.br.api.domain.repository.AulaRepository;
@@ -56,6 +57,40 @@ public class AcessoTurmaService {
         if (arquivoId == null) return false;
         return arquivoRepository.findByArquivoIdAndExcluidoEmIsNull(arquivoId)
                 .map(a -> a.getEntidadeTipo() == EntidadeArquivo.AULA)
+                .orElse(false);
+    }
+
+    /** É arquivo cujo dono é USUARIO? (só o próprio usuário envia/exclui a própria foto de perfil) */
+    @Transactional(readOnly = true)
+    public boolean ehArquivoDeUsuario(Long arquivoId) {
+        if (arquivoId == null) return false;
+        return arquivoRepository.findByArquivoIdAndExcluidoEmIsNull(arquivoId)
+                .map(a -> a.getEntidadeTipo() == EntidadeArquivo.USUARIO)
+                .orElse(false);
+    }
+
+    /** O alvo é o próprio usuário autenticado? */
+    public boolean ehProprioUsuario(EntidadeArquivo entidadeTipo, Long entidadeId) {
+        Long usuarioId = usuarioIdAtual();
+        return entidadeTipo == EntidadeArquivo.USUARIO
+                && entidadeId != null
+                && entidadeId.equals(usuarioId);
+    }
+
+    /** Upload de FOTO_PERFIL do próprio usuário autenticado. */
+    public boolean ehPropriaFotoPerfil(EntidadeArquivo entidadeTipo, Long entidadeId, CategoriaArquivo categoria) {
+        return categoria == CategoriaArquivo.FOTO_PERFIL && ehProprioUsuario(entidadeTipo, entidadeId);
+    }
+
+    /** O arquivo salvo é a FOTO_PERFIL do próprio usuário autenticado? */
+    @Transactional(readOnly = true)
+    public boolean ehPropriaFotoPerfilSalva(Long arquivoId) {
+        Long usuarioId = usuarioIdAtual();
+        if (arquivoId == null || usuarioId == null) return false;
+        return arquivoRepository.findByArquivoIdAndExcluidoEmIsNull(arquivoId)
+                .map(a -> a.getEntidadeTipo() == EntidadeArquivo.USUARIO
+                        && a.getCategoria() == CategoriaArquivo.FOTO_PERFIL
+                        && usuarioId.equals(a.getEntidadeId()))
                 .orElse(false);
     }
 

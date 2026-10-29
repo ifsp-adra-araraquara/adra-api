@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import adra.ifsp.edu.br.api.domain.dto.PaginaDTO;
 import adra.ifsp.edu.br.api.domain.dto.usuario.RedefinicaoSenhaResponseDTO;
+import adra.ifsp.edu.br.api.domain.dto.usuario.UsuarioMeRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.usuario.UsuarioRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.usuario.UsuarioResponseDTO;
 import adra.ifsp.edu.br.api.domain.dto.usuario.UsuarioStatusRequestDTO;
@@ -33,6 +34,18 @@ public class UsuarioController {
 
     private final UsuarioService usuarioService;
     private final UsuarioAdminService usuarioAdminService;
+
+    @PreAuthorize("isAuthenticated()")
+    @GetMapping("/me")
+    public ResponseEntity<UsuarioResponseDTO> buscarMeuPerfil() {
+        return ResponseEntity.ok(usuarioService.buscarMeuPerfil());
+    }
+
+    @PreAuthorize("isAuthenticated()")
+    @PutMapping("/me")
+    public ResponseEntity<UsuarioResponseDTO> atualizarMeuPerfil(@Valid @RequestBody UsuarioMeRequestDTO dto) {
+        return ResponseEntity.ok(usuarioService.atualizarMeuPerfil(dto));
+    }
 
     @PreAuthorize("hasRole('ADMINISTRADOR')")
     @PostMapping
@@ -100,4 +113,3 @@ public class UsuarioController {
     // Propositalmente sem DELETE: usuario nunca e' removido fisicamente
     // (comentario original do schema). Use PATCH /{id}/status com ativo=false.
 }
-

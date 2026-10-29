@@ -26,7 +26,8 @@ import lombok.RequiredArgsConstructor;
 
 /**
  * Permissões:
- * - Assistido/responsável/usuário: Coordenador e Sociopedagógico (como antes).
+ * - Assistido/responsável: Coordenador e Sociopedagógico.
+ * - Usuário (FOTO_PERFIL): o próprio usuário logado (em qualquer perfil) envia, vê e exclui a própria foto.
  * - Material de AULA:
  *   - Oficineiro responsável pela turma ENVIA; vê, abre e exclui SÓ os que ele enviou
  *     (a listagem é filtrada no ArquivoService; abrir/excluir de outro = 403).
@@ -40,7 +41,8 @@ public class ArquivoController {
 
     private final ArquivoService arquivoService;
 
-    @PreAuthorize("(hasAnyRole('COORDENADOR', 'SOCIOPEDAGOGICO') and #entidadeTipo != T(adra.ifsp.edu.br.api.domain.enums.EntidadeArquivo).AULA) "
+    @PreAuthorize("(hasAnyRole('COORDENADOR', 'SOCIOPEDAGOGICO') and #entidadeTipo != T(adra.ifsp.edu.br.api.domain.enums.EntidadeArquivo).AULA and #entidadeTipo != T(adra.ifsp.edu.br.api.domain.enums.EntidadeArquivo).USUARIO) "
+            + "or @acessoTurma.ehPropriaFotoPerfil(#entidadeTipo, #entidadeId, #categoria) "
             + "or (hasRole('OFICINEIRO') and #entidadeTipo == T(adra.ifsp.edu.br.api.domain.enums.EntidadeArquivo).AULA and @acessoTurma.podeAcessarAula(#entidadeId))")
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ArquivoResponseDTO> enviar(@RequestParam EntidadeArquivo entidadeTipo,
@@ -52,6 +54,7 @@ public class ArquivoController {
     }
 
     @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'COORDENADOR', 'SOCIOPEDAGOGICO') "
+            + "or @acessoTurma.ehProprioUsuario(#entidadeTipo, #entidadeId) "
             + "or (hasRole('OFICINEIRO') and #entidadeTipo == T(adra.ifsp.edu.br.api.domain.enums.EntidadeArquivo).AULA and @acessoTurma.podeAcessarAula(#entidadeId))")
     @GetMapping
     public ResponseEntity<List<ArquivoResponseDTO>> listar(@RequestParam EntidadeArquivo entidadeTipo,
@@ -61,13 +64,15 @@ public class ArquivoController {
     }
 
     @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'COORDENADOR', 'SOCIOPEDAGOGICO') "
+            + "or @acessoTurma.ehPropriaFotoPerfilSalva(#id) "
             + "or (hasRole('OFICINEIRO') and @acessoTurma.ehAutorDoArquivoDeAula(#id))")
     @GetMapping("/{id}/url")
     public ResponseEntity<UrlArquivoDTO> gerarUrl(@PathVariable Long id) {
         return ResponseEntity.ok(arquivoService.gerarUrl(id));
     }
 
-    @PreAuthorize("(hasAnyRole('COORDENADOR', 'SOCIOPEDAGOGICO') and !@acessoTurma.ehArquivoDeAula(#id)) "
+    @PreAuthorize("(hasAnyRole('COORDENADOR', 'SOCIOPEDAGOGICO') and !@acessoTurma.ehArquivoDeAula(#id) and !@acessoTurma.ehArquivoDeUsuario(#id)) "
+            + "or @acessoTurma.ehPropriaFotoPerfilSalva(#id) "
             + "or (hasRole('OFICINEIRO') and @acessoTurma.ehAutorDoArquivoDeAula(#id))")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> remover(@PathVariable Long id) {

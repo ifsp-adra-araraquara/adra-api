@@ -2,6 +2,7 @@ package adra.ifsp.edu.br.api.domain.service;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 import org.springframework.data.domain.PageRequest;
@@ -11,13 +12,17 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import adra.ifsp.edu.br.api.domain.dto.PaginaDTO;
+import adra.ifsp.edu.br.api.domain.dto.modulo.ModuloDTO;
+import adra.ifsp.edu.br.api.domain.dto.usuario.UsuarioMeRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.usuario.UsuarioRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.usuario.UsuarioResponseDTO;
 import adra.ifsp.edu.br.api.domain.dto.usuario.UsuarioStatusRequestDTO;
+import adra.ifsp.edu.br.api.domain.repository.NivelPermissaoModuloRepository;
 import adra.ifsp.edu.br.api.domain.repository.UsuarioSpecification;
 import adra.ifsp.edu.br.api.domain.enums.AcaoSistema;
 import adra.ifsp.edu.br.api.domain.enums.ModuloSistema;
 import adra.ifsp.edu.br.api.domain.enums.NomeNivelPermissao;
+import adra.ifsp.edu.br.api.domain.mapper.ModuloMapper;
 import adra.ifsp.edu.br.api.domain.mapper.UsuarioMapper;
 import adra.ifsp.edu.br.api.domain.model.NivelPermissao;
 import adra.ifsp.edu.br.api.domain.model.Usuario;
@@ -34,8 +39,11 @@ public class UsuarioService {
 
     private final UsuarioRepository usuarioRepository;
     private final NivelPermissaoRepository nivelPermissaoRepository;
+    private final NivelPermissaoModuloRepository nivelPermissaoModuloRepository;
     private final UsuarioMapper usuarioMapper;
+    private final ModuloMapper moduloMapper;
     private final AuditoriaService auditoriaService;
+    private final UsuarioAutenticadoService usuarioAutenticadoService;
 
     @Transactional(readOnly = true)
     public void validarNovoCadastro(UsuarioRequestDTO dto) {
@@ -70,6 +78,39 @@ public class UsuarioService {
     @Transactional(readOnly = true)
     public UsuarioResponseDTO buscarPorId(Long id) {
         return usuarioMapper.paraDTO(buscarEntidadePorId(id));
+    }
+
+    @Transactional(readOnly = true)
+    public UsuarioResponseDTO buscarMeuPerfil() {
+        Usuario usuario = usuarioAutenticadoService.getUsuarioAtual();
+        return usuarioMapper.paraDTO(usuario, carregarModulos(usuario));
+    }
+
+    public UsuarioResponseDTO atualizarMeuPerfil(UsuarioMeRequestDTO dto) {
+        Usuario usuario = usuarioAutenticadoService.getUsuarioAtual();
+
+        Map<String, Object> valorAnterior = Map.of(
+                "nomeCompleto", usuario.getNomeCompleto(),
+                "telefone", Objects.requireNonNullElse(usuario.getTelefone(), "")
+        );
+
+        usuarioMapper.atualizarMeuPerfil(usuario, dto);
+        usuario = usuarioRepository.save(usuario);
+
+        auditoriaService.registrar(
+                ModuloSistema.USUARIOS,
+                "usuario",
+                usuario.getUsuarioId(),
+                AcaoSistema.EDITAR,
+                valorAnterior,
+                Map.of(
+                        "nomeCompleto", usuario.getNomeCompleto(),
+                        "telefone", Objects.requireNonNullElse(usuario.getTelefone(), "")
+                ),
+                "Atualizacao do proprio perfil pelo usuario"
+        );
+
+        return usuarioMapper.paraDTO(usuario, carregarModulos(usuario));
     }
 
     @Transactional(readOnly = true)
@@ -174,22 +215,14 @@ public class UsuarioService {
                         "Nivel de permissao '" + nome + "' nao encontrado. Rode a migracao/seed antes de cadastrar usuarios."));
     }
 
-
-//    public UsuarioResponseDTO autenticar(LoginRequestDTO dto) {
-//        Usuario usuario = usuarioRepository.findByEmail(dto.email())
-//                .filter(Usuario::isAtivo)
-//                .filter(u -> passwordEncoder.matches(dto.senha(), u.getSenhaHash()))
-//                .orElseThrow(() -> new CredenciaisInvalidasException("Email ou senha invalidos"));
-//
-//        usuario.setUltimoLogin(OffsetDateTime.now());
-//        usuarioRepository.save(usuario);
-//
-//        List<ModuloDTO> modulos = nivelPermissaoModuloRepository
-//                .findComModuloById_NivelPermissaoIdOrderByOrdemAsc(usuario.getNivelPermissao().getNivelPermissaoId())
-//                .stream()
-//                .map(npm -> moduloMapper.paraDTO(npm.getModulo()))
-//                .toList();
-//
-//        return usuarioMapper.paraDTO(usuario, modulos);
-//    }
+    private List<ModuloDTO> carregarModulos(Usuario usuario) {
+        if (usuario.getNivelPermissao() == null || usuario.getNivelPermissao().getNivelPermissaoId() == null) {
+            return List.of();
+        }
+        return nivelPermissaoModuloRepository
+                .findComModuloById_NivelPermissaoIdOrderByOrdemAsc(usuario.getNivelPermissao().getNivelPermissaoId())
+                .stream()
+                .map(npm -> moduloMapper.paraDTO(npm.getModulo()))
+                .toList();
+    }
 }
