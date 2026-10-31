@@ -1,5 +1,6 @@
 package adra.ifsp.edu.br.api.config;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import javax.crypto.spec.SecretKeySpec;
@@ -28,6 +29,8 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
+
+import adra.ifsp.edu.br.api.domain.service.TokenService;
 
 /**
  * Duas cadeias de seguranca porque sao dois emissores de token diferentes:
@@ -78,11 +81,15 @@ public class SecurityConfig {
     public JwtAuthenticationConverter jwtAuthenticationConverter() {
         JwtAuthenticationConverter converter = new JwtAuthenticationConverter();
         converter.setJwtGrantedAuthoritiesConverter(jwt -> {
-            String perfil = jwt.getClaimAsString(adra.ifsp.edu.br.api.domain.service.TokenService.CLAIM_PERFIL);
-            if (perfil == null) {
-                return List.<GrantedAuthority>of();
+            List<GrantedAuthority> autoridades = new ArrayList<>();
+            String perfil = jwt.getClaimAsString(TokenService.CLAIM_PERFIL);
+            if (perfil != null) {
+                autoridades.add(new SimpleGrantedAuthority("ROLE_" + perfil));
             }
-            return List.of(new SimpleGrantedAuthority("ROLE_" + perfil));
+            if (Boolean.TRUE.equals(jwt.getClaimAsBoolean(TokenService.CLAIM_ADMINISTRADOR))) {
+                autoridades.add(new SimpleGrantedAuthority("ADMINISTRADOR"));
+            }
+            return autoridades;
         });
         return converter;
     }

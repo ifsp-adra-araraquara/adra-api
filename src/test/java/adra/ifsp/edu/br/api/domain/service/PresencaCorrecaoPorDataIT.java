@@ -82,7 +82,7 @@ class PresencaCorrecaoPorDataIT {
     private static final LocalDate HOJE = LocalDate.now();
 
     private Usuario coordenador;
-    private Usuario sociopedagogico;
+    private Usuario educadorSocial;
     private Assistido assistido;
     private Aula aulaHoje;
     private Aula aulaSemanaPassada;
@@ -102,7 +102,7 @@ class PresencaCorrecaoPorDataIT {
         NivelPermissao nivelCoordenador = nivelPermissaoRepository.save(
                 NivelPermissao.builder().nome(NomeNivelPermissao.COORDENADOR).build());
         NivelPermissao nivelSocio = nivelPermissaoRepository.save(
-                NivelPermissao.builder().nome(NomeNivelPermissao.SOCIOPEDAGOGICO).build());
+                NivelPermissao.builder().nome(NomeNivelPermissao.EDUCADOR_SOCIAL).build());
 
         coordenador = usuarioRepository.save(
                 Usuario.builder()
@@ -110,7 +110,7 @@ class PresencaCorrecaoPorDataIT {
                         .nomeCompleto("Coordenadora Teste")
                         .email("coordenadora-us67@teste.local")
                         .build());
-        sociopedagogico = usuarioRepository.save(
+        educadorSocial = usuarioRepository.save(
                 Usuario.builder()
                         .nivelPermissao(nivelSocio)
                         .nomeCompleto("Sociopedagoga Teste")
@@ -164,8 +164,8 @@ class PresencaCorrecaoPorDataIT {
         return Stream.of(
                 arguments(NomeNivelPermissao.COORDENADOR, "hoje", true),
                 arguments(NomeNivelPermissao.COORDENADOR, "semana_passada", true),
-                arguments(NomeNivelPermissao.SOCIOPEDAGOGICO, "hoje", true),
-                arguments(NomeNivelPermissao.SOCIOPEDAGOGICO, "semana_passada", false)
+                arguments(NomeNivelPermissao.EDUCADOR_SOCIAL, "hoje", true),
+                arguments(NomeNivelPermissao.EDUCADOR_SOCIAL, "semana_passada", false)
         );
     }
 
@@ -173,7 +173,7 @@ class PresencaCorrecaoPorDataIT {
     @MethodSource("cenarios")
     @DisplayName("CA-67.1/CA-67.2: regra de correção por data cruzada com o perfil")
     void corrigirChamadaPorPerfilEData(NomeNivelPermissao perfil, String data, boolean devePermitir) {
-        Usuario usuarioDoTeste = perfil == NomeNivelPermissao.COORDENADOR ? coordenador : sociopedagogico;
+        Usuario usuarioDoTeste = perfil == NomeNivelPermissao.COORDENADOR ? coordenador : educadorSocial;
         autenticarComo(usuarioDoTeste);
 
         Long presencaId = data.equals("hoje") ? presencaHojeId : presencaSemanaPassadaId;

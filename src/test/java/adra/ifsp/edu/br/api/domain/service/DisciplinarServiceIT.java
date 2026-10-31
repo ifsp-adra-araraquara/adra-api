@@ -77,7 +77,7 @@ class DisciplinarServiceIT {
     private static final LocalDate HOJE = LocalDate.now();
 
     private Usuario coordenador;
-    private Usuario sociopedagogico;
+    private Usuario educadorSocial;
     private Usuario oficineiro;
     private Assistido assistido;
     private MotivoDisciplinar palavrao;
@@ -96,9 +96,9 @@ class DisciplinarServiceIT {
         }
 
         coordenador = criarUsuario(NomeNivelPermissao.COORDENADOR, "coord-ft04@teste.local");
-        sociopedagogico = criarUsuario(NomeNivelPermissao.SOCIOPEDAGOGICO, "socio-ft04@teste.local");
+        educadorSocial = criarUsuario(NomeNivelPermissao.EDUCADOR_SOCIAL, "socio-ft04@teste.local");
         oficineiro = criarUsuario(NomeNivelPermissao.OFICINEIRO, "oficineiro-ft04@teste.local");
-        autenticarComo(sociopedagogico);
+        autenticarComo(coordenador);
 
         assistido = assistidoRepository.save(Assistido.builder()
                 .nomeCompleto("Assistido FT-04")
@@ -230,6 +230,7 @@ class DisciplinarServiceIT {
     @Test
     @DisplayName("Arquivar tira o registro das contagens e só o Coordenador pode")
     void arquivar() {
+        autenticarComo(educadorSocial);
         RegistroDisciplinarResponseDTO ocorrencia = registrar(palavrao).get(0);
 
         assertThatThrownBy(() -> disciplinarController.arquivar(ocorrencia.registroId(),

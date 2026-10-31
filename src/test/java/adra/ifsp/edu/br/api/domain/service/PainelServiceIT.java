@@ -94,7 +94,7 @@ class PainelServiceIT {
     private static final YearMonth MES = YearMonth.from(HOJE).minusMonths(1);
 
     private Usuario coordenador;
-    private Usuario sociopedagogico;
+    private Usuario educadorSocial;
     private Turma turma;
     private Assistido ana;
     private Assistido bruno;
@@ -110,7 +110,7 @@ class PainelServiceIT {
         }
 
         coordenador = criarUsuario(NomeNivelPermissao.COORDENADOR, "coord-ft05@teste.local");
-        sociopedagogico = criarUsuario(NomeNivelPermissao.SOCIOPEDAGOGICO, "socio-ft05@teste.local");
+        educadorSocial = criarUsuario(NomeNivelPermissao.EDUCADOR_SOCIAL, "socio-ft05@teste.local");
         autenticarComo(coordenador);
 
         Oficina oficina = new Oficina();
@@ -252,7 +252,7 @@ class PainelServiceIT {
     @Test
     @DisplayName("Só o Coordenador acessa o painel")
     void somenteCoordenador() {
-        autenticarComo(sociopedagogico);
+        autenticarComo(educadorSocial);
         assertThatThrownBy(() -> painelController.hoje()).isInstanceOf(AuthorizationDeniedException.class);
         assertThatThrownBy(() -> painelController.mensal(MES, null)).isInstanceOf(AuthorizationDeniedException.class);
     }

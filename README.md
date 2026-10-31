@@ -26,9 +26,10 @@ decorar dois conjuntos de credencial. Senha `mudar123`:
 
 | E-mail | Perfil |
 | --- | --- |
-| `administrador@adra.com` | Administrador |
+| `administrador@adra.com` | Coordenador e Administrador |
 | `coordenador@adra.com` | Coordenador |
-| `sociopedagogico@adra.com` | Sociopedagógico |
+| `sociopedagogico@adra.com` | Educador Social |
+| `assistentesocial@adra.com` | Assistente Social (só local) |
 
 O `supabase/config.toml` copia o que está em stage e produção: signup público
 desligado, senha mínima de 8 com letra e número, JWT em ES256.

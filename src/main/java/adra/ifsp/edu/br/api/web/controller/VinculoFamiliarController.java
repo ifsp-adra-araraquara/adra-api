@@ -55,7 +55,7 @@ public class VinculoFamiliarController {
         return ResponseEntity.ok(vinculoFamiliarService.atualizar(assistidoId, responsavelId, dto));
     }
 
-    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    @PreAuthorize("hasAuthority('ADMINISTRADOR')")
     @DeleteMapping("/{responsavelId}")
     public ResponseEntity<Void> desvincular(@PathVariable Long assistidoId, @PathVariable Long responsavelId) {
         vinculoFamiliarService.desvincular(assistidoId, responsavelId);
