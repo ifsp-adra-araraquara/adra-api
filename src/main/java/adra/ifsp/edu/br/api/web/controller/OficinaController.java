@@ -24,7 +24,7 @@ public class OficinaController {
     private final HistoricoOficineiroService historicoOficineiroService;
 
     /** Quem foi o oficineiro responsável e em qual período (mais recente primeiro). */
-    @PreAuthorize("hasAnyRole('SOCIOPEDAGOGICO', 'COORDENADOR')")
+    @PreAuthorize("hasAnyRole('EDUCADOR_SOCIAL', 'ASSISTENTE_SOCIAL', 'COORDENADOR')")
     @GetMapping("/{id}/oficineiros-historico")
     public ResponseEntity<List<OficineiroHistoricoDTO>> historicoOficineiros(@PathVariable Long id) {
         return ResponseEntity.ok(historicoOficineiroService.listarPorOficina(id));
@@ -34,7 +34,7 @@ public class OficinaController {
      * Listagem visivel para Coordenador e Sociopedagogico, assim como em
      * Turmas. A restricao de CA-13.3 e' apenas sobre o cadastro.
      */
-    @PreAuthorize("hasAnyRole('SOCIOPEDAGOGICO', 'COORDENADOR')")
+    @PreAuthorize("hasAnyRole('EDUCADOR_SOCIAL', 'ASSISTENTE_SOCIAL', 'COORDENADOR')")
     @GetMapping
     public ResponseEntity<List<OficinaResponseDTO>> listar(
             @RequestParam(required = false) String nome,
@@ -44,13 +44,13 @@ public class OficinaController {
     }
 
     /** Números das turmas de cada oficina (dias, horário, vagas) para os cards. */
-    @PreAuthorize("hasAnyRole('SOCIOPEDAGOGICO', 'COORDENADOR')")
+    @PreAuthorize("hasAnyRole('EDUCADOR_SOCIAL', 'ASSISTENTE_SOCIAL', 'COORDENADOR')")
     @GetMapping("/resumo")
     public ResponseEntity<List<OficinaResumoDTO>> resumo() {
         return ResponseEntity.ok(oficinaService.resumo());
     }
 
-    @PreAuthorize("hasAnyRole('SOCIOPEDAGOGICO', 'COORDENADOR')")
+    @PreAuthorize("hasAnyRole('EDUCADOR_SOCIAL', 'ASSISTENTE_SOCIAL', 'COORDENADOR')")
     @GetMapping("/{id}")
     public ResponseEntity<OficinaResponseDTO> buscarPorId(@PathVariable Long id) {
         return ResponseEntity.ok(oficinaService.buscarPorId(id));
@@ -129,7 +129,7 @@ public class OficinaController {
         return ResponseEntity.ok(reativada);
     }
 
-    @PreAuthorize("hasAnyRole('OFICINEIRO', 'SOCIOPEDAGOGICO', 'COORDENADOR')")
+    @PreAuthorize("hasAnyRole('OFICINEIRO', 'EDUCADOR_SOCIAL', 'ASSISTENTE_SOCIAL', 'COORDENADOR')")
     @GetMapping("/minhas-oficinas/{idOficineiro}")
     public ResponseEntity<List<OficinaResponseDTO>> minhasOficinas(
             @PathVariable Long idOficineiro

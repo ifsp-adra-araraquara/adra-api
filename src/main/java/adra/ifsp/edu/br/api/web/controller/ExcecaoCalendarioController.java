@@ -27,13 +27,13 @@ public class ExcecaoCalendarioController {
         return ResponseEntity.status(HttpStatus.CREATED).body(excecaoCalendarioService.cadastrar(dto));
     }
 
-    @PreAuthorize("hasAnyRole('COORDENADOR', 'SOCIOPEDAGOGICO', 'OFICINEIRO')")
+    @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL', 'EDUCADOR_SOCIAL', 'OFICINEIRO')")
     @GetMapping
     public ResponseEntity<List<ExcecaoCalendarioResponseDTO>> listar() {
         return ResponseEntity.ok(excecaoCalendarioService.listarTodas());
     }
 
-    @PreAuthorize("hasAnyRole('COORDENADOR', 'SOCIOPEDAGOGICO', 'OFICINEIRO')")
+    @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL', 'EDUCADOR_SOCIAL', 'OFICINEIRO')")
     @GetMapping("/{id}")
     public ResponseEntity<ExcecaoCalendarioResponseDTO> buscarPorId(@PathVariable Long id) {
         return ResponseEntity.ok(excecaoCalendarioService.buscarPorId(id));

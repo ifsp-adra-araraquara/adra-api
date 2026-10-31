@@ -22,6 +22,7 @@ import adra.ifsp.edu.br.api.domain.repository.AssistidoRepository;
 import adra.ifsp.edu.br.api.domain.repository.MotivoDisciplinarRepository;
 import adra.ifsp.edu.br.api.domain.repository.NivelPermissaoRepository;
 import adra.ifsp.edu.br.api.domain.repository.UsuarioRepository;
+import adra.ifsp.edu.br.api.exception.AcessoNegadoException;
 import adra.ifsp.edu.br.api.exception.RegraNegocioException;
 import adra.ifsp.edu.br.api.web.controller.DisciplinarController;
 import org.junit.jupiter.api.BeforeEach;
@@ -245,6 +246,17 @@ class DisciplinarServiceIT {
                 .isZero();
         assertThatThrownBy(() -> disciplinarService.marcarDocumentoDevolvido(ocorrencia.registroId(), null))
                 .isInstanceOf(RegraNegocioException.class);
+    }
+
+    @Test
+    @DisplayName("Educador Social só registra ocorrência")
+    void educadorSocialSoRegistraOcorrencia() {
+        autenticarComo(educadorSocial);
+
+        assertThat(registrar(palavrao)).singleElement()
+                .extracting(RegistroDisciplinarResponseDTO::nivel).isEqualTo(NivelDisciplinar.OCORRENCIA);
+        assertThatThrownBy(() -> registrar(agressao)).isInstanceOf(AcessoNegadoException.class);
+        assertThatThrownBy(() -> registrar(uniforme)).isInstanceOf(AcessoNegadoException.class);
     }
 
     @Test

@@ -45,7 +45,7 @@ public class AulaController {
     // CA-65.3: quem faz a chamada (sociopedagógico) é quem marca a aula como
     // REALIZADA nesse fluxo — precisa poder chamar esse PATCH pontual de
     // status também, não só o coordenador.
-    @PreAuthorize("hasAnyRole('SOCIOPEDAGOGICO', 'COORDENADOR')")
+    @PreAuthorize("hasAnyRole('EDUCADOR_SOCIAL', 'COORDENADOR')")
     @PatchMapping("/{id}")
     public ResponseEntity<AulaResponseDTO> atualizarStatus(
             @PathVariable Long id,
@@ -54,7 +54,7 @@ public class AulaController {
         return ResponseEntity.ok(aulaService.atualizarStatus(id, dto));
     }
 
-    @PreAuthorize("hasAnyRole('OFICINEIRO', 'SOCIOPEDAGOGICO', 'COORDENADOR')")
+    @PreAuthorize("hasAnyRole('OFICINEIRO', 'EDUCADOR_SOCIAL', 'ASSISTENTE_SOCIAL', 'COORDENADOR')")
     @GetMapping
     public ResponseEntity<List<AulaResponseDTO>> listar(
             @RequestParam(name = "turmaId", required = false) Long turmaId,
@@ -85,7 +85,7 @@ public class AulaController {
      * filtro de data em cima pra trocar o dia. Nao restringe por turma nem
      * exige turmaId de antemao.
      */
-    @PreAuthorize("hasAnyRole('OFICINEIRO', 'SOCIOPEDAGOGICO', 'COORDENADOR')")
+    @PreAuthorize("hasAnyRole('OFICINEIRO', 'EDUCADOR_SOCIAL', 'ASSISTENTE_SOCIAL', 'COORDENADOR')")
     @GetMapping("/com-detalhes")
     public ResponseEntity<List<AulaComDetalhesResponseDTO>> listarComDetalhes(
             @RequestParam(required = false) Long turmaId,
@@ -115,26 +115,26 @@ public class AulaController {
         return ResponseEntity.ok(aulaService.listarStatusChamada(turmaId, dataInicio, dataFim));
     }
 
-    @PreAuthorize("hasAnyRole('OFICINEIRO', 'SOCIOPEDAGOGICO', 'COORDENADOR')")
+    @PreAuthorize("hasAnyRole('OFICINEIRO', 'EDUCADOR_SOCIAL', 'ASSISTENTE_SOCIAL', 'COORDENADOR')")
     @GetMapping("/{id}")
     public ResponseEntity<AulaResponseDTO> buscarPorId(@PathVariable Long id) {
         return ResponseEntity.ok(aulaService.buscarPorId(id));
     }
 
-    @PreAuthorize("hasAnyRole('SOCIOPEDAGOGICO', 'COORDENADOR') "
+    @PreAuthorize("hasAnyRole('EDUCADOR_SOCIAL', 'ASSISTENTE_SOCIAL', 'COORDENADOR') "
             + "or (hasRole('OFICINEIRO') and @acessoTurma.podeAcessarAula(#id))")
     @GetMapping("/{id}/detalhes")
     public ResponseEntity<AulaComDetalhesResponseDTO> buscarPorIdComDetalhes(@PathVariable Long id) {
         return ResponseEntity.ok(aulaService.buscarPorIdComDetalhes(id));
     }
 
-    @PreAuthorize("hasAnyRole('OFICINEIRO', 'SOCIOPEDAGOGICO', 'COORDENADOR')")
+    @PreAuthorize("hasAnyRole('OFICINEIRO', 'EDUCADOR_SOCIAL', 'ASSISTENTE_SOCIAL', 'COORDENADOR')")
     @GetMapping("/turma/{idTurma}")
     public ResponseEntity<List<AulaResponseDTO>> buscarPorTurma(@PathVariable Long idTurma) {
         return ResponseEntity.ok(aulaService.findByTurma(idTurma));
     }
 
-    @PreAuthorize("hasAnyRole('OFICINEIRO', 'SOCIOPEDAGOGICO', 'COORDENADOR')")
+    @PreAuthorize("hasAnyRole('OFICINEIRO', 'EDUCADOR_SOCIAL', 'ASSISTENTE_SOCIAL', 'COORDENADOR')")
     @GetMapping("/turma/{idTurma}/detalhes")
     public ResponseEntity<List<AulaComDetalhesResponseDTO>> buscarPorTurmaComDetalhes(@PathVariable Long idTurma) {
         return ResponseEntity.ok(aulaService.findByTurmaComDetalhes(idTurma));

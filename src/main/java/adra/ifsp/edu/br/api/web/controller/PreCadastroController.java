@@ -31,13 +31,13 @@ public class PreCadastroController {
         return ResponseEntity.status(HttpStatus.CREATED).build();
     }
 
-    @PreAuthorize("hasAnyRole('COORDENADOR', 'SOCIOPEDAGOGICO')")
+    @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL')")
     @GetMapping("/pendentes")
     public ResponseEntity<List<PreCadastroResponseDTO>> listarPendentes() {
         return ResponseEntity.ok(service.listarPendentes());
     }
 
-    @PreAuthorize("hasAnyRole('COORDENADOR', 'SOCIOPEDAGOGICO')")
+    @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL')")
     @PatchMapping("/{preCadastroId}/descartar")
     public ResponseEntity<PreCadastroResponseDTO> descartar(
             @PathVariable Long preCadastroId,
@@ -46,7 +46,7 @@ public class PreCadastroController {
         return ResponseEntity.ok(service.descartar(preCadastroId, dto));
     }
 
-    @PreAuthorize("hasAnyRole('COORDENADOR', 'SOCIOPEDAGOGICO')")
+    @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL')")
     @PatchMapping("/{preCadastroId}/converter")
     public ResponseEntity<PreCadastroResponseDTO> marcarConvertido(@PathVariable Long preCadastroId) {
         return ResponseEntity.ok(service.marcarConvertido(preCadastroId));

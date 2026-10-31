@@ -26,7 +26,7 @@ public class ChamadaController {
 
     private final PresencaService presencaService;
 
-    @PreAuthorize("hasAnyRole('COORDENADOR', 'SOCIOPEDAGOGICO')")
+    @PreAuthorize("hasAnyRole('COORDENADOR', 'EDUCADOR_SOCIAL')")
     @PostMapping
     public ResponseEntity<PresencaResponseDTO> registrarPresenca(
             @Valid @RequestBody PresencaRequestDTO presencaRequestDTO
@@ -34,7 +34,7 @@ public class ChamadaController {
         return ResponseEntity.ok(presencaService.registrarPresenca(presencaRequestDTO));
     }
 
-    @PreAuthorize("hasAnyRole('COORDENADOR', 'SOCIOPEDAGOGICO')")
+    @PreAuthorize("hasAnyRole('COORDENADOR', 'EDUCADOR_SOCIAL')")
     @PostMapping("/aula/{idAula}")
     public ResponseEntity<List<PresencaResponseDTO>> registrarChamada(
             @PathVariable Long idAula,
@@ -43,21 +43,21 @@ public class ChamadaController {
         return ResponseEntity.ok(presencaService.registrarChamada(idAula, presencas));
     }
 
-    @PreAuthorize("hasAnyRole('COORDENADOR', 'SOCIOPEDAGOGICO') "
+    @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL', 'EDUCADOR_SOCIAL') "
             + "or (hasRole('OFICINEIRO') and @acessoTurma.podeAcessarAula(#idAula))")
     @GetMapping("/aula/{idAula}")
     public ResponseEntity<List<PresencaResponseDTO>> buscarPorAula(@PathVariable Long idAula) {
         return ResponseEntity.ok(presencaService.buscarPorAula(idAula));
     }
 
-    @PreAuthorize("hasAnyRole('COORDENADOR', 'SOCIOPEDAGOGICO')")
+    @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL', 'EDUCADOR_SOCIAL')")
     @GetMapping("/assistido/{idAssistido}")
     public ResponseEntity<List<PresencaResponseDTO>> buscarPorAssistido(@PathVariable Long idAssistido) {
         return ResponseEntity.ok(presencaService.buscarPorAssistido(idAssistido));
     }
 
     /** Aba "Chamadas" do cadastro do assistido — histórico de frequência completo (US novo, ver PresencaService). */
-    @PreAuthorize("hasAnyRole('COORDENADOR', 'SOCIOPEDAGOGICO')")
+    @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL', 'EDUCADOR_SOCIAL')")
     @GetMapping("/assistido/{idAssistido}/frequencia")
     public ResponseEntity<List<FrequenciaAulaDTO>> buscarFrequenciaAssistido(@PathVariable Long idAssistido) {
         return ResponseEntity.ok(presencaService.buscarFrequenciaAssistido(idAssistido));
@@ -67,7 +67,7 @@ public class ChamadaController {
      * Grade mensal da turma no formato da planilha (FT-06) — `mes` no formato
      * yyyy-MM; sem ele, o mês atual.
      */
-    @PreAuthorize("hasAnyRole('COORDENADOR', 'SOCIOPEDAGOGICO') "
+    @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL', 'EDUCADOR_SOCIAL') "
             + "or (hasRole('OFICINEIRO') and @acessoTurma.podeAcessarTurma(#idTurma))")
     @GetMapping("/turma/{idTurma}/grade")
     public ResponseEntity<GradeMensalTurmaDTO> buscarGradeMensalTurma(
@@ -77,7 +77,7 @@ public class ChamadaController {
         return ResponseEntity.ok(presencaService.buscarGradeMensalTurma(idTurma, mes != null ? mes : YearMonth.now()));
     }
 
-    @PreAuthorize("hasAnyRole('COORDENADOR', 'SOCIOPEDAGOGICO')")
+    @PreAuthorize("hasAnyRole('COORDENADOR', 'EDUCADOR_SOCIAL')")
     @PutMapping("/{id}")
     public ResponseEntity<PresencaResponseDTO> atualizarPresenca(
             @PathVariable Long id,
@@ -86,7 +86,7 @@ public class ChamadaController {
         return ResponseEntity.ok(presencaService.atualizarPresenca(id, presencaRequestDTO));
     }
 
-    @PreAuthorize("hasAnyRole('COORDENADOR', 'SOCIOPEDAGOGICO')")
+    @PreAuthorize("hasAnyRole('COORDENADOR', 'EDUCADOR_SOCIAL')")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deletarPresenca(@PathVariable Long id) {
         presencaService.deletarPresenca(id);
