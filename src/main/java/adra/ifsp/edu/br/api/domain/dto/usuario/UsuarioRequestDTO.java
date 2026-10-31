@@ -24,6 +24,9 @@ public record UsuarioRequestDTO(
         String cargoFuncao,
 
         @jakarta.validation.constraints.Pattern(regexp = "^$|\\d{10,11}", message = "Telefone deve conter DDD + numero (10 ou 11 digitos)")
-        String telefone
+        String telefone,
+
+        @NotNull(message = "Administrador e' obrigatorio")
+        Boolean administrador
 ) {
 }

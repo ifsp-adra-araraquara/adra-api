@@ -33,7 +33,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api")
 @RequiredArgsConstructor
-@PreAuthorize("hasAnyRole('COORDENADOR', 'SOCIOPEDAGOGICO')")
+@PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL', 'EDUCADOR_SOCIAL')")
 public class DisciplinarController {
 
     private final DisciplinarService disciplinarService;
@@ -90,6 +90,7 @@ public class DisciplinarController {
     }
 
     /** Devolve o registro lançado e os gerados pela progressão (advertência/suspensão automáticas). */
+    @PreAuthorize("hasAnyRole('COORDENADOR', 'EDUCADOR_SOCIAL')")
     @PostMapping("/assistidos/{assistidoId}/disciplinar")
     public ResponseEntity<List<RegistroDisciplinarResponseDTO>> registrar(
             @PathVariable Long assistidoId,
@@ -105,6 +106,7 @@ public class DisciplinarController {
         return ResponseEntity.ok(disciplinarService.buscarRegistro(registroId));
     }
 
+    @PreAuthorize("hasRole('COORDENADOR')")
     @PatchMapping("/disciplinar/{registroId}/documento-devolvido")
     public ResponseEntity<RegistroDisciplinarResponseDTO> marcarDocumentoDevolvido(
             @PathVariable Long registroId,
@@ -113,6 +115,7 @@ public class DisciplinarController {
         return ResponseEntity.ok(disciplinarService.marcarDocumentoDevolvido(registroId, dto));
     }
 
+    @PreAuthorize("hasRole('COORDENADOR')")
     @PatchMapping("/disciplinar/{registroId}/suspensao")
     public ResponseEntity<RegistroDisciplinarResponseDTO> alterarPeriodoSuspensao(
             @PathVariable Long registroId,
@@ -121,6 +124,7 @@ public class DisciplinarController {
         return ResponseEntity.ok(disciplinarService.alterarPeriodoSuspensao(registroId, dto));
     }
 
+    @PreAuthorize("hasRole('COORDENADOR')")
     @PatchMapping("/disciplinar/{registroId}/consequencia")
     public ResponseEntity<RegistroDisciplinarResponseDTO> resolverConsequencia(
             @PathVariable Long registroId,

@@ -29,13 +29,13 @@ public class TurmaController {
     private final HistoricoOficineiroService historicoOficineiroService;
 
     /** Quem foi o oficineiro responsável e em qual período (mais recente primeiro). */
-    @PreAuthorize("hasAnyRole('SOCIOPEDAGOGICO', 'COORDENADOR')")
+    @PreAuthorize("hasAnyRole('EDUCADOR_SOCIAL', 'ASSISTENTE_SOCIAL', 'COORDENADOR')")
     @GetMapping("/{id}/oficineiros-historico")
     public ResponseEntity<List<OficineiroHistoricoDTO>> historicoOficineiros(@PathVariable Long id) {
         return ResponseEntity.ok(historicoOficineiroService.listarPorTurma(id));
     }
 
-    @PreAuthorize("hasAnyRole('SOCIOPEDAGOGICO', 'COORDENADOR')")
+    @PreAuthorize("hasAnyRole('EDUCADOR_SOCIAL', 'ASSISTENTE_SOCIAL', 'COORDENADOR')")
     @GetMapping
     public ResponseEntity<List<TurmaResponseDTO>> listar(
             @RequestParam(required = false) String nome,
@@ -80,7 +80,7 @@ public class TurmaController {
         return null;
     }
 
-    @PreAuthorize("hasAnyRole('SOCIOPEDAGOGICO', 'COORDENADOR')")
+    @PreAuthorize("hasRole('COORDENADOR')")
     @PostMapping
     public ResponseEntity<TurmaResponseDTO> cadastrar(
             @Valid @RequestBody TurmaRequestDTO turmaRequestDTO
@@ -89,7 +89,7 @@ public class TurmaController {
         return ResponseEntity.ok(turmaCriada);
     }
 
-    @PreAuthorize("hasAnyRole('SOCIOPEDAGOGICO', 'COORDENADOR')")
+    @PreAuthorize("hasRole('COORDENADOR')")
     @PostMapping("/com-horario")
     public ResponseEntity<TurmaResponseDTO> cadastrarComHorario(
             @Valid @RequestBody CriacaoTurmaDTO criacaoTurmaDTO
@@ -98,7 +98,7 @@ public class TurmaController {
         return ResponseEntity.ok(turmaCriada);
     }
 
-    @PreAuthorize("hasAnyRole('SOCIOPEDAGOGICO', 'COORDENADOR')")
+    @PreAuthorize("hasAnyRole('EDUCADOR_SOCIAL', 'ASSISTENTE_SOCIAL', 'COORDENADOR')")
     @GetMapping("/{id}")
     public ResponseEntity<TurmaResponseDTO> buscarPorId(
             @PathVariable Long id
@@ -124,7 +124,7 @@ public class TurmaController {
         return ResponseEntity.ok(turmaService.alterarStatus(id, statusRequestDTO));
     }
 
-    @PreAuthorize("hasAnyRole('OFICINEIRO', 'SOCIOPEDAGOGICO', 'COORDENADOR')")
+    @PreAuthorize("hasAnyRole('OFICINEIRO', 'EDUCADOR_SOCIAL', 'ASSISTENTE_SOCIAL', 'COORDENADOR')")
     @GetMapping("/minhas-turmas/{idOficineiro}")
     public ResponseEntity<List<TurmaComAlunosResponseDTO>> minhasTurmas(
             @PathVariable Long idOficineiro
@@ -132,7 +132,7 @@ public class TurmaController {
         return ResponseEntity.ok(turmaService.minhasTurmas(idOficineiro));
     }
 
-    @PreAuthorize("hasAnyRole('OFICINEIRO', 'SOCIOPEDAGOGICO', 'COORDENADOR')")
+    @PreAuthorize("hasAnyRole('OFICINEIRO', 'EDUCADOR_SOCIAL', 'ASSISTENTE_SOCIAL', 'COORDENADOR')")
     @GetMapping("/oficina/{idOficina}")
     public ResponseEntity<List<TurmaResponseDTO>> minhasTurmasPorOficina(
             @PathVariable Long idOficina
@@ -142,7 +142,7 @@ public class TurmaController {
 
     // Botão "+" da tabela de turmas: vincula assistidos à turma (cria os
     // vínculos em turma_aluno, que é o que o CA-65/chamada usa como roster).
-    @PreAuthorize("hasAnyRole('SOCIOPEDAGOGICO', 'COORDENADOR')")
+    @PreAuthorize("hasRole('COORDENADOR')")
     @PostMapping("/{id}/alunos")
     public ResponseEntity<List<AssistidoResponseDTO>> vincularAlunos(
             @PathVariable Long id,
@@ -151,7 +151,7 @@ public class TurmaController {
         return ResponseEntity.ok(turmaService.vincularAlunos(id, dto));
     }
 
-    @PreAuthorize("hasAnyRole('SOCIOPEDAGOGICO', 'COORDENADOR')")
+    @PreAuthorize("hasAnyRole('EDUCADOR_SOCIAL', 'ASSISTENTE_SOCIAL', 'COORDENADOR')")
     @GetMapping("/{id}/alunos")
     public ResponseEntity<List<AssistidoResponseDTO>> listarAlunosVinculados(@PathVariable Long id) {
         return ResponseEntity.ok(turmaService.listarAlunosVinculados(id));

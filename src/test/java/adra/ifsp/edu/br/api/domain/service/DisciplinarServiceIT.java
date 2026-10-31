@@ -22,6 +22,7 @@ import adra.ifsp.edu.br.api.domain.repository.AssistidoRepository;
 import adra.ifsp.edu.br.api.domain.repository.MotivoDisciplinarRepository;
 import adra.ifsp.edu.br.api.domain.repository.NivelPermissaoRepository;
 import adra.ifsp.edu.br.api.domain.repository.UsuarioRepository;
+import adra.ifsp.edu.br.api.exception.AcessoNegadoException;
 import adra.ifsp.edu.br.api.exception.RegraNegocioException;
 import adra.ifsp.edu.br.api.web.controller.DisciplinarController;
 import org.junit.jupiter.api.BeforeEach;
@@ -77,7 +78,7 @@ class DisciplinarServiceIT {
     private static final LocalDate HOJE = LocalDate.now();
 
     private Usuario coordenador;
-    private Usuario sociopedagogico;
+    private Usuario educadorSocial;
     private Usuario oficineiro;
     private Assistido assistido;
     private MotivoDisciplinar palavrao;
@@ -96,9 +97,9 @@ class DisciplinarServiceIT {
         }
 
         coordenador = criarUsuario(NomeNivelPermissao.COORDENADOR, "coord-ft04@teste.local");
-        sociopedagogico = criarUsuario(NomeNivelPermissao.SOCIOPEDAGOGICO, "socio-ft04@teste.local");
+        educadorSocial = criarUsuario(NomeNivelPermissao.EDUCADOR_SOCIAL, "socio-ft04@teste.local");
         oficineiro = criarUsuario(NomeNivelPermissao.OFICINEIRO, "oficineiro-ft04@teste.local");
-        autenticarComo(sociopedagogico);
+        autenticarComo(coordenador);
 
         assistido = assistidoRepository.save(Assistido.builder()
                 .nomeCompleto("Assistido FT-04")
@@ -230,6 +231,7 @@ class DisciplinarServiceIT {
     @Test
     @DisplayName("Arquivar tira o registro das contagens e só o Coordenador pode")
     void arquivar() {
+        autenticarComo(educadorSocial);
         RegistroDisciplinarResponseDTO ocorrencia = registrar(palavrao).get(0);
 
         assertThatThrownBy(() -> disciplinarController.arquivar(ocorrencia.registroId(),
@@ -244,6 +246,17 @@ class DisciplinarServiceIT {
                 .isZero();
         assertThatThrownBy(() -> disciplinarService.marcarDocumentoDevolvido(ocorrencia.registroId(), null))
                 .isInstanceOf(RegraNegocioException.class);
+    }
+
+    @Test
+    @DisplayName("Educador Social só registra ocorrência")
+    void educadorSocialSoRegistraOcorrencia() {
+        autenticarComo(educadorSocial);
+
+        assertThat(registrar(palavrao)).singleElement()
+                .extracting(RegistroDisciplinarResponseDTO::nivel).isEqualTo(NivelDisciplinar.OCORRENCIA);
+        assertThatThrownBy(() -> registrar(agressao)).isInstanceOf(AcessoNegadoException.class);
+        assertThatThrownBy(() -> registrar(uniforme)).isInstanceOf(AcessoNegadoException.class);
     }
 
     @Test

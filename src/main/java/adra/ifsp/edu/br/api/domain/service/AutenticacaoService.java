@@ -1,11 +1,13 @@
 package adra.ifsp.edu.br.api.domain.service;
 
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
 import adra.ifsp.edu.br.api.domain.dto.modulo.ModuloDTO;
 import adra.ifsp.edu.br.api.domain.mapper.ModuloMapper;
+import adra.ifsp.edu.br.api.domain.repository.ModuloRepository;
 import adra.ifsp.edu.br.api.domain.repository.NivelPermissaoModuloRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,6 +28,7 @@ public class AutenticacaoService {
     private final UsuarioMapper usuarioMapper;
     private final TokenService tokenService;
     private final NivelPermissaoModuloRepository nivelPermissaoModuloRepository;
+    private final ModuloRepository moduloRepository;
     private final ModuloMapper moduloMapper;
 
     public LoginResponseDTO login(UUID authUid) {
@@ -39,11 +42,15 @@ public class AutenticacaoService {
         usuario.setUltimoLogin(OffsetDateTime.now());
         usuarioRepository.save(usuario);
 
-        List<ModuloDTO> modulos = nivelPermissaoModuloRepository
+        List<ModuloDTO> modulos = new ArrayList<>(nivelPermissaoModuloRepository
                 .findComModuloById_NivelPermissaoIdOrderByOrdemAsc(usuario.getNivelPermissao().getNivelPermissaoId())
                 .stream()
                 .map(npm -> moduloMapper.paraDTO(npm.getModulo()))
-                .toList();
+                .toList());
+
+        if (usuario.isAdministrador()) {
+            moduloRepository.findByCodigo("USUARIOS").map(moduloMapper::paraDTO).ifPresent(modulos::add);
+        }
 
         return new LoginResponseDTO(tokenService.gerarToken(usuario), usuarioMapper.paraDTO(usuario, modulos));
     }

@@ -599,18 +599,18 @@ public class PresencaService {
     }
 
     /**
-     * US-67: Coordenador corrige chamada de qualquer data; Sociopedagógico só
+     * US-67: Coordenador corrige chamada de qualquer data; Educador Social só
      * pode corrigir a chamada do dia atual — evita abrir brecha de alteração
      * indevida de histórico por quem lança a chamada no dia a dia.
      */
     private void validarPermissaoCorrecaoPorData(Aula aula, Usuario usuarioLogado) {
         NomeNivelPermissao perfil = usuarioLogado.getNivelPermissao().getNome();
-        boolean ehSociopedagogicoForaDoDia =
-                perfil == NomeNivelPermissao.SOCIOPEDAGOGICO && !aula.getDataAula().isEqual(LocalDate.now());
+        boolean ehEducadorSocialForaDoDia =
+                perfil == NomeNivelPermissao.EDUCADOR_SOCIAL && !aula.getDataAula().isEqual(LocalDate.now());
 
-        if (ehSociopedagogicoForaDoDia) {
+        if (ehEducadorSocialForaDoDia) {
             throw new AcessoNegadoException(
-                    "Sociopedagógico só pode corrigir a chamada do dia atual (aula de "
+                    "O Educador Social só pode corrigir a chamada do dia atual (aula de "
                             + aula.getDataAula() + ")."
             );
         }

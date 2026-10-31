@@ -330,7 +330,7 @@ public class AssistidoService {
             throw new RegraNegocioException("O assistido deve manter pelo menos um responsavel vinculado");
         }
 
-        if (!paraRemover.isEmpty() && !usuarioAtualTemPapel("ROLE_ADMINISTRADOR")) {
+        if (!paraRemover.isEmpty() && !usuarioAtualTemPapel("ADMINISTRADOR")) {
             throw new AcessoNegadoException("Somente o administrador pode remover um responsavel vinculado");
         }
 

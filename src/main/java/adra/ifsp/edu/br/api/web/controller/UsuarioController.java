@@ -34,27 +34,27 @@ public class UsuarioController {
     private final UsuarioService usuarioService;
     private final UsuarioAdminService usuarioAdminService;
 
-    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    @PreAuthorize("hasAuthority('ADMINISTRADOR')")
     @PostMapping
     public ResponseEntity<UsuarioResponseDTO> cadastrar(@Valid @RequestBody UsuarioRequestDTO dto) {
         UsuarioResponseDTO criado = usuarioAdminService.cadastrar(dto);
         return ResponseEntity.created(URI.create("/api/usuarios/" + criado.usuarioId())).body(criado);
     }
 
-    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    @PreAuthorize("hasAuthority('ADMINISTRADOR')")
     @PostMapping("/{id}/convite")
     public ResponseEntity<Void> reenviarConvite(@PathVariable Long id) {
         usuarioAdminService.reenviarConvite(id);
         return ResponseEntity.noContent().build();
     }
 
-    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    @PreAuthorize("hasAuthority('ADMINISTRADOR')")
     @PostMapping("/{id}/redefinicao-senha")
     public ResponseEntity<RedefinicaoSenhaResponseDTO> redefinirSenha(@PathVariable Long id) {
         return ResponseEntity.ok(usuarioAdminService.redefinirSenha(id));
     }
 
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'COORDENADOR')")
+    @PreAuthorize("hasAuthority('ADMINISTRADOR')")
     @GetMapping
     public ResponseEntity<PaginaDTO<UsuarioResponseDTO>> listar(
             @RequestParam(required = false) String busca,
@@ -77,20 +77,20 @@ public class UsuarioController {
         return ResponseEntity.ok(usuarioService.listarOficineiros());
     }
 
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'COORDENADOR')")
+    @PreAuthorize("hasAuthority('ADMINISTRADOR')")
     @GetMapping("/{id}")
     public ResponseEntity<UsuarioResponseDTO> buscarPorId(@PathVariable Long id) {
         return ResponseEntity.ok(usuarioService.buscarPorId(id));
     }
 
-    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    @PreAuthorize("hasAuthority('ADMINISTRADOR')")
     @PutMapping("/{id}")
     public ResponseEntity<UsuarioResponseDTO> atualizar(@PathVariable Long id,
                                                           @Valid @RequestBody UsuarioRequestDTO dto) {
         return ResponseEntity.ok(usuarioService.atualizar(id, dto));
     }
 
-    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    @PreAuthorize("hasAuthority('ADMINISTRADOR')")
     @PatchMapping("/{id}/status")
     public ResponseEntity<UsuarioResponseDTO> alterarStatus(@PathVariable Long id,
                                                               @Valid @RequestBody UsuarioStatusRequestDTO dto) {

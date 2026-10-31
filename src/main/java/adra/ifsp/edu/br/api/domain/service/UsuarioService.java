@@ -42,6 +42,13 @@ public class UsuarioService {
         if (usuarioRepository.existsByEmailIgnoreCase(dto.email())) {
             throw new RegraNegocioException("Ja existe um usuario cadastrado com este e-mail.");
         }
+        validarAdministrador(dto);
+    }
+
+    private void validarAdministrador(UsuarioRequestDTO dto) {
+        if (dto.administrador() && dto.nivelPermissao() != NomeNivelPermissao.COORDENADOR) {
+            throw new RegraNegocioException("Somente o Coordenador pode ser Administrador.");
+        }
     }
 
     public UsuarioResponseDTO cadastrar(UsuarioRequestDTO dto, UUID authUid) {
@@ -59,7 +66,8 @@ public class UsuarioService {
                 Map.of(
                         "nomeCompleto", usuario.getNomeCompleto(),
                         "email", usuario.getEmail(),
-                        "nivelPermissao", dto.nivelPermissao().name()
+                        "nivelPermissao", dto.nivelPermissao().name(),
+                        "administrador", dto.administrador()
                 ),
                 "Cadastro de usuario (colaborador)"
         );
@@ -103,13 +111,15 @@ public class UsuarioService {
         if (usuarioRepository.existsByEmailIgnoreCaseAndUsuarioIdNot(dto.email(), id)) {
             throw new RegraNegocioException("Ja existe outro usuario cadastrado com este e-mail.");
         }
+        validarAdministrador(dto);
 
         NivelPermissao nivelPermissao = buscarNivelPermissao(dto.nivelPermissao());
 
         Map<String, Object> valorAnterior = Map.of(
                 "nomeCompleto", usuario.getNomeCompleto(),
                 "email", usuario.getEmail(),
-                "nivelPermissao", usuario.getNivelPermissao().getNome().name()
+                "nivelPermissao", usuario.getNivelPermissao().getNome().name(),
+                "administrador", usuario.isAdministrador()
         );
 
         usuarioMapper.atualizarEntidade(usuario, dto, nivelPermissao);
@@ -124,7 +134,8 @@ public class UsuarioService {
                 Map.of(
                         "nomeCompleto", usuario.getNomeCompleto(),
                         "email", usuario.getEmail(),
-                        "nivelPermissao", dto.nivelPermissao().name()
+                        "nivelPermissao", dto.nivelPermissao().name(),
+                        "administrador", dto.administrador()
                 ),
                 "Atualizacao de dados cadastrais do usuario"
         );

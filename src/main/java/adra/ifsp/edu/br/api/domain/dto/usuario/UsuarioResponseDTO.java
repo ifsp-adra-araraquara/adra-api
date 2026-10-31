@@ -14,6 +14,7 @@ public record UsuarioResponseDTO(
         String cargoFuncao,
         String telefone,
         boolean ativo,
+        boolean administrador,
         OffsetDateTime ultimoLogin,
         OffsetDateTime criadoEm,
         OffsetDateTime atualizadoEm,

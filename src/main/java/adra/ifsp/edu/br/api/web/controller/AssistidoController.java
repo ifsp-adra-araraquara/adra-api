@@ -35,13 +35,13 @@ public class AssistidoController {
     private final ElegibilidadeService elegibilidadeService;
 
     /** Critérios de entrada (ex.: limite de renda familiar) para o formulário avisar antes de salvar. */
-    @PreAuthorize("hasAnyRole('COORDENADOR', 'SOCIOPEDAGOGICO')")
+    @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL')")
     @GetMapping("/elegibilidade")
     public ResponseEntity<ElegibilidadeDTO> elegibilidade() {
         return ResponseEntity.ok(elegibilidadeService.criterios());
     }
 
-    @PreAuthorize("hasAnyRole('COORDENADOR', 'SOCIOPEDAGOGICO')")
+    @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL')")
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<AssistidoResponseDTO> cadastrar(@Valid @RequestPart("dados") AssistidoRequestDTO dto,
                                                           @RequestPart(value = "foto", required = false) MultipartFile foto,
@@ -51,13 +51,13 @@ public class AssistidoController {
     }
 
     // Sem @Valid no corpo: cada linha e' validada no service para o lote seguir com as demais.
-    @PreAuthorize("hasAnyRole('COORDENADOR', 'SOCIOPEDAGOGICO')")
+    @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL')")
     @PostMapping("/lote/validar")
     public ResponseEntity<List<ResultadoLinhaLoteDTO>> validarLote(@RequestBody List<AssistidoRequestDTO> itens) {
         return ResponseEntity.ok(assistidoLoteService.validar(itens));
     }
 
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'COORDENADOR', 'SOCIOPEDAGOGICO', 'OFICINEIRO')")
+    @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL', 'EDUCADOR_SOCIAL', 'OFICINEIRO')")
     @GetMapping
     public ResponseEntity<PaginaDTO<AssistidoResponseDTO>> listar(
             @RequestParam(required = false) String busca,
@@ -72,7 +72,7 @@ public class AssistidoController {
     }
 
     /** Totais das abas da listagem (Todos / Ativos / Inativos / Em acompanhamento). */
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'COORDENADOR', 'SOCIOPEDAGOGICO', 'OFICINEIRO')")
+    @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL', 'EDUCADOR_SOCIAL', 'OFICINEIRO')")
     @GetMapping("/contagem")
     public ResponseEntity<AssistidoContagemDTO> contar(
             @RequestParam(required = false) String busca,
@@ -85,7 +85,7 @@ public class AssistidoController {
      * Endpoint leve para o alerta NAO BLOQUEANTE de duplicidade por nome
      * e data de nascimento no formulario do front (CA-A02.2).
      */
-    @PreAuthorize("hasAnyRole('COORDENADOR', 'SOCIOPEDAGOGICO')")
+    @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL')")
     @GetMapping("/verificar-duplicidade")
     public ResponseEntity<Map<String, Object>> verificarDuplicidade(
             @RequestParam(required = false) String nomeCompleto,
@@ -100,26 +100,26 @@ public class AssistidoController {
         return ResponseEntity.ok(assistidoService.verificarDuplicidade(nomeCompleto, dataNascimento));
     }
 
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'COORDENADOR', 'SOCIOPEDAGOGICO')")
+    @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL', 'EDUCADOR_SOCIAL')")
     @GetMapping("/cpf/{cpf}")
     public ResponseEntity<AssistidoResponseDTO> buscarPorCpf(@PathVariable String cpf) {
         return ResponseEntity.ok(assistidoService.buscarPorCpf(cpf));
     }
 
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'COORDENADOR', 'SOCIOPEDAGOGICO')")
+    @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL', 'EDUCADOR_SOCIAL')")
     @GetMapping("/{id}")
     public ResponseEntity<AssistidoResponseDTO> buscarPorId(@PathVariable Long id) {
         return ResponseEntity.ok(assistidoService.buscarPorId(id));
     }
 
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'COORDENADOR', 'SOCIOPEDAGOGICO')")
+    @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL')")
     @PutMapping("/{id}")
     public ResponseEntity<AssistidoResponseDTO> atualizar(@PathVariable Long id,
                                                             @Valid @RequestBody AssistidoRequestDTO dto) {
         return ResponseEntity.ok(assistidoService.atualizar(id, dto));
     }
 
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'COORDENADOR', 'SOCIOPEDAGOGICO')")
+    @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL')")
     @PatchMapping("/{id}/status")
     public ResponseEntity<AssistidoResponseDTO> alterarStatus(@PathVariable Long id,
                                                                 @Valid @RequestBody AssistidoStatusRequestDTO dto) {
@@ -127,7 +127,7 @@ public class AssistidoController {
     }
 
     /** Aba "Turmas" do modal do assistido — histórico de vínculos (turma_aluno), só pro coordenador. */
-    @PreAuthorize("hasAnyRole('COORDENADOR', 'SOCIOPEDAGOGICO')")
+    @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL', 'EDUCADOR_SOCIAL')")
     @GetMapping("/{id}/turmas")
     public ResponseEntity<List<VinculoTurmaAssistidoResponseDTO>> listarHistoricoTurmas(@PathVariable Long id) {
         return ResponseEntity.ok(assistidoService.listarHistoricoTurmas(id));

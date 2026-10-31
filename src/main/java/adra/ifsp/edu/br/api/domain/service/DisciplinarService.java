@@ -19,6 +19,7 @@ import adra.ifsp.edu.br.api.domain.enums.ConsequenciaDisciplinar;
 import adra.ifsp.edu.br.api.domain.enums.EntidadeArquivo;
 import adra.ifsp.edu.br.api.domain.enums.ModuloSistema;
 import adra.ifsp.edu.br.api.domain.enums.NivelDisciplinar;
+import adra.ifsp.edu.br.api.domain.enums.NomeNivelPermissao;
 import adra.ifsp.edu.br.api.domain.enums.OrigemRegistroDisciplinar;
 import adra.ifsp.edu.br.api.domain.enums.StatusDocumentoDisciplinar;
 import adra.ifsp.edu.br.api.domain.enums.StatusGeral;
@@ -37,6 +38,7 @@ import adra.ifsp.edu.br.api.domain.repository.RegistroDisciplinarSpecification;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import adra.ifsp.edu.br.api.exception.AcessoNegadoException;
 import adra.ifsp.edu.br.api.exception.EntidadeNaoEncontradaException;
 import adra.ifsp.edu.br.api.exception.RegraNegocioException;
 import lombok.RequiredArgsConstructor;
@@ -149,6 +151,12 @@ public class DisciplinarService {
             throw new RegraNegocioException("O motivo \"" + motivo.getNome() + "\" está inativo.");
         }
 
+        Usuario usuario = usuarioAutenticadoService.getUsuarioAtual();
+        if (usuario.getNivelPermissao().getNome() == NomeNivelPermissao.EDUCADOR_SOCIAL
+                && motivo.getNivel() != NivelDisciplinar.OCORRENCIA) {
+            throw new AcessoNegadoException("O Educador Social só registra ocorrência.");
+        }
+
         Aula aula = dto.aulaId() == null ? null : aulaRepository.findById(dto.aulaId())
                 .orElseThrow(() -> new EntidadeNaoEncontradaException("Aula não encontrada: id " + dto.aulaId()));
 
@@ -160,7 +168,6 @@ public class DisciplinarService {
             validarPeriodo(inicio, fim);
         }
 
-        Usuario usuario = usuarioAutenticadoService.getUsuarioAtual();
         List<RegistroDisciplinar> criados = new ArrayList<>();
 
         RegistroDisciplinar registro = salvarRegistro(assistido, motivo, motivo.getNivel(),
