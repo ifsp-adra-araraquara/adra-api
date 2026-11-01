@@ -29,6 +29,8 @@ import adra.ifsp.edu.br.api.domain.enums.EntidadeArquivo;
 import adra.ifsp.edu.br.api.domain.enums.ModuloSistema;
 import adra.ifsp.edu.br.api.domain.enums.ProvedorArmazenamento;
 import adra.ifsp.edu.br.api.domain.model.Arquivo;
+import adra.ifsp.edu.br.api.domain.model.Usuario;
+import adra.ifsp.edu.br.api.exception.AcessoNegadoException;
 import adra.ifsp.edu.br.api.exception.ArquivoInvalidoException;
 import adra.ifsp.edu.br.api.exception.EntidadeNaoEncontradaException;
 import adra.ifsp.edu.br.api.infra.armazenamento.ArmazenamentoArquivos;
@@ -46,6 +48,7 @@ public class ArquivoService {
     private final UsuarioRepository usuarioRepository;
     private final ResponsavelRepository responsavelRepository;
     private final AulaRepository aulaRepository;
+    private final PreCadastroRepository preCadastroRepository;
     private final TurmaRepository turmaRepository;
     private final AcessoTurmaService acessoTurma;
     private final ProcessadorArquivo processador;
@@ -67,6 +70,16 @@ public class ArquivoService {
      */
     public ArquivoResponseDTO salvar(EntidadeArquivo entidadeTipo, Long entidadeId,
                                      CategoriaArquivo categoria, MultipartFile arquivo) {
+        return gravar(entidadeTipo, entidadeId, categoria, arquivo, usuarioAutenticadoService.getUsuarioAtual());
+    }
+
+    /** Link público do pré-cadastro: sem login, então sem "enviado por". */
+    public ArquivoResponseDTO salvarDoLinkPublico(Long preCadastroId, CategoriaArquivo categoria, MultipartFile arquivo) {
+        return gravar(EntidadeArquivo.PRE_CADASTRO, preCadastroId, categoria, arquivo, null);
+    }
+
+    private ArquivoResponseDTO gravar(EntidadeArquivo entidadeTipo, Long entidadeId, CategoriaArquivo categoria,
+                                      MultipartFile arquivo, Usuario enviadoPor) {
         if (arquivo == null || arquivo.isEmpty()) {
             throw new ArquivoInvalidoException("Envie um arquivo.");
         }
@@ -101,7 +114,7 @@ public class ArquivoService {
                 .mimeType(processado.mimeType())
                 .tamanhoBytes((long) processado.conteudo().length)
                 .hashSha256(hash)
-                .enviadoPor(usuarioAutenticadoService.getUsuarioAtual())
+                .enviadoPor(enviadoPor)
                 .build());
 
         auditoriaService.registrar(ModuloSistema.DOCUMENTOS, "arquivo", salvo.getArquivoId(),
@@ -171,6 +184,32 @@ public class ArquivoService {
     @Transactional(readOnly = true)
     public UrlArquivoDTO gerarUrl(Long arquivoId) {
         Arquivo arquivo = buscarAtivo(arquivoId);
+        // Arquivo do pré-cadastro só pela tela de pré-cadastros (Coordenação e Assistente Social).
+        if (arquivo.getEntidadeTipo() == EntidadeArquivo.PRE_CADASTRO) {
+            throw new AcessoNegadoException("Arquivo de pré-cadastro: abra pela tela de pré-cadastros.");
+        }
+        return urlTemporaria(arquivo);
+    }
+
+    @Transactional(readOnly = true)
+    public UrlArquivoDTO gerarUrlDePreCadastro(Long preCadastroId, Long arquivoId) {
+        Arquivo arquivo = buscarAtivo(arquivoId);
+        if (arquivo.getEntidadeTipo() != EntidadeArquivo.PRE_CADASTRO || !arquivo.getEntidadeId().equals(preCadastroId)) {
+            throw new EntidadeNaoEncontradaException("Arquivo nao encontrado neste pré-cadastro: id " + arquivoId);
+        }
+        return urlTemporaria(arquivo);
+    }
+
+    /**
+     * Passa os arquivos de um dono para outro (pré-cadastro aprovado → assistido/responsável).
+     * O binário fica onde está no storage; só a linha muda de dono.
+     */
+    public void transferir(EntidadeArquivo deTipo, Long deId, CategoriaArquivo deCategoria,
+                           EntidadeArquivo paraTipo, Long paraId, CategoriaArquivo paraCategoria) {
+        arquivoRepository.transferirDono(deTipo, deId, deCategoria, paraTipo, paraId, paraCategoria);
+    }
+
+    private UrlArquivoDTO urlTemporaria(Arquivo arquivo) {
         var url = armazenamento(arquivo.getProvedor()).urlTemporaria(arquivo.getChave(), validadeUrl);
         return new UrlArquivoDTO(url.toString(), Instant.now().plus(validadeUrl));
     }
@@ -225,6 +264,10 @@ public class ArquivoService {
             }
         } else if(entidadeTipo==EntidadeArquivo.AULA){
             if (!aulaRepository.existsById(entidadeId)) {
+                throw new EntidadeNaoEncontradaException(entidadeTipo + " nao encontrado: id " + entidadeId);
+            }
+        } else if(entidadeTipo==EntidadeArquivo.PRE_CADASTRO){
+            if (!preCadastroRepository.existsById(entidadeId)) {
                 throw new EntidadeNaoEncontradaException(entidadeTipo + " nao encontrado: id " + entidadeId);
             }
         } else {

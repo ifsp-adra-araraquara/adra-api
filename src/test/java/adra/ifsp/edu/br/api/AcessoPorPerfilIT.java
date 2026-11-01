@@ -9,6 +9,7 @@ import static org.junit.jupiter.params.provider.Arguments.arguments;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -29,6 +30,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -79,6 +81,7 @@ class AcessoPorPerfilIT {
                 arguments(HttpMethod.GET, "/api/pre-cadastro", Set.of(COORDENADOR, ASSISTENTE_SOCIAL)),
                 arguments(HttpMethod.GET, "/api/pre-cadastro/" + INEXISTENTE, Set.of(COORDENADOR, ASSISTENTE_SOCIAL)),
                 arguments(HttpMethod.GET, "/api/pre-cadastro/" + INEXISTENTE + "/rascunho-assistido", Set.of(COORDENADOR, ASSISTENTE_SOCIAL)),
+                arguments(HttpMethod.GET, "/api/pre-cadastro/" + INEXISTENTE + "/arquivos/1/url", Set.of(COORDENADOR, ASSISTENTE_SOCIAL)),
 
                 arguments(HttpMethod.GET, "/api/chamadas/assistido/" + INEXISTENTE, Set.of(COORDENADOR, ASSISTENTE_SOCIAL, EDUCADOR_SOCIAL)),
                 arguments(HttpMethod.DELETE, "/api/chamadas/" + INEXISTENTE, Set.of(COORDENADOR, EDUCADOR_SOCIAL)),
@@ -128,8 +131,9 @@ class AcessoPorPerfilIT {
                    "autorizacoes": {"eventosPasseios": true, "irEmboraSozinho": true}}}
                 """;
 
-        mvc.perform(post("/api/pre-cadastro").header("X-Forwarded-For", "acesso-" + UUID.randomUUID())
-                        .contentType(MediaType.APPLICATION_JSON).content(corpo))
+        mvc.perform(multipart("/api/pre-cadastro")
+                        .file(new MockMultipartFile("dados", "", MediaType.APPLICATION_JSON_VALUE, corpo.getBytes()))
+                        .header("X-Forwarded-For", "acesso-" + UUID.randomUUID()))
                 .andExpect(status().isCreated());
     }
 
