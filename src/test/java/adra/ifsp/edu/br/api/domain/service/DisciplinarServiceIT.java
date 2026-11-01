@@ -8,6 +8,7 @@ import adra.ifsp.edu.br.api.domain.dto.disciplinar.RegistroDisciplinarRequestDTO
 import adra.ifsp.edu.br.api.domain.dto.disciplinar.RegistroDisciplinarResponseDTO;
 import adra.ifsp.edu.br.api.domain.dto.disciplinar.ResolverConsequenciaRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.disciplinar.SinalizacaoDisciplinarDTO;
+import adra.ifsp.edu.br.api.domain.dto.disciplinar.ZerarContagemRequestDTO;
 import adra.ifsp.edu.br.api.domain.enums.ConsequenciaDisciplinar;
 import adra.ifsp.edu.br.api.domain.enums.NivelDisciplinar;
 import adra.ifsp.edu.br.api.domain.enums.NomeNivelPermissao;
@@ -277,6 +278,66 @@ class DisciplinarServiceIT {
         assistido.setStatus(StatusGeral.INATIVO);
         assistidoRepository.save(assistido);
         assertThatThrownBy(() -> registrar(agressao)).isInstanceOf(RegraNegocioException.class);
+    }
+
+    @Test
+    @DisplayName("Zerar tudo arquiva os registros ativos, zera os contadores e a próxima ocorrência é a 1ª")
+    void zerarTudo() {
+        for (int i = 0; i < 4; i++) {
+            registrar(palavrao);
+        }
+        registrar(agressao);
+
+        FichaDisciplinarDTO ficha = disciplinarController.zerarContagem(assistido.getAssistidoId(),
+                new ZerarContagemRequestDTO("Início do ano letivo", null)).getBody();
+
+        assertThat(ficha.resumo().ocorrenciasAtivas()).isZero();
+        assertThat(ficha.resumo().advertenciasAtivas()).isZero();
+        assertThat(ficha.registros()).isNotEmpty().allSatisfy(r -> {
+            assertThat(r.arquivado()).isTrue();
+            assertThat(r.arquivadoMotivo()).isEqualTo("Início do ano letivo");
+        });
+
+        Assistido atualizado = assistidoRepository.findById(assistido.getAssistidoId()).orElseThrow();
+        assertThat(atualizado.getTotalOcorrenciasAtivas()).isZero();
+        assertThat(atualizado.getTotalAdvertenciasAtivas()).isZero();
+
+        assertThat(registrar(palavrao).get(0).sequencia()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("Zerar só ocorrências mantém os outros níveis; a próxima ocorrência é a 1ª")
+    void zerarSoOcorrencias() {
+        for (int i = 0; i < 4; i++) {
+            registrar(palavrao);
+        }
+        long advertenciasAntes = disciplinarService.buscarFicha(assistido.getAssistidoId()).resumo().advertenciasAtivas();
+
+        FichaDisciplinarDTO ficha = disciplinarService.zerarContagem(assistido.getAssistidoId(),
+                new ZerarContagemRequestDTO("Acordo com a família", NivelDisciplinar.OCORRENCIA));
+
+        assertThat(ficha.resumo().ocorrenciasAtivas()).isZero();
+        assertThat(ficha.resumo().advertenciasAtivas()).isEqualTo(advertenciasAntes);
+        assertThat(registrar(palavrao).get(0).sequencia()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("Só o Coordenador zera a contagem; sem registros ativos não há o que zerar")
+    void zerarPermissaoEValidacao() {
+        registrar(palavrao);
+        Usuario assistenteSocial = criarUsuario(NomeNivelPermissao.ASSISTENTE_SOCIAL, "assistente-ft24@teste.local");
+        ZerarContagemRequestDTO dto = new ZerarContagemRequestDTO("Motivo", null);
+
+        for (Usuario usuario : List.of(educadorSocial, assistenteSocial)) {
+            autenticarComo(usuario);
+            assertThatThrownBy(() -> disciplinarController.zerarContagem(assistido.getAssistidoId(), dto))
+                    .isInstanceOf(AuthorizationDeniedException.class);
+        }
+
+        autenticarComo(coordenador);
+        assertThatThrownBy(() -> disciplinarService.zerarContagem(assistido.getAssistidoId(),
+                new ZerarContagemRequestDTO("Motivo", NivelDisciplinar.SUSPENSAO)))
+                .isInstanceOf(RegraNegocioException.class);
     }
 
     // ------------------------------------------------------------------

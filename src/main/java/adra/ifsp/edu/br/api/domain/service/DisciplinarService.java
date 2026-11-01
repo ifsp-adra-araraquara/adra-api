@@ -13,6 +13,7 @@ import adra.ifsp.edu.br.api.domain.dto.disciplinar.RegistroDisciplinarResponseDT
 import adra.ifsp.edu.br.api.domain.dto.disciplinar.ResolverConsequenciaRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.disciplinar.ResumoDisciplinarDTO;
 import adra.ifsp.edu.br.api.domain.dto.disciplinar.SinalizacaoDisciplinarDTO;
+import adra.ifsp.edu.br.api.domain.dto.disciplinar.ZerarContagemRequestDTO;
 import adra.ifsp.edu.br.api.domain.enums.AcaoSistema;
 import adra.ifsp.edu.br.api.domain.enums.CategoriaArquivo;
 import adra.ifsp.edu.br.api.domain.enums.ConsequenciaDisciplinar;
@@ -320,11 +321,7 @@ public class DisciplinarService {
     /** Só o Coordenador (ver DisciplinarController). Não exclui e não desfaz consequências já aplicadas. */
     public RegistroDisciplinarResponseDTO arquivar(Long registroId, ArquivarRegistroRequestDTO dto) {
         RegistroDisciplinar registro = buscarRegistroAtivo(registroId);
-
-        registro.setArquivado(true);
-        registro.setArquivadoMotivo(dto.motivo().trim());
-        registro.setArquivadoEm(OffsetDateTime.now());
-        registro.setArquivadoPor(usuarioAutenticadoService.getUsuarioAtual());
+        marcarArquivado(registro, dto.motivo().trim(), usuarioAutenticadoService.getUsuarioAtual());
 
         Long assistidoId = registro.getAssistido().getAssistidoId();
         auditoriaService.registrar(ModuloSistema.DISCIPLINA, "registro_disciplinar", registroId, AcaoSistema.EXCLUIR,
@@ -334,6 +331,41 @@ public class DisciplinarService {
         RegistroDisciplinarResponseDTO resposta = RegistroDisciplinarResponseDTO.de(registro);
         assistidoRepository.recalcularContadoresDisciplinares(assistidoId);
         return resposta;
+    }
+
+    /**
+     * FT-24: só o Coordenador. Arquiva de uma vez os registros ativos do
+     * assistido (de um nível ou de todos), então a próxima ocorrência volta a
+     * ser a 1ª. O histórico continua visível como arquivado.
+     */
+    public FichaDisciplinarDTO zerarContagem(Long assistidoId, ZerarContagemRequestDTO dto) {
+        Assistido assistido = buscarAssistido(assistidoId);
+        List<RegistroDisciplinar> ativos = registroRepository.findByAssistidoAndArquivadoFalse(assistido).stream()
+                .filter(r -> dto.nivel() == null || r.getNivel() == dto.nivel())
+                .toList();
+        if (ativos.isEmpty()) {
+            throw new RegraNegocioException("Não há registros ativos para zerar.");
+        }
+
+        String motivo = dto.motivo().trim();
+        Usuario usuario = usuarioAutenticadoService.getUsuarioAtual();
+        ativos.forEach(r -> marcarArquivado(r, motivo, usuario));
+
+        auditoriaService.registrar(ModuloSistema.DISCIPLINA, "assistido", assistidoId, AcaoSistema.EXCLUIR, null,
+                Map.of("nivel", dto.nivel() == null ? "TODOS" : dto.nivel().name(),
+                        "registrosArquivados", ativos.size(),
+                        "registroIds", ativos.stream().map(RegistroDisciplinar::getRegistroId).toList()),
+                "Contagem disciplinar zerada");
+
+        assistidoRepository.recalcularContadoresDisciplinares(assistidoId);
+        return buscarFicha(assistidoId);
+    }
+
+    private static void marcarArquivado(RegistroDisciplinar registro, String motivo, Usuario usuario) {
+        registro.setArquivado(true);
+        registro.setArquivadoMotivo(motivo);
+        registro.setArquivadoEm(OffsetDateTime.now());
+        registro.setArquivadoPor(usuario);
     }
 
     // ------------------------------------------------------------------
