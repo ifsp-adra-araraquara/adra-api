@@ -4,5 +4,7 @@ public enum EntidadeArquivo {
     ASSISTIDO,
     RESPONSAVEL,
     USUARIO,
-    AULA
+    AULA,
+    /** Foto e documentos do link público, até a aprovação. */
+    PRE_CADASTRO
 }

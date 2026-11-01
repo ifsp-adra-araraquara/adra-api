@@ -51,7 +51,8 @@ public class ArquivoController {
         return ResponseEntity.created(URI.create("/api/arquivos/" + salvo.arquivoId())).body(salvo);
     }
 
-    @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL', 'EDUCADOR_SOCIAL') "
+    // Arquivos de pré-cadastro só pela tela de pré-cadastros (GET /api/pre-cadastro/{id}).
+    @PreAuthorize("(hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL', 'EDUCADOR_SOCIAL') and #entidadeTipo != T(adra.ifsp.edu.br.api.domain.enums.EntidadeArquivo).PRE_CADASTRO) "
             + "or (hasRole('OFICINEIRO') and #entidadeTipo == T(adra.ifsp.edu.br.api.domain.enums.EntidadeArquivo).AULA and @acessoTurma.podeAcessarAula(#entidadeId))")
     @GetMapping
     public ResponseEntity<List<ArquivoResponseDTO>> listar(@RequestParam EntidadeArquivo entidadeTipo,

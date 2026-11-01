@@ -9,6 +9,7 @@ import static org.junit.jupiter.params.provider.Arguments.arguments;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -29,6 +30,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -75,8 +77,11 @@ class AcessoPorPerfilIT {
                 arguments(HttpMethod.GET, "/api/responsaveis", Set.of(COORDENADOR, ASSISTENTE_SOCIAL, EDUCADOR_SOCIAL)),
                 arguments(HttpMethod.DELETE, "/api/assistidos/" + INEXISTENTE + "/responsaveis/1", Set.of()),
 
-                arguments(HttpMethod.GET, "/api/pre-cadastro/pendentes", Set.of(COORDENADOR, ASSISTENTE_SOCIAL)),
-                arguments(HttpMethod.PATCH, "/api/pre-cadastro/" + INEXISTENTE + "/converter", Set.of(COORDENADOR, ASSISTENTE_SOCIAL)),
+                // aprovar e reprovar têm corpo obrigatório: o 403 deles está no PreCadastroIT.
+                arguments(HttpMethod.GET, "/api/pre-cadastro", Set.of(COORDENADOR, ASSISTENTE_SOCIAL)),
+                arguments(HttpMethod.GET, "/api/pre-cadastro/" + INEXISTENTE, Set.of(COORDENADOR, ASSISTENTE_SOCIAL)),
+                arguments(HttpMethod.GET, "/api/pre-cadastro/" + INEXISTENTE + "/rascunho-assistido", Set.of(COORDENADOR, ASSISTENTE_SOCIAL)),
+                arguments(HttpMethod.GET, "/api/pre-cadastro/" + INEXISTENTE + "/arquivos/1/url", Set.of(COORDENADOR, ASSISTENTE_SOCIAL)),
 
                 arguments(HttpMethod.GET, "/api/chamadas/assistido/" + INEXISTENTE, Set.of(COORDENADOR, ASSISTENTE_SOCIAL, EDUCADOR_SOCIAL)),
                 arguments(HttpMethod.DELETE, "/api/chamadas/" + INEXISTENTE, Set.of(COORDENADOR, EDUCADOR_SOCIAL)),
@@ -110,6 +115,26 @@ class AcessoPorPerfilIT {
                 assertThat(status).as("%s em %s %s", perfil, metodo, url).isEqualTo(403);
             }
         }
+    }
+
+    /** Sem login e contra o schema das migrations (enum de auditoria incluso). Dados inventados. */
+    @Test
+    void linkPublicoDePreCadastroGravaSemLogin() throws Exception {
+        String corpo = """
+                {"nomeCompleto": "Crianca Teste", "dataNascimento": "2016-04-12", "cpf": "56532228281", "sexo": "FEMININO", "site": "",
+                 "dados": {"termos": {"aceiteLgpd": true, "autorizaUsoImagem": false},
+                   "mae": {"nomeCompleto": "Mae Teste", "dataNascimento": "1990-01-20", "cpf": "96234168493",
+                           "escolaridade": "MEDIO_COMPLETO", "estadoCivil": "SOLTEIRO", "renda": 1500, "telefone": "16991234567"},
+                   "enderecoFamilia": {"logradouro": "Rua das Flores"},
+                   "transferencia": {"recebe": false},
+                   "saude": {"possuiProblema": false, "contatoEmergenciaNome": "Tia Teste", "contatoEmergenciaTelefone": "16998765432"},
+                   "autorizacoes": {"eventosPasseios": true, "irEmboraSozinho": true}}}
+                """;
+
+        mvc.perform(multipart("/api/pre-cadastro")
+                        .file(new MockMultipartFile("dados", "", MediaType.APPLICATION_JSON_VALUE, corpo.getBytes()))
+                        .header("X-Forwarded-For", "acesso-" + UUID.randomUUID()))
+                .andExpect(status().isCreated());
     }
 
     @Test
