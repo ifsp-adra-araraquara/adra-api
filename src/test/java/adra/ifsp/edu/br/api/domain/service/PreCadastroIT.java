@@ -17,6 +17,7 @@ import adra.ifsp.edu.br.api.domain.enums.Escolaridade;
 import adra.ifsp.edu.br.api.domain.enums.EstadoCivil;
 import adra.ifsp.edu.br.api.domain.enums.NomeNivelPermissao;
 import adra.ifsp.edu.br.api.domain.enums.ProgramaTransferencia;
+import adra.ifsp.edu.br.api.domain.enums.ProvedorArmazenamento;
 import adra.ifsp.edu.br.api.domain.enums.Sexo;
 import adra.ifsp.edu.br.api.domain.model.Assistido;
 import adra.ifsp.edu.br.api.domain.repository.AssistidoRepository;
@@ -33,6 +34,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.TestPropertySource;
@@ -42,6 +44,10 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import tools.jackson.databind.json.JsonMapper;
 
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
@@ -56,7 +62,9 @@ import static adra.ifsp.edu.br.api.domain.enums.NomeNivelPermissao.OFICINEIRO;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -82,6 +90,9 @@ class PreCadastroIT {
     private static final String CPF_CRIANCA_JA_ATENDIDA = "99590633137";
     private static final String CPF_RESPONSAVEL_JA_ATENDIDA = "01462189733";
     private static final String CPF_RESPONSAVEL_LEGAL = "39577220045";
+    private static final String CPF_CRIANCA_SEM_ANEXOS = "74584844208";
+    private static final String CPF_CRIANCA_COM_ANEXOS = "67795615848";
+    private static final String CPF_MAE_COM_ANEXOS = "18205377570";
 
     @Autowired private MockMvc mvc;
     @Autowired private JsonMapper jsonMapper;
@@ -103,6 +114,7 @@ class PreCadastroIT {
         jdbcTemplate.execute("alter table adra.responsavel alter column atualizado_em set default now()");
         jdbcTemplate.execute("alter table adra.assistido_responsavel alter column criado_em set default now()");
         jdbcTemplate.execute("alter table adra.log_auditoria alter column data_hora set default now()");
+        when(storage.provedor()).thenReturn(ProvedorArmazenamento.SUPABASE);
     }
 
     @Test
@@ -191,9 +203,8 @@ class PreCadastroIT {
                 base.pai(), base.responsavelLegal(), base.enderecoFamilia(), base.transferencia(), base.saude(),
                 base.autorizacoes());
 
-        mvc.perform(post("/api/pre-cadastro").header("X-Forwarded-For", ipNovo())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(jsonMapper.writeValueAsString(requisicao(CPF_CRIANCA, semAceite))))
+        mvc.perform(multipart("/api/pre-cadastro").file(partDados(requisicao(CPF_CRIANCA, semAceite)))
+                        .header("X-Forwarded-For", ipNovo()))
                 .andExpect(status().isBadRequest());
     }
 
@@ -240,6 +251,42 @@ class PreCadastroIT {
     }
 
     @Test
+    @DisplayName("Foto e documentos sao opcionais; o que falta vira alerta e a aprovacao leva os arquivos para o atendido")
+    void anexosOpcionaisComAlertaETransferidosNaAprovacao() throws Exception {
+        Long semAnexos = enviarPublico(requisicao(CPF_CRIANCA_SEM_ANEXOS, dados(CPF_MAE)));
+        mvc.perform(get("/api/pre-cadastro/" + semAnexos).with(comPerfil(ASSISTENTE_SOCIAL)))
+                .andExpect(jsonPath("$.anexosFaltando.length()").value(3));
+
+        Long id = enviarPublico(requisicao(CPF_CRIANCA_COM_ANEXOS, dados(CPF_MAE_COM_ANEXOS)),
+                imagem("foto"), imagem("documentosCrianca"), imagem("documentosResponsavel"));
+        mvc.perform(get("/api/pre-cadastro").with(comPerfil(ASSISTENTE_SOCIAL)))
+                .andExpect(jsonPath("$[?(@.preCadastroId == " + id + ")].anexosFaltando.length()").value(0));
+        String detalhe = mvc.perform(get("/api/pre-cadastro/" + id).with(comPerfil(ASSISTENTE_SOCIAL)))
+                .andExpect(jsonPath("$.arquivos.length()").value(3))
+                .andReturn().getResponse().getContentAsString();
+        int arquivoId = JsonPath.read(detalhe, "$.arquivos[0].arquivoId");
+        mvc.perform(get("/api/arquivos/" + arquivoId + "/url").with(comPerfil(ASSISTENTE_SOCIAL)))
+                .andExpect(status().isForbidden());
+
+        String rascunho = mvc.perform(get("/api/pre-cadastro/" + id + "/rascunho-assistido").with(comPerfil(ASSISTENTE_SOCIAL)))
+                .andReturn().getResponse().getContentAsString();
+        mvc.perform(post("/api/pre-cadastro/" + id + "/aprovar").with(comPerfil(ASSISTENTE_SOCIAL))
+                        .contentType(MediaType.APPLICATION_JSON).content(rascunho))
+                .andExpect(status().isOk());
+
+        Long assistidoId = assistidoRepository.findByCpf(CPF_CRIANCA_COM_ANEXOS).orElseThrow().getAssistidoId();
+        Long maeId = responsavelRepository.findByCpf(CPF_MAE_COM_ANEXOS).orElseThrow().getResponsavelId();
+        assertThat(jdbcTemplate.queryForList(
+                "select categoria from adra.arquivo where entidade_tipo = 'ASSISTIDO' and entidade_id = ? order by categoria",
+                String.class, assistidoId)).containsExactly("DOCUMENTO_IDENTIDADE", "FOTO_PERFIL");
+        assertThat(jdbcTemplate.queryForList(
+                "select categoria from adra.arquivo where entidade_tipo = 'RESPONSAVEL' and entidade_id = ?",
+                String.class, maeId)).containsExactly("DOCUMENTO_IDENTIDADE");
+        assertThat(preCadastroRepository.findById(id).orElseThrow().getStatus().name()).isEqualTo("CONVERTIDO");
+        assertThat(preCadastroRepository.findById(id).orElseThrow().getAssistidoId()).isEqualTo(assistidoId);
+    }
+
+    @Test
     @DisplayName("Educador Social e Oficineiro recebem 403 ao aprovar e reprovar")
     void educadorEOficineiroNaoAprovamNemReprovam() throws Exception {
         String corpoAprovar = jsonMapper.writeValueAsString(assistido("Qualquer", CPF_CRIANCA, CPF_MAE));
@@ -253,12 +300,25 @@ class PreCadastroIT {
         }
     }
 
-    private Long enviarPublico(PreCadastroRequestDTO requisicao) throws Exception {
-        String resposta = mvc.perform(post("/api/pre-cadastro").header("X-Forwarded-For", ipNovo())
-                        .contentType(MediaType.APPLICATION_JSON).content(jsonMapper.writeValueAsString(requisicao)))
+    private Long enviarPublico(PreCadastroRequestDTO requisicao, MockMultipartFile... anexos) throws Exception {
+        var envio = multipart("/api/pre-cadastro").file(partDados(requisicao));
+        for (MockMultipartFile anexo : anexos) {
+            envio.file(anexo);
+        }
+        String resposta = mvc.perform(envio.header("X-Forwarded-For", ipNovo()))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
         return ((Number) JsonPath.read(resposta, "$.preCadastroId")).longValue();
+    }
+
+    private MockMultipartFile partDados(PreCadastroRequestDTO requisicao) {
+        return new MockMultipartFile("dados", "", MediaType.APPLICATION_JSON_VALUE, jsonMapper.writeValueAsBytes(requisicao));
+    }
+
+    private static MockMultipartFile imagem(String parte) throws IOException {
+        ByteArrayOutputStream png = new ByteArrayOutputStream();
+        ImageIO.write(new BufferedImage(8, 8, BufferedImage.TYPE_INT_RGB), "png", png);
+        return new MockMultipartFile(parte, parte + ".png", "image/png", png.toByteArray());
     }
 
     private static String ipNovo() {

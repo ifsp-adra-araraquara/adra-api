@@ -6,6 +6,7 @@ import adra.ifsp.edu.br.api.domain.model.PreCadastro;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.Period;
+import java.util.List;
 
 /** Linha da lista de pré-cadastros da equipe. */
 public record PreCadastroResumoDTO(
@@ -18,9 +19,11 @@ public record PreCadastroResumoDTO(
         OffsetDateTime criadoEm,
         StatusPreCadastro status,
         boolean cpfJaCadastrado,
-        Long assistidoId
+        Long assistidoId,
+        List<String> anexosFaltando
 ) {
-    public static PreCadastroResumoDTO de(PreCadastro p, boolean cpfJaCadastrado, LocalDate hoje) {
+    public static PreCadastroResumoDTO de(PreCadastro p, boolean cpfJaCadastrado, List<String> anexosFaltando,
+                                          LocalDate hoje) {
         return new PreCadastroResumoDTO(
                 p.getPreCadastroId(),
                 p.getNomeCompleto(),
@@ -31,6 +34,7 @@ public record PreCadastroResumoDTO(
                 p.getCriadoEm(),
                 p.getStatus(),
                 cpfJaCadastrado,
-                p.getAssistidoId());
+                p.getAssistidoId(),
+                anexosFaltando);
     }
 }

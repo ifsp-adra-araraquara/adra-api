@@ -1,6 +1,8 @@
 package adra.ifsp.edu.br.api.web.controller;
 
+import adra.ifsp.edu.br.api.domain.dto.arquivo.UrlArquivoDTO;
 import adra.ifsp.edu.br.api.domain.dto.assistido.AssistidoRequestDTO;
+import adra.ifsp.edu.br.api.domain.dto.precadastro.AnexosPreCadastro;
 import adra.ifsp.edu.br.api.domain.dto.precadastro.PreCadastroRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.precadastro.PreCadastroResponseDTO;
 import adra.ifsp.edu.br.api.domain.dto.precadastro.PreCadastroResumoDTO;
@@ -11,9 +13,11 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.Collections;
 import java.util.List;
@@ -30,10 +34,17 @@ public class PreCadastroController {
 
     private final PreCadastroService service;
 
-    @PostMapping
-    public ResponseEntity<Map<String, Long>> registrarPublico(@Valid @RequestBody PreCadastroRequestDTO dto,
-                                                              HttpServletRequest request) {
-        Long protocolo = service.registrarPublico(dto, ipDoCliente(request));
+    /** Multipart: "dados" (JSON) + foto e documentos opcionais. */
+    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<Map<String, Long>> registrarPublico(
+            @Valid @RequestPart("dados") PreCadastroRequestDTO dto,
+            @RequestPart(value = "foto", required = false) MultipartFile foto,
+            @RequestPart(value = "documentosCrianca", required = false) List<MultipartFile> documentosCrianca,
+            @RequestPart(value = "documentosResponsavel", required = false) List<MultipartFile> documentosResponsavel,
+            HttpServletRequest request
+    ) {
+        AnexosPreCadastro anexos = new AnexosPreCadastro(foto, documentosCrianca, documentosResponsavel);
+        Long protocolo = service.registrarPublico(dto, anexos, ipDoCliente(request));
         return ResponseEntity.status(HttpStatus.CREATED).body(Collections.singletonMap("preCadastroId", protocolo));
     }
 
@@ -49,6 +60,12 @@ public class PreCadastroController {
     @GetMapping("/{preCadastroId}")
     public ResponseEntity<PreCadastroResponseDTO> buscar(@PathVariable Long preCadastroId) {
         return ResponseEntity.ok(service.buscarDetalhe(preCadastroId));
+    }
+
+    @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL')")
+    @GetMapping("/{preCadastroId}/arquivos/{arquivoId}/url")
+    public ResponseEntity<UrlArquivoDTO> urlDoArquivo(@PathVariable Long preCadastroId, @PathVariable Long arquivoId) {
+        return ResponseEntity.ok(service.gerarUrlDoArquivo(preCadastroId, arquivoId));
     }
 
     @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL')")
