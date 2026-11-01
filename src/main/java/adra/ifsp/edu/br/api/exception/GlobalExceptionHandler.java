@@ -12,6 +12,7 @@ import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import adra.ifsp.edu.br.api.domain.dto.comum.AlertaAssistidoExistenteDTO;
 import adra.ifsp.edu.br.api.domain.dto.comum.AlertaCpfDuplicadoDTO;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.support.MissingServletRequestPartException;
@@ -111,6 +112,13 @@ public class GlobalExceptionHandler {
     public ResponseEntity<AlertaCpfDuplicadoDTO> tratarCpfDuplicado(CpfDuplicadoException ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(new AlertaCpfDuplicadoDTO(ex.getMessage(), ex.getResponsavelExistente()));
+    }
+
+    /** 409 com o id do atendido que já tem o CPF, para o front levar à ficha dele. */
+    @ExceptionHandler(AssistidoJaCadastradoException.class)
+    public ResponseEntity<AlertaAssistidoExistenteDTO> tratarAssistidoJaCadastrado(AssistidoJaCadastradoException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new AlertaAssistidoExistenteDTO(ex.getMessage(), ex.getAssistidoId()));
     }
 
     @ExceptionHandler(ArquivoInvalidoException.class)
