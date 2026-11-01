@@ -1,8 +1,11 @@
 package adra.ifsp.edu.br.api.web.controller;
 
-import adra.ifsp.edu.br.api.domain.dto.precadastro.DescartarPreCadastroRequestDTO;
+import adra.ifsp.edu.br.api.domain.dto.assistido.AssistidoRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.precadastro.PreCadastroRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.precadastro.PreCadastroResponseDTO;
+import adra.ifsp.edu.br.api.domain.dto.precadastro.PreCadastroResumoDTO;
+import adra.ifsp.edu.br.api.domain.dto.precadastro.ReprovarPreCadastroRequestDTO;
+import adra.ifsp.edu.br.api.domain.enums.StatusPreCadastro;
 import adra.ifsp.edu.br.api.domain.service.PreCadastroService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -12,11 +15,13 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 /**
- * FT: link público de pré-cadastro. POST é aberto (sem login — ver
- * SecurityConfig); o resto só Coordenação/Sociopedagógico.
+ * FT-11: link público de pré-cadastro. POST é aberto (sem login — ver
+ * SecurityConfig); o resto só Coordenação/Assistente Social.
  */
 @RestController
 @RequestMapping("/api/pre-cadastro")
@@ -26,30 +31,48 @@ public class PreCadastroController {
     private final PreCadastroService service;
 
     @PostMapping
-    public ResponseEntity<Void> registrarPublico(@Valid @RequestBody PreCadastroRequestDTO dto, HttpServletRequest request) {
-        service.registrarPublico(dto, ipDoCliente(request));
-        return ResponseEntity.status(HttpStatus.CREATED).build();
+    public ResponseEntity<Map<String, Long>> registrarPublico(@Valid @RequestBody PreCadastroRequestDTO dto,
+                                                              HttpServletRequest request) {
+        Long protocolo = service.registrarPublico(dto, ipDoCliente(request));
+        return ResponseEntity.status(HttpStatus.CREATED).body(Collections.singletonMap("preCadastroId", protocolo));
     }
 
     @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL')")
-    @GetMapping("/pendentes")
-    public ResponseEntity<List<PreCadastroResponseDTO>> listarPendentes() {
-        return ResponseEntity.ok(service.listarPendentes());
-    }
-
-    @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL')")
-    @PatchMapping("/{preCadastroId}/descartar")
-    public ResponseEntity<PreCadastroResponseDTO> descartar(
-            @PathVariable Long preCadastroId,
-            @RequestBody(required = false) DescartarPreCadastroRequestDTO dto
+    @GetMapping
+    public ResponseEntity<List<PreCadastroResumoDTO>> listar(
+            @RequestParam(defaultValue = "PENDENTE") StatusPreCadastro status
     ) {
-        return ResponseEntity.ok(service.descartar(preCadastroId, dto));
+        return ResponseEntity.ok(service.listar(status));
     }
 
     @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL')")
-    @PatchMapping("/{preCadastroId}/converter")
-    public ResponseEntity<PreCadastroResponseDTO> marcarConvertido(@PathVariable Long preCadastroId) {
-        return ResponseEntity.ok(service.marcarConvertido(preCadastroId));
+    @GetMapping("/{preCadastroId}")
+    public ResponseEntity<PreCadastroResponseDTO> buscar(@PathVariable Long preCadastroId) {
+        return ResponseEntity.ok(service.buscarDetalhe(preCadastroId));
+    }
+
+    @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL')")
+    @GetMapping("/{preCadastroId}/rascunho-assistido")
+    public ResponseEntity<AssistidoRequestDTO> rascunhoAssistido(@PathVariable Long preCadastroId) {
+        return ResponseEntity.ok(service.montarRascunho(preCadastroId));
+    }
+
+    @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL')")
+    @PostMapping("/{preCadastroId}/aprovar")
+    public ResponseEntity<PreCadastroResponseDTO> aprovar(
+            @PathVariable Long preCadastroId,
+            @Valid @RequestBody AssistidoRequestDTO dto
+    ) {
+        return ResponseEntity.ok(service.aprovar(preCadastroId, dto));
+    }
+
+    @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL')")
+    @PatchMapping("/{preCadastroId}/reprovar")
+    public ResponseEntity<PreCadastroResponseDTO> reprovar(
+            @PathVariable Long preCadastroId,
+            @Valid @RequestBody ReprovarPreCadastroRequestDTO dto
+    ) {
+        return ResponseEntity.ok(service.reprovar(preCadastroId, dto));
     }
 
     private String ipDoCliente(HttpServletRequest request) {

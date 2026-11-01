@@ -1,34 +1,47 @@
 package adra.ifsp.edu.br.api.domain.dto.precadastro;
 
+import adra.ifsp.edu.br.api.domain.enums.Sexo;
 import adra.ifsp.edu.br.api.domain.enums.StatusPreCadastro;
 import adra.ifsp.edu.br.api.domain.model.PreCadastro;
 
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 
+/** Detalhe do pré-cadastro: tudo o que a família enviou e a revisão da equipe. */
 public record PreCadastroResponseDTO(
         Long preCadastroId,
         String nomeCompleto,
         LocalDate dataNascimento,
+        String cpf,
+        Sexo sexo,
+        String email,
         String responsavelNome,
         String responsavelTelefone,
-        String endereco,
-        String observacao,
+        PreCadastroDadosDTO dados,
         StatusPreCadastro status,
+        String motivoReprovacao,
+        Long assistidoId,
+        /** Atendido que já tem este CPF (null se não há): a equipe abre a ficha em vez de aprovar. */
+        Long assistidoExistenteId,
         String revisadoPorNome,
         OffsetDateTime revisadoEm,
         OffsetDateTime criadoEm
 ) {
-    public static PreCadastroResponseDTO de(PreCadastro p) {
+    public static PreCadastroResponseDTO de(PreCadastro p, Long assistidoExistenteId) {
         return new PreCadastroResponseDTO(
                 p.getPreCadastroId(),
                 p.getNomeCompleto(),
                 p.getDataNascimento(),
+                p.getCpf(),
+                p.getSexo(),
+                p.getEmail(),
                 p.getResponsavelNome(),
                 p.getResponsavelTelefone(),
-                p.getEndereco(),
-                p.getObservacao(),
+                p.getDados(),
                 p.getStatus(),
+                p.getMotivoReprovacao(),
+                p.getAssistidoId(),
+                assistidoExistenteId,
                 p.getRevisadoPor() != null ? p.getRevisadoPor().getNomeCompleto() : null,
                 p.getRevisadoEm(),
                 p.getCriadoEm());
