@@ -31,7 +31,7 @@ public record PainelHojeDTO(
     public record ChamadaPendente(Long aulaId, LocalDate data, String horario, String turma) {
     }
 
-    /** Assistido com 2 registros do nível (de 3): o próximo gera a consequência. */
+    /** Assistido com 2 registros do nível (de 3): o próximo gera a recomendação. */
     public record UmPasso(Long assistidoId, String nome, String nivel, long registros) {
     }
 

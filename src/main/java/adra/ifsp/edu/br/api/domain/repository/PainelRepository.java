@@ -316,7 +316,7 @@ public class PainelRepository {
 
     /**
      * Ativos com contagem do nível ≡ 2 (mod 3): o próximo registro dispara
-     * a progressão (FT-04 usa a sequência % 3 sobre não arquivados).
+     * a recomendação (FT-22 usa a sequência % 3 sobre não arquivados).
      */
     public List<UmPasso> umPassoDaProgressao() {
         return jdbc.sql("""

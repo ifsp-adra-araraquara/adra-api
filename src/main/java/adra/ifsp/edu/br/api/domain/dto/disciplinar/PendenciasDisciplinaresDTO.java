@@ -5,6 +5,8 @@ public record PendenciasDisciplinaresDTO(
         long assistidosSuspensosHoje,
         long retornosComResponsavelPendentes,
         long perdemProximoPasseio,
-        long documentosAAssinar
+        long documentosAAssinar,
+        long recomendacoesAdvertencia,
+        long recomendacoesSuspensao
 ) {
 }

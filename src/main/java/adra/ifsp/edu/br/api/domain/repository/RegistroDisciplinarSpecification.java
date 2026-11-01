@@ -17,10 +17,12 @@ public final class RegistroDisciplinarSpecification {
 
     /**
      * @param somentePendencias só o que espera ação: documento a assinar ou
-     *                          consequência pendente (passeio/retorno com responsável)
+     *                          consequência pendente (recomendação, passeio, retorno com responsável)
+     * @param somenteRecomendacoes só recomendações de advertência/suspensão ainda não resolvidas
      */
     public static Specification<RegistroDisciplinar> comFiltros(String busca, NivelDisciplinar nivel,
-                                                                boolean somentePendencias, boolean incluirArquivados) {
+                                                                boolean somentePendencias, boolean somenteRecomendacoes,
+                                                                boolean incluirArquivados) {
         return (root, query, cb) -> {
             List<Predicate> predicados = new ArrayList<>();
 
@@ -38,9 +40,13 @@ public final class RegistroDisciplinarSpecification {
                 predicados.add(cb.or(
                         cb.equal(root.get("documentoStatus"), StatusDocumentoDisciplinar.PENDENTE_ASSINATURA),
                         cb.and(
-                                root.get("consequencia").in(ConsequenciaDisciplinar.PERDE_PROXIMO_PASSEIO,
-                                        ConsequenciaDisciplinar.RETORNO_COM_RESPONSAVEL),
+                                cb.isNotNull(root.get("consequencia")),
                                 cb.isNull(root.get("consequenciaResolvidaEm")))));
+            }
+            if (somenteRecomendacoes) {
+                predicados.add(root.get("consequencia").in(ConsequenciaDisciplinar.RECOMENDA_ADVERTENCIA,
+                        ConsequenciaDisciplinar.RECOMENDA_SUSPENSAO));
+                predicados.add(cb.isNull(root.get("consequenciaResolvidaEm")));
             }
             return cb.and(predicados.toArray(Predicate[]::new));
         };
