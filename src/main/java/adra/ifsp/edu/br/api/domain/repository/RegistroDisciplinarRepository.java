@@ -47,6 +47,8 @@ public interface RegistroDisciplinarRepository extends JpaRepository<RegistroDis
 
     long countByAssistidoAndNivelAndArquivadoFalse(Assistido assistido, NivelDisciplinar nivel);
 
+    List<RegistroDisciplinar> findByAssistidoAndArquivadoFalse(Assistido assistido);
+
     /** Histórico da ficha, mais recente primeiro, já com motivo e autores (evita N+1). */
     @Query("""
             SELECT r FROM RegistroDisciplinar r

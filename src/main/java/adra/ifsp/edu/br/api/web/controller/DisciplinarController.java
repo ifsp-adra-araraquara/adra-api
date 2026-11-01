@@ -13,6 +13,7 @@ import adra.ifsp.edu.br.api.domain.dto.disciplinar.RegistroDisciplinarRequestDTO
 import adra.ifsp.edu.br.api.domain.dto.disciplinar.RegistroDisciplinarResponseDTO;
 import adra.ifsp.edu.br.api.domain.dto.disciplinar.ResolverConsequenciaRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.disciplinar.SinalizacaoDisciplinarDTO;
+import adra.ifsp.edu.br.api.domain.dto.disciplinar.ZerarContagemRequestDTO;
 import adra.ifsp.edu.br.api.domain.service.DisciplinarService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -97,6 +98,16 @@ public class DisciplinarController {
             @Valid @RequestBody RegistroDisciplinarRequestDTO dto
     ) {
         return ResponseEntity.status(HttpStatus.CREATED).body(disciplinarService.registrar(assistidoId, dto));
+    }
+
+    /** FT-24: arquiva os registros ativos (de um nível ou de todos) e devolve a ficha atualizada. */
+    @PreAuthorize("hasRole('COORDENADOR')")
+    @PostMapping("/assistidos/{assistidoId}/disciplinar/zerar")
+    public ResponseEntity<FichaDisciplinarDTO> zerarContagem(
+            @PathVariable Long assistidoId,
+            @Valid @RequestBody ZerarContagemRequestDTO dto
+    ) {
+        return ResponseEntity.ok(disciplinarService.zerarContagem(assistidoId, dto));
     }
 
     // ---- Registro ----
