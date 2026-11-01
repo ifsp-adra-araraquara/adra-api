@@ -114,6 +114,25 @@ class AcessoPorPerfilIT {
         }
     }
 
+    /** Sem login e contra o schema das migrations (enum de auditoria incluso). Dados inventados. */
+    @Test
+    void linkPublicoDePreCadastroGravaSemLogin() throws Exception {
+        String corpo = """
+                {"nomeCompleto": "Crianca Teste", "dataNascimento": "2016-04-12", "cpf": "56532228281", "sexo": "FEMININO", "site": "",
+                 "dados": {"termos": {"aceiteLgpd": true, "autorizaUsoImagem": false},
+                   "mae": {"nomeCompleto": "Mae Teste", "dataNascimento": "1990-01-20", "cpf": "96234168493",
+                           "escolaridade": "MEDIO_COMPLETO", "estadoCivil": "SOLTEIRO", "renda": 1500, "telefone": "16991234567"},
+                   "enderecoFamilia": {"logradouro": "Rua das Flores"},
+                   "transferencia": {"recebe": false},
+                   "saude": {"possuiProblema": false, "contatoEmergenciaNome": "Tia Teste", "contatoEmergenciaTelefone": "16998765432"},
+                   "autorizacoes": {"eventosPasseios": true, "irEmboraSozinho": true}}}
+                """;
+
+        mvc.perform(post("/api/pre-cadastro").header("X-Forwarded-For", "acesso-" + UUID.randomUUID())
+                        .contentType(MediaType.APPLICATION_JSON).content(corpo))
+                .andExpect(status().isCreated());
+    }
+
     @Test
     void soOCoordenadorComAFlagConvida() throws Exception {
         when(supabaseAdminClient.convidar(anyString())).thenReturn(UUID.randomUUID());
