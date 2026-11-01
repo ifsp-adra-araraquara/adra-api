@@ -75,8 +75,10 @@ class AcessoPorPerfilIT {
                 arguments(HttpMethod.GET, "/api/responsaveis", Set.of(COORDENADOR, ASSISTENTE_SOCIAL, EDUCADOR_SOCIAL)),
                 arguments(HttpMethod.DELETE, "/api/assistidos/" + INEXISTENTE + "/responsaveis/1", Set.of()),
 
-                arguments(HttpMethod.GET, "/api/pre-cadastro/pendentes", Set.of(COORDENADOR, ASSISTENTE_SOCIAL)),
-                arguments(HttpMethod.PATCH, "/api/pre-cadastro/" + INEXISTENTE + "/converter", Set.of(COORDENADOR, ASSISTENTE_SOCIAL)),
+                // aprovar e reprovar têm corpo obrigatório: o 403 deles está no PreCadastroIT.
+                arguments(HttpMethod.GET, "/api/pre-cadastro", Set.of(COORDENADOR, ASSISTENTE_SOCIAL)),
+                arguments(HttpMethod.GET, "/api/pre-cadastro/" + INEXISTENTE, Set.of(COORDENADOR, ASSISTENTE_SOCIAL)),
+                arguments(HttpMethod.GET, "/api/pre-cadastro/" + INEXISTENTE + "/rascunho-assistido", Set.of(COORDENADOR, ASSISTENTE_SOCIAL)),
 
                 arguments(HttpMethod.GET, "/api/chamadas/assistido/" + INEXISTENTE, Set.of(COORDENADOR, ASSISTENTE_SOCIAL, EDUCADOR_SOCIAL)),
                 arguments(HttpMethod.DELETE, "/api/chamadas/" + INEXISTENTE, Set.of(COORDENADOR, EDUCADOR_SOCIAL)),

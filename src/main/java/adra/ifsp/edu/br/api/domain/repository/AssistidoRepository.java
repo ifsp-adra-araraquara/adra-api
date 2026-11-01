@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -22,6 +23,10 @@ public interface AssistidoRepository extends JpaRepository<Assistido, Long>, Jpa
     List<Assistido> findByNomeCompletoIgnoreCaseAndDataNascimento(String nomeCompleto, LocalDate dataNascimento);
 
     Optional<Assistido> findByCpf(String cpf);
+
+    /** Quais destes CPFs já são de algum atendido — uma query para a lista de pré-cadastros inteira. */
+    @Query("SELECT a.cpf FROM Assistido a WHERE a.cpf IN :cpfs")
+    List<String> findCpfsCadastrados(@Param("cpfs") Collection<String> cpfs);
 
     /**
      * Usado pra montar a contagem de "Alunos" nas telas de turma
