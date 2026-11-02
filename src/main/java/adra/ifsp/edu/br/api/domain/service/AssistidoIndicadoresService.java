@@ -1,5 +1,6 @@
 package adra.ifsp.edu.br.api.domain.service;
 
+import adra.ifsp.edu.br.api.domain.dto.presenca.AutorizadoRetiradaDTO;
 import adra.ifsp.edu.br.api.domain.enums.StatusAula;
 import adra.ifsp.edu.br.api.domain.enums.StatusPresenca;
 import adra.ifsp.edu.br.api.domain.model.Assistido;
@@ -113,5 +114,25 @@ public class AssistidoIndicadoresService {
                         ar -> ar.getAssistido().getAssistidoId(),
                         Collectors.collectingAndThen(Collectors.toList(),
                                 lista -> lista.stream().min(prioridade).orElseThrow())));
+    }
+
+    /** Quem pode buscar cada assistido (responsáveis "autorizado a retirar"), principal primeiro. */
+    @Transactional(readOnly = true)
+    public Map<Long, List<AutorizadoRetiradaDTO>> autorizadosRetirada(Collection<Assistido> assistidos) {
+        if (assistidos.isEmpty()) {
+            return Map.of();
+        }
+        List<Long> ids = assistidos.stream().map(Assistido::getAssistidoId).toList();
+
+        return assistidoResponsavelRepository.findComResponsavelByAssistidoIds(ids).stream()
+                .filter(AssistidoResponsavel::isAutorizadoRetirada)
+                .sorted(Comparator.comparing(AssistidoResponsavel::isResponsavelPrincipal).reversed()
+                        .thenComparing(v -> v.getResponsavel().getNomeCompleto()))
+                .collect(Collectors.groupingBy(
+                        v -> v.getAssistido().getAssistidoId(),
+                        Collectors.mapping(v -> new AutorizadoRetiradaDTO(
+                                v.getResponsavel().getNomeCompleto(),
+                                v.getParentesco(),
+                                v.getResponsavel().getTelefone()), Collectors.toList())));
     }
 }
