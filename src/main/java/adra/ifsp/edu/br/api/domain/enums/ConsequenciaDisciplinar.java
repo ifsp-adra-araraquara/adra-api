@@ -1,11 +1,14 @@
 package adra.ifsp.edu.br.api.domain.enums;
 
-/** O que um registro disparou ao completar 3 do mesmo nível — ver NivelDisciplinar. */
+/**
+ * O que um registro recomenda ao completar 3 do mesmo nível — ver NivelDisciplinar.
+ * Fica pendente até o Coordenador gerar o próximo registro ou dispensar.
+ */
 public enum ConsequenciaDisciplinar {
-    /** Gerou uma advertência automaticamente (resolvida na hora). */
-    ADVERTENCIA_GERADA(false),
-    /** Gerou uma suspensão de 3 dias automaticamente (resolvida na hora). */
-    SUSPENSAO_GERADA(false),
+    /** Recomenda advertência escrita (3ª ocorrência). */
+    RECOMENDA_ADVERTENCIA(true),
+    /** Recomenda suspensão de 3 dias (3ª advertência). */
+    RECOMENDA_SUSPENSAO(true),
     /** Pendente até a coordenação registrar que o passeio foi perdido. */
     PERDE_PROXIMO_PASSEIO(true),
     /** Pendente até a coordenação registrar a conversa com o responsável. */
@@ -18,4 +21,13 @@ public enum ConsequenciaDisciplinar {
     }
 
     public boolean exigeResolucao() { return exigeResolucao; }
+
+    /** Recomendações que o Coordenador resolve gerando um registro do próximo nível. */
+    public NivelDisciplinar nivelRecomendado() {
+        return switch (this) {
+            case RECOMENDA_ADVERTENCIA -> NivelDisciplinar.ADVERTENCIA;
+            case RECOMENDA_SUSPENSAO -> NivelDisciplinar.SUSPENSAO;
+            default -> null;
+        };
+    }
 }
