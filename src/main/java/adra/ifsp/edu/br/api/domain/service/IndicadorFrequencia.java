@@ -8,7 +8,7 @@ import java.util.List;
 /**
  * Indicadores de frequência de um assistido, calculados a partir do status de
  * cada aula REALIZADA dos vínculos de turma dele (mesma reconstituição de
- * {@link PresencaService#buscarFrequenciaAssistido}: ausência de falta = presente).
+ * {@link FrequenciaService#historicoDoAtendido}: ausência de falta = presente).
  *
  * <p>Mesma regra da aba "Chamadas" da ficha no front: só PRESENTE conta como
  * presença; faltas seguidas consideram só FALTA (uma justificada interrompe a

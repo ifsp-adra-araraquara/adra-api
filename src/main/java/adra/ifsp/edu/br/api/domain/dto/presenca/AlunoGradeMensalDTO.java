@@ -8,7 +8,7 @@ import java.util.List;
 /**
  * Uma linha da grade mensal. `presencas` é paralela a
  * `GradeMensalTurmaDTO.colunas` (mesmo índice = mesmo dia) e só tem valor
- * nas colunas AULA em que o aluno estava na turma e não desligado; nas
+ * nas colunas LANCADA em que o atendido estava no grupo e não desligado; nas
  * demais vem null. `dataSaida`/`motivoSaida` vêm preenchidos quando o
  * assistido foi desligado — a grade mostra a faixa "Desligado" a partir daí.
  */

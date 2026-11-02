@@ -29,16 +29,16 @@ import adra.ifsp.edu.br.api.domain.enums.StatusDocumentoDisciplinar;
 import adra.ifsp.edu.br.api.domain.enums.StatusGeral;
 import adra.ifsp.edu.br.api.domain.model.Arquivo;
 import adra.ifsp.edu.br.api.domain.model.Assistido;
-import adra.ifsp.edu.br.api.domain.model.Aula;
 import adra.ifsp.edu.br.api.domain.model.MotivoDisciplinar;
 import adra.ifsp.edu.br.api.domain.model.RegistroDisciplinar;
 import adra.ifsp.edu.br.api.domain.model.Usuario;
+import adra.ifsp.edu.br.api.domain.model.Turma;
 import adra.ifsp.edu.br.api.domain.repository.ArquivoRepository;
 import adra.ifsp.edu.br.api.domain.repository.AssistidoRepository;
-import adra.ifsp.edu.br.api.domain.repository.AulaRepository;
 import adra.ifsp.edu.br.api.domain.repository.MotivoDisciplinarRepository;
 import adra.ifsp.edu.br.api.domain.repository.RegistroDisciplinarRepository;
 import adra.ifsp.edu.br.api.domain.repository.RegistroDisciplinarSpecification;
+import adra.ifsp.edu.br.api.domain.repository.TurmaRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -86,7 +86,7 @@ public class DisciplinarService {
     private final RegistroDisciplinarRepository registroRepository;
     private final MotivoDisciplinarRepository motivoRepository;
     private final AssistidoRepository assistidoRepository;
-    private final AulaRepository aulaRepository;
+    private final TurmaRepository turmaRepository;
     private final ArquivoRepository arquivoRepository;
     private final AuditoriaService auditoriaService;
     private final UsuarioAutenticadoService usuarioAutenticadoService;
@@ -157,8 +157,8 @@ public class DisciplinarService {
             throw new AcessoNegadoException("O Educador Social só registra ocorrência.");
         }
 
-        Aula aula = dto.aulaId() == null ? null : aulaRepository.findById(dto.aulaId())
-                .orElseThrow(() -> new EntidadeNaoEncontradaException("Aula não encontrada: id " + dto.aulaId()));
+        Turma turma = dto.turmaId() == null ? null : turmaRepository.findById(dto.turmaId())
+                .orElseThrow(() -> new EntidadeNaoEncontradaException("Grupo não encontrado: id " + dto.turmaId()));
 
         LocalDate inicio = null;
         LocalDate fim = null;
@@ -169,7 +169,7 @@ public class DisciplinarService {
         }
 
         RegistroDisciplinar registro = salvarRegistro(assistido, motivo, motivo.getNivel(),
-                OrigemRegistroDisciplinar.MANUAL, null, dto.data(), dto.descricao().trim(), aula, inicio, fim,
+                OrigemRegistroDisciplinar.MANUAL, null, dto.data(), dto.descricao().trim(), turma, inicio, fim,
                 usuario);
         marcarRecomendacao(registro);
         return montarRespostaERecalcular(registro);
@@ -238,7 +238,7 @@ public class DisciplinarService {
 
     private RegistroDisciplinar salvarRegistro(Assistido assistido, MotivoDisciplinar motivo, NivelDisciplinar nivel,
                                                OrigemRegistroDisciplinar origem, RegistroDisciplinar registroOrigem,
-                                               LocalDate data, String descricao, Aula aula,
+                                               LocalDate data, String descricao, Turma turma,
                                                LocalDate suspensaoInicio, LocalDate suspensaoFim,
                                                Usuario usuario) {
         int sequencia = (int) registroRepository.countByAssistidoAndNivelAndArquivadoFalse(assistido, nivel) + 1;
@@ -252,7 +252,7 @@ public class DisciplinarService {
                 .sequencia(sequencia)
                 .dataRegistro(data)
                 .descricao(descricao)
-                .aula(aula)
+                .turma(turma)
                 .suspensaoInicio(suspensaoInicio)
                 .suspensaoFim(suspensaoFim)
                 .documentoStatus(nivel.geraDocumento() ? StatusDocumentoDisciplinar.PENDENTE_ASSINATURA : null)

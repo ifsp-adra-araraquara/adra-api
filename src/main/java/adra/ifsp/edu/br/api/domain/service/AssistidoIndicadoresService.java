@@ -1,16 +1,15 @@
 package adra.ifsp.edu.br.api.domain.service;
 
 import adra.ifsp.edu.br.api.domain.dto.presenca.AutorizadoRetiradaDTO;
-import adra.ifsp.edu.br.api.domain.enums.StatusAula;
 import adra.ifsp.edu.br.api.domain.enums.StatusPresenca;
 import adra.ifsp.edu.br.api.domain.model.Assistido;
 import adra.ifsp.edu.br.api.domain.model.AssistidoResponsavel;
-import adra.ifsp.edu.br.api.domain.model.Aula;
+import adra.ifsp.edu.br.api.domain.model.Chamada;
 import adra.ifsp.edu.br.api.domain.model.Presenca;
 import adra.ifsp.edu.br.api.domain.model.Turma;
 import adra.ifsp.edu.br.api.domain.model.TurmaAlunos;
 import adra.ifsp.edu.br.api.domain.repository.AssistidoResponsavelRepository;
-import adra.ifsp.edu.br.api.domain.repository.AulaRepository;
+import adra.ifsp.edu.br.api.domain.repository.ChamadaRepository;
 import adra.ifsp.edu.br.api.domain.repository.PresencaRepository;
 import adra.ifsp.edu.br.api.domain.repository.TurmaAlunosRepository;
 import lombok.RequiredArgsConstructor;
@@ -31,7 +30,7 @@ import java.util.stream.Collectors;
  * Dados derivados das linhas da listagem de assistidos — responsável principal
  * e indicadores de frequência — calculados em lote (4 queries por página, não
  * 1 por aluno). Frequência com a mesma reconstituição de
- * {@link PresencaService#buscarFrequenciaAssistido}, pra lista e ficha nunca
+ * {@link FrequenciaService#historicoDoAtendido}, pra lista e ficha nunca
  * divergirem.
  */
 @Service
@@ -39,7 +38,7 @@ import java.util.stream.Collectors;
 public class AssistidoIndicadoresService {
 
     private final TurmaAlunosRepository turmaAlunosRepository;
-    private final AulaRepository aulaRepository;
+    private final ChamadaRepository chamadaRepository;
     private final PresencaRepository presencaRepository;
     private final AssistidoResponsavelRepository assistidoResponsavelRepository;
 
@@ -51,19 +50,17 @@ public class AssistidoIndicadoresService {
 
         List<TurmaAlunos> vinculos = turmaAlunosRepository.findByAssistidoIn(assistidos);
         Set<Turma> turmas = vinculos.stream().map(TurmaAlunos::getTurma).collect(Collectors.toSet());
-        List<Aula> aulas = turmas.isEmpty()
-                ? List.of()
-                : aulaRepository.findByTurmaInAndStatusAula(turmas, StatusAula.REALIZADA);
+        List<Chamada> chamadas = turmas.isEmpty() ? List.of() : chamadaRepository.findByTurmaIn(turmas);
 
-        Map<Long, List<Aula>> aulasPorTurma = aulas.stream()
-                .collect(Collectors.groupingBy(a -> a.getTurma().getTurmaId()));
+        Map<Long, List<Chamada>> chamadasPorTurma = chamadas.stream()
+                .collect(Collectors.groupingBy(c -> c.getTurma().getTurmaId()));
 
         Map<Long, Map<Long, StatusPresenca>> faltasPorAssistido = new HashMap<>();
-        if (!aulas.isEmpty()) {
-            for (Presenca falta : presencaRepository.findByAulaInAndAssistidoIn(aulas, assistidos)) {
+        if (!chamadas.isEmpty()) {
+            for (Presenca falta : presencaRepository.findByChamadaInAndAssistidoIn(chamadas, assistidos)) {
                 faltasPorAssistido
                         .computeIfAbsent(falta.getAssistido().getAssistidoId(), k -> new HashMap<>())
-                        .put(falta.getAula().getAulaId(), falta.getStatusPresenca());
+                        .put(falta.getChamada().getChamadaId(), falta.getStatusPresenca());
             }
         }
 
@@ -75,21 +72,21 @@ public class AssistidoIndicadoresService {
             Long id = assistido.getAssistidoId();
             Map<Long, StatusPresenca> faltas = faltasPorAssistido.getOrDefault(id, Map.of());
 
-            // aulaId -> aula, sem repetir caso dois vínculos cubram a mesma aula
-            Map<Long, Aula> aulasDoAssistido = new LinkedHashMap<>();
+            // chamadaId -> chamada, só as dos dias em que o atendido estava no grupo
+            Map<Long, Chamada> chamadasDoAssistido = new LinkedHashMap<>();
             for (TurmaAlunos vinculo : vinculosPorAssistido.getOrDefault(id, List.of())) {
                 LocalDate fim = vinculo.getDataSaida() != null ? vinculo.getDataSaida() : LocalDate.now();
-                for (Aula aula : aulasPorTurma.getOrDefault(vinculo.getTurma().getTurmaId(), List.of())) {
-                    LocalDate data = aula.getDataAula();
+                for (Chamada chamada : chamadasPorTurma.getOrDefault(vinculo.getTurma().getTurmaId(), List.of())) {
+                    LocalDate data = chamada.getDataChamada();
                     if (!data.isBefore(vinculo.getDataEntrada()) && !data.isAfter(fim)) {
-                        aulasDoAssistido.putIfAbsent(aula.getAulaId(), aula);
+                        chamadasDoAssistido.putIfAbsent(chamada.getChamadaId(), chamada);
                     }
                 }
             }
 
-            List<StatusPresenca> statusMaisRecentePrimeiro = aulasDoAssistido.values().stream()
-                    .sorted(Comparator.comparing(Aula::getDataAula).thenComparing(Aula::getAulaId).reversed())
-                    .map(aula -> faltas.getOrDefault(aula.getAulaId(), StatusPresenca.PRESENTE))
+            List<StatusPresenca> statusMaisRecentePrimeiro = chamadasDoAssistido.values().stream()
+                    .sorted(Comparator.comparing(Chamada::getDataChamada).thenComparing(Chamada::getChamadaId).reversed())
+                    .map(chamada -> faltas.getOrDefault(chamada.getChamadaId(), StatusPresenca.PRESENTE))
                     .toList();
 
             resultado.put(id, IndicadorFrequencia.de(statusMaisRecentePrimeiro, assistido.getStatus()));

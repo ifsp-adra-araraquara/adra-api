@@ -1,58 +1,49 @@
 package adra.ifsp.edu.br.api.domain.service;
 
 import adra.ifsp.edu.br.api.ContainerPostgresAdra;
-import adra.ifsp.edu.br.api.domain.dto.aula.AulaStatusChamadaResponseDTO;
-import adra.ifsp.edu.br.api.domain.dto.aula.AulaStatusPatchRequestDTO;
-import adra.ifsp.edu.br.api.domain.dto.presenca.PresencaRequestDTO;
+import adra.ifsp.edu.br.api.domain.dto.chamada.ChamadasDoDiaDTO;
+import adra.ifsp.edu.br.api.domain.dto.chamada.StatusChamadaDiaDTO;
 import adra.ifsp.edu.br.api.domain.enums.NomeNivelPermissao;
-import adra.ifsp.edu.br.api.domain.enums.StatusAula;
 import adra.ifsp.edu.br.api.domain.enums.StatusChamada;
-import adra.ifsp.edu.br.api.domain.enums.StatusGeral;
-import adra.ifsp.edu.br.api.domain.enums.StatusPresenca;
+import adra.ifsp.edu.br.api.domain.enums.TipoExcecaoCalendario;
 import adra.ifsp.edu.br.api.domain.enums.Turno;
-import adra.ifsp.edu.br.api.domain.model.Assistido;
-import adra.ifsp.edu.br.api.domain.model.Aula;
+import adra.ifsp.edu.br.api.domain.model.Chamada;
+import adra.ifsp.edu.br.api.domain.model.ExcecaoCalendario;
 import adra.ifsp.edu.br.api.domain.model.NivelPermissao;
 import adra.ifsp.edu.br.api.domain.model.Oficina;
 import adra.ifsp.edu.br.api.domain.model.Turma;
-import adra.ifsp.edu.br.api.domain.model.TurmaAlunos;
 import adra.ifsp.edu.br.api.domain.model.Usuario;
-import adra.ifsp.edu.br.api.domain.repository.AssistidoRepository;
-import adra.ifsp.edu.br.api.domain.repository.AulaRepository;
+import adra.ifsp.edu.br.api.domain.repository.ChamadaRepository;
+import adra.ifsp.edu.br.api.domain.repository.ExcecaoCalendarioRepository;
 import adra.ifsp.edu.br.api.domain.repository.NivelPermissaoRepository;
 import adra.ifsp.edu.br.api.domain.repository.OficinaRepository;
-import adra.ifsp.edu.br.api.domain.repository.TurmaAlunosRepository;
 import adra.ifsp.edu.br.api.domain.repository.TurmaRepository;
 import adra.ifsp.edu.br.api.domain.repository.UsuarioRepository;
-import adra.ifsp.edu.br.api.exception.RegraNegocioException;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.transaction.annotation.Transactional;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import javax.sql.DataSource;
 import java.sql.SQLException;
-import java.time.Instant;
+import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.assertj.core.api.Assertions.tuple;
 
 /**
- * US-71: painel de status de chamada do coordenador. Cobre os testes de
- * fluxo do card (2 de 3 aulas lançadas, aula cancelada some do painel)
- * mais o filtro por turma/período, no mesmo estilo de PresencaCorrecaoPorDataIT.
+ * FT-15: situação das chamadas por grupo e dia (relatório por período, aba
+ * Pendentes e painel). Pendente = dia de chamada do grupo, até hoje, sem
+ * feriado nem exceção do calendário e sem chamada lançada.
  */
 @SpringBootTest
 @Testcontainers
@@ -71,176 +62,150 @@ class StatusChamadaIT {
     @Autowired private UsuarioRepository usuarioRepository;
     @Autowired private OficinaRepository oficinaRepository;
     @Autowired private TurmaRepository turmaRepository;
-    @Autowired private TurmaAlunosRepository turmaAlunosRepository;
-    @Autowired private AulaRepository aulaRepository;
-    @Autowired private AssistidoRepository assistidoRepository;
-    @Autowired private PresencaService presencaService;
-    @Autowired private AulaService aulaService;
+    @Autowired private ChamadaRepository chamadaRepository;
+    @Autowired private ExcecaoCalendarioRepository excecaoCalendarioRepository;
+    @Autowired private StatusChamadaService statusChamadaService;
+    @Autowired private ChamadaService chamadaService;
+    @Autowired private EntityManager entityManager;
     @Autowired private DataSource dataSource;
 
     private static final LocalDate HOJE = LocalDate.now();
+    private static final LocalDate DIA_EXCECAO = anteriorSemFeriado(HOJE.minusDays(2));
+    private static final LocalDate DIA_LANCADO = anteriorSemFeriado(DIA_EXCECAO.minusDays(1));
+    private static final LocalDate DIA_PENDENTE = anteriorSemFeriado(DIA_LANCADO.minusDays(1));
 
     private Usuario coordenador;
     private Oficina oficina;
     private Turma turma;
-    private Assistido assistido;
-    private Aula aula1;
-    private Aula aula2;
-    private Aula aula3;
 
     @BeforeEach
     void montarCenario() throws SQLException {
         try (var conexao = dataSource.getConnection(); var stmt = conexao.createStatement()) {
             stmt.execute("alter table adra.usuario alter column criado_em set default now()");
             stmt.execute("alter table adra.usuario alter column atualizado_em set default now()");
-            stmt.execute("alter table adra.assistido alter column criado_em set default now()");
-            stmt.execute("alter table adra.assistido alter column atualizado_em set default now()");
-            stmt.execute("alter table adra.log_auditoria alter column data_hora set default now()");
         }
 
-        NivelPermissao nivelCoordenador = nivelPermissaoRepository.save(
+        NivelPermissao nivel = nivelPermissaoRepository.save(
                 NivelPermissao.builder().nome(NomeNivelPermissao.COORDENADOR).build());
-
-        coordenador = usuarioRepository.save(
-                Usuario.builder()
-                        .nivelPermissao(nivelCoordenador)
-                        .nomeCompleto("Coordenadora Teste")
-                        .email("coordenadora-us71@teste.local")
-                        .build());
-
-        autenticarComo(coordenador);
+        coordenador = usuarioRepository.save(Usuario.builder()
+                .nivelPermissao(nivel)
+                .nomeCompleto("Coordenador Status")
+                .email("coord-status@teste.local")
+                .build());
 
         oficina = new Oficina();
-        oficina.setNomeOficina("Oficina Teste US-71");
+        oficina.setNomeOficina("Oficina Status");
         oficina.setOficineiroResponsavel(coordenador);
         oficina = oficinaRepository.save(oficina);
 
-        turma = criarTurma("Turma US-71");
+        turma = criarGrupo("SI Manhã A");
+        fundarGrupoEm(turma, DIA_PENDENTE.minusDays(1));
 
-        assistido = Assistido.builder()
-                .nomeCompleto("Assistido US-71")
-                .dataNascimento(LocalDate.of(2015, 1, 1))
-                .dataEntrada(HOJE.minusMonths(6))
-                .status(StatusGeral.ATIVO)
-                .turma(turma)
-                .build();
-        assistido = assistidoRepository.save(assistido);
+        Chamada chamada = new Chamada();
+        chamada.setTurma(turma);
+        chamada.setDataChamada(DIA_LANCADO);
+        chamada.setCriadoPor(coordenador);
+        chamada.setAtualizadoPor(coordenador);
+        chamadaRepository.save(chamada);
 
-        TurmaAlunos vinculo = new TurmaAlunos();
-        vinculo.setTurma(turma);
-        vinculo.setAssistido(assistido);
-        vinculo.setDataEntrada(HOJE.minusMonths(6));
-        vinculo.setStatus(StatusGeral.ATIVO);
-        turmaAlunosRepository.save(vinculo);
-
-        // 3 aulas no período; a chamada é lançada em 2 (o fluxo do front
-        // marca REALIZADA antes de lançar — a 3ª fica PLANEJADA, esquecida)
-        aula1 = criarAula(turma, HOJE.minusDays(14), StatusAula.REALIZADA);
-        aula2 = criarAula(turma, HOJE.minusDays(7), StatusAula.REALIZADA);
-        aula3 = criarAula(turma, HOJE.minusDays(3), StatusAula.PLANEJADA);
-
-        lancarChamada(aula1);
-        lancarChamada(aula2);
+        ExcecaoCalendario excecao = new ExcecaoCalendario();
+        excecao.setDataExcecao(DIA_EXCECAO);
+        excecao.setTipo(TipoExcecaoCalendario.EVENTO_PASSEIO);
+        excecao.setDescricao("Passeio no parque");
+        excecaoCalendarioRepository.save(excecao);
     }
 
     @Test
-    @DisplayName("CA-71.1: 2 de 3 aulas com chamada -> 2 LANCADA e 1 PENDENTE")
-    void mostraStatusDeLancamentoPorAula() {
-        List<AulaStatusChamadaResponseDTO> painel =
-                aulaService.listarStatusChamada(turma.getTurmaId(), HOJE.minusDays(30), HOJE);
+    @DisplayName("Dia com chamada vem como lançada, com quem lançou")
+    void diaLancado() {
+        Optional<StatusChamadaDiaDTO> status = statusDoDia(turma, DIA_LANCADO);
 
-        assertThat(painel)
-                .extracting(AulaStatusChamadaResponseDTO::aulaId, AulaStatusChamadaResponseDTO::statusChamada)
-                .containsExactly(
-                        tuple(aula1.getAulaId(), StatusChamada.LANCADA),
-                        tuple(aula2.getAulaId(), StatusChamada.LANCADA),
-                        tuple(aula3.getAulaId(), StatusChamada.PENDENTE)
-                );
+        assertThat(status).isPresent();
+        assertThat(status.get().status()).isEqualTo(StatusChamada.LANCADA);
+        assertThat(status.get().lancadaPorNome()).isEqualTo("Coordenador Status");
     }
 
     @Test
-    @DisplayName("CA-71.3: aula cancelada some do painel de pendências")
-    void aulaCanceladaNaoApareceComoPendente() {
-        aulaService.atualizarStatus(aula3.getAulaId(), new AulaStatusPatchRequestDTO(StatusAula.CANCELADA));
-        criarAula(turma, HOJE.minusDays(1), StatusAula.REMARCADA);
-
-        List<AulaStatusChamadaResponseDTO> painel =
-                aulaService.listarStatusChamada(turma.getTurmaId(), HOJE.minusDays(30), HOJE);
-
-        assertThat(painel).extracting(AulaStatusChamadaResponseDTO::aulaId)
-                .containsExactly(aula1.getAulaId(), aula2.getAulaId());
-        assertThat(painel).noneMatch(a -> a.statusChamada() == StatusChamada.PENDENTE);
+    @DisplayName("Dia de chamada passado sem lançamento vem como pendente")
+    void diaSemLancamentoPendente() {
+        assertThat(statusDoDia(turma, DIA_PENDENTE)).get()
+                .extracting(StatusChamadaDiaDTO::status)
+                .isEqualTo(StatusChamada.PENDENTE);
+        assertThat(statusChamadaService.pendentes(DIA_PENDENTE, HOJE))
+                .extracting(StatusChamadaDiaDTO::data)
+                .contains(DIA_PENDENTE)
+                .doesNotContain(DIA_LANCADO);
     }
 
     @Test
-    @DisplayName("CA-71.3: aula futura ainda não conta como pendente")
-    void aulaFuturaNaoApareceComoPendente() {
-        criarAula(turma, HOJE.plusDays(2), StatusAula.PLANEJADA);
-
-        List<AulaStatusChamadaResponseDTO> painel =
-                aulaService.listarStatusChamada(turma.getTurmaId(), HOJE.minusDays(30), HOJE.plusDays(30));
-
-        assertThat(painel).hasSize(3);
+    @DisplayName("Feriado nacional e exceção do calendário não ficam pendentes")
+    void feriadoEExcecaoNaoPendentes() {
+        assertThat(statusDoDia(turma, DIA_EXCECAO)).isEmpty();
+        assertThat(statusChamadaService.noPeriodo(DIA_PENDENTE, HOJE))
+                .extracting(StatusChamadaDiaDTO::data)
+                .noneMatch(FeriadosNacionais::ehFeriado);
     }
 
     @Test
-    @DisplayName("CA-71.2: filtro por turma e por período")
-    void filtraPorTurmaEPeriodo() {
-        Turma outraTurma = criarTurma("Outra turma US-71");
-        Aula aulaOutraTurma = criarAula(outraTurma, HOJE.minusDays(7), StatusAula.PLANEJADA);
-
-        assertThat(aulaService.listarStatusChamada(outraTurma.getTurmaId(), null, null))
-                .extracting(AulaStatusChamadaResponseDTO::aulaId)
-                .containsExactly(aulaOutraTurma.getAulaId());
-
-        assertThat(aulaService.listarStatusChamada(turma.getTurmaId(), HOJE.minusDays(8), HOJE.minusDays(2)))
-                .extracting(AulaStatusChamadaResponseDTO::aulaId)
-                .containsExactly(aula2.getAulaId(), aula3.getAulaId());
+    @DisplayName("Dia futuro não fica pendente")
+    void futuroNaoPendente() {
+        assertThat(statusChamadaService.noPeriodo(DIA_PENDENTE, HOJE.plusDays(7)))
+                .extracting(StatusChamadaDiaDTO::data)
+                .allMatch(dia -> !dia.isAfter(HOJE));
     }
 
     @Test
-    @DisplayName("Período invertido é rejeitado")
-    void periodoInvertidoERejeitado() {
-        assertThatThrownBy(() -> aulaService.listarStatusChamada(null, HOJE, HOJE.minusDays(1)))
-                .isInstanceOf(RegraNegocioException.class);
+    @DisplayName("Grupo criado depois só cobra chamada a partir da criação")
+    void grupoNovoNaoCobraDiasAnteriores() {
+        Turma novo = criarGrupo("CJ Novo");
+        fundarGrupoEm(novo, HOJE);
+
+        assertThat(statusChamadaService.noPeriodo(DIA_PENDENTE, HOJE))
+                .filteredOn(s -> s.turmaId().equals(novo.getTurmaId()))
+                .extracting(StatusChamadaDiaDTO::data)
+                .allMatch(HOJE::equals);
     }
 
-    private Turma criarTurma(String nome) {
-        Turma nova = new Turma();
-        nova.setOficina(oficina);
-        nova.setOficineiroResponsavel(coordenador);
-        nova.setNomeTurma(nome);
-        nova.setTurno(Turno.MANHA);
-        nova.setCapacidade(20);
-        return turmaRepository.save(nova);
+    @Test
+    @DisplayName("Chamadas do dia: em exceção do calendário não lista grupos e diz o motivo")
+    void chamadasDoDiaComExcecao() {
+        ChamadasDoDiaDTO dia = chamadaService.chamadasDoDia(DIA_EXCECAO);
+
+        assertThat(dia.motivoSemChamada()).isEqualTo("Passeio no parque");
+        assertThat(dia.grupos()).isEmpty();
     }
 
-    private Aula criarAula(Turma turmaDaAula, LocalDate data, StatusAula status) {
-        Aula aula = new Aula();
-        aula.setTurma(turmaDaAula);
-        aula.setDataAula(data);
-        aula.setStatusAula(status);
-        return aulaRepository.save(aula);
+    private Optional<StatusChamadaDiaDTO> statusDoDia(Turma grupo, LocalDate dia) {
+        return statusChamadaService.noPeriodo(DIA_PENDENTE, HOJE).stream()
+                .filter(s -> s.turmaId().equals(grupo.getTurmaId()) && s.data().equals(dia))
+                .findFirst();
     }
 
-    private void lancarChamada(Aula aula) {
-        presencaService.registrarPresenca(
-                new PresencaRequestDTO(aula.getAulaId(), assistido.getAssistidoId(),
-                        StatusPresenca.PRESENTE, null, null));
+    private static LocalDate anteriorSemFeriado(LocalDate dia) {
+        while (FeriadosNacionais.ehFeriado(dia)) {
+            dia = dia.minusDays(1);
+        }
+        return dia;
     }
 
-    private static void autenticarComo(Usuario usuario) {
-        Jwt jwt = Jwt.withTokenValue("token-fake-de-teste-" + usuario.getUsuarioId())
-                .header("alg", "none")
-                .subject(usuario.getUsuarioId().toString())
-                .issuedAt(Instant.now())
-                .expiresAt(Instant.now().plusSeconds(3600))
-                .claim("perfil", usuario.getNivelPermissao().getNome().name())
-                .build();
+    private Turma criarGrupo(String nome) {
+        Turma grupo = new Turma();
+        grupo.setOficina(oficina);
+        grupo.setOficineiroResponsavel(coordenador);
+        grupo.setNomeTurma(nome);
+        grupo.setTurno(Turno.MANHA);
+        grupo.setCapacidade(20);
+        grupo.setDiasDaSemana(new ArrayList<>(List.of(DayOfWeek.values())));
+        return turmaRepository.save(grupo);
+    }
 
-        JwtAuthenticationToken auth = new JwtAuthenticationToken(
-                jwt, List.of(new SimpleGrantedAuthority("ROLE_" + usuario.getNivelPermissao().getNome().name())));
-
-        SecurityContextHolder.getContext().setAuthentication(auth);
+    /** O grupo só cobra chamada a partir da criação, e o @PrePersist grava "agora": volta a data pelo banco. */
+    private void fundarGrupoEm(Turma grupo, LocalDate data) {
+        entityManager.flush();
+        entityManager.createNativeQuery("update adra.turma set criado_em = :data where turma_id = :id")
+                .setParameter("data", data.atStartOfDay())
+                .setParameter("id", grupo.getTurmaId())
+                .executeUpdate();
+        entityManager.refresh(grupo);
     }
 }

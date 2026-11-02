@@ -83,8 +83,10 @@ class AcessoPorPerfilIT {
                 arguments(HttpMethod.GET, "/api/pre-cadastro/" + INEXISTENTE + "/rascunho-assistido", Set.of(COORDENADOR, ASSISTENTE_SOCIAL)),
                 arguments(HttpMethod.GET, "/api/pre-cadastro/" + INEXISTENTE + "/arquivos/1/url", Set.of(COORDENADOR, ASSISTENTE_SOCIAL)),
 
-                arguments(HttpMethod.GET, "/api/chamadas/assistido/" + INEXISTENTE, Set.of(COORDENADOR, ASSISTENTE_SOCIAL, EDUCADOR_SOCIAL)),
-                arguments(HttpMethod.DELETE, "/api/chamadas/" + INEXISTENTE, Set.of(COORDENADOR, EDUCADOR_SOCIAL)),
+                // gravar a chamada (PUT) tem corpo obrigatório, então fica fora desta matriz.
+                arguments(HttpMethod.GET, "/api/chamadas/assistido/" + INEXISTENTE + "/frequencia", Set.of(COORDENADOR, ASSISTENTE_SOCIAL, EDUCADOR_SOCIAL)),
+                arguments(HttpMethod.GET, "/api/chamadas/turma/" + INEXISTENTE + "/dia/2026-10-30", Set.of(COORDENADOR, ASSISTENTE_SOCIAL, EDUCADOR_SOCIAL)),
+                arguments(HttpMethod.GET, "/api/chamadas/status?inicio=2026-10-01&fim=2026-10-31", Set.of(COORDENADOR)),
 
                 arguments(HttpMethod.GET, "/api/disciplinar/registros", Set.of(COORDENADOR, ASSISTENTE_SOCIAL, EDUCADOR_SOCIAL)),
                 arguments(HttpMethod.PATCH, "/api/disciplinar/" + INEXISTENTE + "/documento-devolvido", Set.of(COORDENADOR)),
