@@ -16,6 +16,7 @@ import adra.ifsp.edu.br.api.domain.enums.ConsequenciaDisciplinar;
 import adra.ifsp.edu.br.api.domain.enums.NivelDisciplinar;
 import adra.ifsp.edu.br.api.domain.enums.NomeNivelPermissao;
 import adra.ifsp.edu.br.api.domain.enums.OrigemRegistroDisciplinar;
+import adra.ifsp.edu.br.api.domain.enums.Sexo;
 import adra.ifsp.edu.br.api.domain.enums.StatusDocumentoDisciplinar;
 import adra.ifsp.edu.br.api.domain.enums.StatusGeral;
 import adra.ifsp.edu.br.api.domain.model.Assistido;
@@ -108,6 +109,7 @@ class DisciplinarServiceIT {
 
         assistido = assistidoRepository.save(Assistido.builder()
                 .nomeCompleto("Assistido FT-04")
+                .sexo(Sexo.FEMININO)
                 .dataNascimento(LocalDate.of(2014, 5, 10))
                 .dataEntrada(HOJE.minusMonths(6))
                 .status(StatusGeral.ATIVO)
@@ -327,6 +329,7 @@ class DisciplinarServiceIT {
     @DisplayName("Documento devolvido assinado; ocorrência simples não tem documento")
     void documentoDevolvido() {
         RegistroDisciplinarResponseDTO advertencia = registrar(agressao).registro();
+        assertThat(advertencia.sexoAssistido()).isEqualTo(Sexo.FEMININO); // FT-25: pronome do documento
         RegistroDisciplinarResponseDTO devolvida =
                 disciplinarService.marcarDocumentoDevolvido(advertencia.registroId(), new DocumentoDevolvidoRequestDTO(null));
         assertThat(devolvida.documentoStatus()).isEqualTo(StatusDocumentoDisciplinar.DEVOLVIDO_ASSINADO);
