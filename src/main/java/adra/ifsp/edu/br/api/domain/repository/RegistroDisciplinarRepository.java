@@ -45,6 +45,19 @@ public interface RegistroDisciplinarRepository extends JpaRepository<RegistroDis
 
     long countByArquivadoFalseAndDocumentoStatus(StatusDocumentoDisciplinar documentoStatus);
 
+    /** FT-18: registros com algo a resolver na data — consequência aberta, documento a assinar ou suspensão vigente. */
+    @EntityGraph(attributePaths = {"assistido", "turma"})
+    @Query("""
+            SELECT r FROM RegistroDisciplinar r
+            WHERE r.arquivado = false
+              AND ((r.consequencia IS NOT NULL AND r.consequenciaResolvidaEm IS NULL)
+                   OR r.documentoStatus = adra.ifsp.edu.br.api.domain.enums.StatusDocumentoDisciplinar.PENDENTE_ASSINATURA
+                   OR (r.nivel = adra.ifsp.edu.br.api.domain.enums.NivelDisciplinar.SUSPENSAO
+                       AND r.suspensaoInicio <= :data AND r.suspensaoFim >= :data))
+            ORDER BY r.dataRegistro DESC, r.registroId DESC
+            """)
+    List<RegistroDisciplinar> findComPendenciaEm(@Param("data") LocalDate data);
+
 
     long countByAssistidoAndNivelAndArquivadoFalse(Assistido assistido, NivelDisciplinar nivel);
 

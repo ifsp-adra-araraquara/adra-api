@@ -34,6 +34,9 @@ public interface AssistidoRepository extends JpaRepository<Assistido, Long>, Jpa
      */
     long countByTurma_TurmaIdAndStatus(Long turmaId, StatusGeral status);
 
+    /** FT-18: importados das planilhas sem data de nascimento confiável. */
+    long countByDataNascimentoIsNullAndStatus(StatusGeral status);
+
     /**
      * Contagem de matriculados por turma, para várias turmas de uma vez (uma
      * query agrupada em vez de uma COUNT por turma) — usado na listagem geral
