@@ -67,8 +67,8 @@ public class RegistroDisciplinar {
     private String descricao;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "aula_id")
-    private Aula aula;
+    @JoinColumn(name = "turma_id")
+    private Turma turma;
 
     @Column(name = "suspensao_inicio")
     private LocalDate suspensaoInicio;

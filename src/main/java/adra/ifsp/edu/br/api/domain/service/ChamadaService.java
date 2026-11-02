@@ -15,14 +15,12 @@ import adra.ifsp.edu.br.api.domain.enums.StatusPresenca;
 import adra.ifsp.edu.br.api.domain.mapper.PresencaMapper;
 import adra.ifsp.edu.br.api.domain.model.Assistido;
 import adra.ifsp.edu.br.api.domain.model.Chamada;
-import adra.ifsp.edu.br.api.domain.model.ExcecaoCalendario;
 import adra.ifsp.edu.br.api.domain.model.FaltaJustificada;
 import adra.ifsp.edu.br.api.domain.model.Presenca;
 import adra.ifsp.edu.br.api.domain.model.Turma;
 import adra.ifsp.edu.br.api.domain.model.TurmaAlunos;
 import adra.ifsp.edu.br.api.domain.model.Usuario;
 import adra.ifsp.edu.br.api.domain.repository.ChamadaRepository;
-import adra.ifsp.edu.br.api.domain.repository.ExcecaoCalendarioRepository;
 import adra.ifsp.edu.br.api.domain.repository.FaltaJustificadaRepository;
 import adra.ifsp.edu.br.api.domain.repository.PresencaRepository;
 import adra.ifsp.edu.br.api.domain.repository.TurmaAlunosRepository;
@@ -52,14 +50,12 @@ import java.util.stream.Collectors;
 @Transactional
 public class ChamadaService {
 
-    private static final String FERIADO_NACIONAL = "Feriado nacional";
-
     private final ChamadaRepository chamadaRepository;
     private final PresencaRepository presencaRepository;
     private final FaltaJustificadaRepository faltaJustificadaRepository;
     private final TurmaRepository turmaRepository;
     private final TurmaAlunosRepository turmaAlunosRepository;
-    private final ExcecaoCalendarioRepository excecaoCalendarioRepository;
+    private final DiasDeChamadaService diasDeChamadaService;
     private final AssistidoIndicadoresService indicadoresService;
     private final PresencaMapper presencaMapper;
     private final AuditoriaService auditoriaService;
@@ -67,7 +63,7 @@ public class ChamadaService {
 
     @Transactional(readOnly = true)
     public ChamadasDoDiaDTO chamadasDoDia(LocalDate data) {
-        String motivoSemChamada = motivoSemChamada(data);
+        String motivoSemChamada = diasDeChamadaService.motivoSemChamada(data);
         if (motivoSemChamada != null) {
             return new ChamadasDoDiaDTO(data, motivoSemChamada, List.of());
         }
@@ -252,7 +248,7 @@ public class ChamadaService {
         if (data.isAfter(LocalDate.now())) {
             throw new RegraNegocioException("Não é possível lançar a chamada de um dia futuro.");
         }
-        String motivoSemChamada = motivoSemChamada(data);
+        String motivoSemChamada = diasDeChamadaService.motivoSemChamada(data);
         if (motivoSemChamada != null) {
             throw new RegraNegocioException("Não há chamada neste dia: " + motivoSemChamada + ".");
         }
@@ -262,7 +258,7 @@ public class ChamadaService {
         if (!data.isEqual(LocalDate.now())) {
             throw new AcessoNegadoException("O Educador Social só pode lançar a chamada do dia de hoje.");
         }
-        if (!temChamadaNoDia(turma, data)) {
+        if (!diasDeChamadaService.temChamadaNoDia(turma, data)) {
             throw new RegraNegocioException("O grupo " + turma.getNomeTurma() + " não tem chamada neste dia da semana.");
         }
     }
@@ -277,7 +273,7 @@ public class ChamadaService {
     }
 
     private boolean podeEditar(Turma turma, LocalDate data, Usuario usuario) {
-        if (data.isAfter(LocalDate.now()) || motivoSemChamada(data) != null) {
+        if (data.isAfter(LocalDate.now()) || diasDeChamadaService.motivoSemChamada(data) != null) {
             return false;
         }
         NomeNivelPermissao perfil = usuario.getNivelPermissao().getNome();
@@ -286,31 +282,11 @@ public class ChamadaService {
         }
         return perfil == NomeNivelPermissao.EDUCADOR_SOCIAL
                 && data.isEqual(LocalDate.now())
-                && temChamadaNoDia(turma, data);
+                && diasDeChamadaService.temChamadaNoDia(turma, data);
     }
 
     private boolean ehCoordenador(Usuario usuario) {
         return usuario.getNivelPermissao().getNome() == NomeNivelPermissao.COORDENADOR;
-    }
-
-    private boolean temChamadaNoDia(Turma turma, LocalDate data) {
-        return turma.getDiasDaSemana() != null && turma.getDiasDaSemana().contains(data.getDayOfWeek());
-    }
-
-    /** Feriado nacional ou dia sem atividade cadastrado no calendário; null quando o dia tem chamada. */
-    private String motivoSemChamada(LocalDate data) {
-        if (FeriadosNacionais.ehFeriado(data)) {
-            return FERIADO_NACIONAL;
-        }
-        return excecaoCalendarioRepository.findByDataExcecao(data)
-                .map(this::descricaoExcecao)
-                .orElse(null);
-    }
-
-    private String descricaoExcecao(ExcecaoCalendario excecao) {
-        return excecao.getDescricao() != null && !excecao.getDescricao().isBlank()
-                ? excecao.getDescricao()
-                : "Dia sem chamada no calendário";
     }
 
     /** Quem estava no grupo na data (vínculo e assistido elegíveis), em ordem de nome. */

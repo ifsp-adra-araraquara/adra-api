@@ -14,6 +14,8 @@ public interface TurmaRepository extends JpaRepository<Turma, Long>, JpaSpecific
     List<Turma> findByOficineiroResponsavelUsuarioId(Long idOficineiro);
     List<Turma> findByOficinaOficinaId(Long idOficina);
 
+    List<Turma> findByAtivoTrue();
+
     /** Este usuário é o oficineiro responsável pela turma? (ver AcessoTurmaService) */
     boolean existsByTurmaIdAndOficineiroResponsavelUsuarioId(Long turmaId, Long usuarioId);
 

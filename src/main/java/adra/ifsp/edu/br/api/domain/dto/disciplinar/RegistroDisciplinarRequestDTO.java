@@ -17,8 +17,8 @@ public record RegistroDisciplinarRequestDTO(
         @NotBlank(message = "Descreva o que aconteceu.")
         String descricao,
 
-        /** Opcional: aula em que aconteceu (vem preenchida quando registrado pela chamada). */
-        Long aulaId,
+        /** Opcional: grupo em que aconteceu (vem preenchido quando registrado pela chamada). */
+        Long turmaId,
 
         /** Só para suspensão; sem valor, vale de `data` até `data` + 2 dias (3 dias). */
         LocalDate suspensaoInicio,

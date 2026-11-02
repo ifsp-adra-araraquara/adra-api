@@ -61,7 +61,7 @@ public interface RegistroDisciplinarRepository extends JpaRepository<RegistroDis
             LEFT JOIN FETCH r.registradoPor
             LEFT JOIN FETCH r.arquivadoPor
             LEFT JOIN FETCH r.consequenciaResolvidaPor
-            LEFT JOIN FETCH r.aula
+            LEFT JOIN FETCH r.turma
             WHERE r.assistido = :assistido
             ORDER BY r.dataRegistro DESC, r.registroId DESC
             """)

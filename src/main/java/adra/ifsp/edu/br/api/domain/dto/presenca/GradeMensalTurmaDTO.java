@@ -4,9 +4,9 @@ import java.util.List;
 
 /**
  * Grade turma × dias de um mês, no formato da planilha de chamada que a
- * instituição usava (uma folha por mês, uma coluna por dia de aula, uma
- * linha por aluno). Só leitura — a chamada em si é lançada pela lista do
- * dia (GET/POST /api/chamadas/aula/{id}).
+ * instituição usava (uma folha por mês, uma coluna por dia de chamada, uma
+ * linha por atendido). Só leitura — a chamada em si é lançada pela lista do
+ * dia (GET/PUT /api/chamadas/turma/{id}/dia/{data}).
  */
 public record GradeMensalTurmaDTO(
         Long turmaId,

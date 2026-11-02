@@ -20,7 +20,7 @@ import java.util.List;
  * <p>Regras iguais às da chamada (PresencaService/IndicadorFrequencia):
  * <ul>
  *   <li>presença é esparsa — sem linha em {@code presenca} = PRESENTE;</li>
- *   <li>aluno esperado numa aula = vínculo com a turma cobrindo a data
+ *   <li>atendido esperado numa chamada = vínculo com o grupo cobrindo a data
  *       ({@code turma_aluno}) e assistido elegível (ativo, ou desligado
  *       depois da data — CA-70.1);</li>
  *   <li>só PRESENTE conta como presença; FJ é ausência.</li>
@@ -45,26 +45,25 @@ public class PainelRepository {
                  WHERE ta.assistido_id = %s AND t.oficina_id = :oficinaId))
             """;
 
-    /** Aluno esperado numa aula REALIZADA (CTE reaproveitada pelas consultas de frequência). */
+    /** Atendido esperado numa chamada lançada (CTE reaproveitada pelas consultas de frequência). */
     private static final String ESPERADOS = """
             esperados AS (
-                SELECT a.aula_id, a.turma_id, a.data_aula, ta.assistido_id
-                  FROM adra.aula a
-                  JOIN adra.turma t ON t.turma_id = a.turma_id
+                SELECT c.chamada_id, c.turma_id, c.data_chamada, ta.assistido_id
+                  FROM adra.chamada c
+                  JOIN adra.turma t ON t.turma_id = c.turma_id
                   JOIN adra.turma_aluno ta
-                    ON ta.turma_id = a.turma_id
-                   AND ta.data_entrada <= a.data_aula
-                   AND (ta.data_saida IS NULL OR ta.data_saida >= a.data_aula)
+                    ON ta.turma_id = c.turma_id
+                   AND ta.data_entrada <= c.data_chamada
+                   AND (ta.data_saida IS NULL OR ta.data_saida >= c.data_chamada)
                   JOIN adra.assistido s
                     ON s.assistido_id = ta.assistido_id
-                   AND (s.status = 'ATIVO' OR s.data_saida > a.data_aula)
-                 WHERE a.status_aula = 'REALIZADA'
-                   AND a.data_aula BETWEEN :inicio AND :fim
+                   AND (s.status = 'ATIVO' OR s.data_saida > c.data_chamada)
+                 WHERE c.data_chamada BETWEEN :inicio AND :fim
                    AND """ + NA_OFICINA + """
             )
             """;
 
-    public record FrequenciaTurmaMes(LocalDate mes, Long turmaId, long aulas, long esperados, long faltas, long justificadas) {
+    public record FrequenciaTurmaMes(LocalDate mes, Long turmaId, long chamadas, long esperados, long faltas, long justificadas) {
     }
 
     /**
@@ -74,15 +73,15 @@ public class PainelRepository {
      */
     public List<FrequenciaTurmaMes> frequenciaPorTurmaEMes(LocalDate inicio, LocalDate fim, Long oficinaId) {
         return jdbc.sql("WITH " + ESPERADOS + """
-                        SELECT date_trunc('month', e.data_aula)::date AS mes,
+                        SELECT date_trunc('month', e.data_chamada)::date AS mes,
                                e.turma_id,
-                               COUNT(DISTINCT e.aula_id) AS aulas,
+                               COUNT(DISTINCT e.chamada_id) AS chamadas,
                                COUNT(*) AS esperados,
                                COUNT(*) FILTER (WHERE p.status_presenca = 'FALTA') AS faltas,
                                COUNT(*) FILTER (WHERE p.status_presenca = 'FALTA_JUSTIFICADA') AS justificadas
                           FROM esperados e
                           LEFT JOIN adra.presenca p
-                            ON p.aula_id = e.aula_id AND p.assistido_id = e.assistido_id
+                            ON p.chamada_id = e.chamada_id AND p.assistido_id = e.assistido_id
                          GROUP BY 1, 2
                         """)
                 .param("inicio", inicio)
@@ -91,7 +90,7 @@ public class PainelRepository {
                 .query((rs, i) -> new FrequenciaTurmaMes(
                         rs.getObject("mes", LocalDate.class),
                         rs.getLong("turma_id"),
-                        rs.getLong("aulas"),
+                        rs.getLong("chamadas"),
                         rs.getLong("esperados"),
                         rs.getLong("faltas"),
                         rs.getLong("justificadas")))
@@ -99,15 +98,15 @@ public class PainelRepository {
     }
 
     public record TurmaResumo(Long turmaId, String nomeTurma, String nomeOficina, Integer capacidade,
-                              long alunos, long aulasRealizadas, long chamadasPendentes) {
+                              long alunos, long chamadasLancadas) {
     }
 
     /**
-     * Turmas ativas com alunos na data de referência e as aulas do mês
-     * (realizadas e pendentes até `hoje`). Subconsultas por turma em vez de
-     * dois JOINs, para a contagem de alunos não multiplicar pela de aulas.
+     * Grupos ativos com atendidos na data de referência e as chamadas lançadas
+     * no mês. Subconsultas por grupo em vez de dois JOINs, para a contagem de
+     * atendidos não multiplicar pela de chamadas. Pendentes vêm do StatusChamadaService.
      */
-    public List<TurmaResumo> turmas(LocalDate inicio, LocalDate fim, LocalDate referencia, LocalDate hoje, Long oficinaId) {
+    public List<TurmaResumo> turmas(LocalDate inicio, LocalDate fim, LocalDate referencia, Long oficinaId) {
         return jdbc.sql("""
                         SELECT t.turma_id, t.nome_turma, o.nome_oficina, t.capacidade,
                                (SELECT COUNT(*)
@@ -117,24 +116,20 @@ public class PainelRepository {
                                    AND ta.data_entrada <= :referencia
                                    AND (ta.data_saida IS NULL OR ta.data_saida >= :referencia)
                                    AND (s.status = 'ATIVO' OR s.data_saida > :referencia)) AS alunos,
-                               COALESCE(a.realizadas, 0) AS realizadas,
-                               COALESCE(a.pendentes, 0) AS pendentes
+                               COALESCE(c.lancadas, 0) AS lancadas
                           FROM adra.turma t
                           LEFT JOIN adra.oficina o ON o.oficina_id = t.oficina_id
                           LEFT JOIN (
-                                SELECT turma_id,
-                                       COUNT(*) FILTER (WHERE status_aula = 'REALIZADA') AS realizadas,
-                                       COUNT(*) FILTER (WHERE status_aula = 'PLANEJADA' AND data_aula < :hoje) AS pendentes
-                                  FROM adra.aula
-                                 WHERE data_aula BETWEEN :inicio AND :fim
+                                SELECT turma_id, COUNT(*) AS lancadas
+                                  FROM adra.chamada
+                                 WHERE data_chamada BETWEEN :inicio AND :fim
                                  GROUP BY turma_id
-                          ) a ON a.turma_id = t.turma_id
+                          ) c ON c.turma_id = t.turma_id
                          WHERE t.ativo AND """ + NA_OFICINA + """
                         """)
                 .param("inicio", inicio)
                 .param("fim", fim)
                 .param("referencia", referencia)
-                .param("hoje", hoje)
                 .param("oficinaId", oficinaId)
                 .query((rs, i) -> new TurmaResumo(
                         rs.getLong("turma_id"),
@@ -142,8 +137,7 @@ public class PainelRepository {
                         rs.getString("nome_oficina"),
                         (Integer) rs.getObject("capacidade"),
                         rs.getLong("alunos"),
-                        rs.getLong("realizadas"),
-                        rs.getLong("pendentes")))
+                        rs.getLong("lancadas")))
                 .list();
     }
 
@@ -236,40 +230,39 @@ public class PainelRepository {
 
     /* ======================= Precisa de atenção hoje ======================= */
 
-    public record FaltasSeguidas(Long assistidoId, String nome, String turma, long faltas, LocalDate ultimaAula) {
+    public record FaltasSeguidas(Long assistidoId, String nome, String turma, long faltas, LocalDate ultimaChamada) {
     }
 
     /**
-     * Ativos com N+ faltas (não justificadas) seguidas nas aulas mais
-     * recentes. Numera as aulas de cada aluno da mais nova para a mais
+     * Ativos com N+ faltas (não justificadas) seguidas nas chamadas mais
+     * recentes. Numera as chamadas de cada atendido da mais nova para a mais
      * antiga e conta as faltas antes da primeira "quebra" (P ou FJ) — a
      * soma acumulada de quebras é 0 exatamente nesse trecho inicial.
      */
     public List<FaltasSeguidas> faltasSeguidas(LocalDate desde, LocalDate hoje, int limiar) {
         return jdbc.sql("""
-                        WITH aulas_do_aluno AS (
-                            SELECT ta.assistido_id, a.data_aula,
+                        WITH chamadas_do_atendido AS (
+                            SELECT ta.assistido_id, ch.data_chamada,
                                    COALESCE(p.status_presenca::text, 'PRESENTE') AS status,
                                    ROW_NUMBER() OVER (PARTITION BY ta.assistido_id
-                                                      ORDER BY a.data_aula DESC, a.horario_inicio DESC NULLS LAST) AS ordem
+                                                      ORDER BY ch.data_chamada DESC) AS ordem
                               FROM adra.turma_aluno ta
                               JOIN adra.assistido s ON s.assistido_id = ta.assistido_id AND s.status = 'ATIVO'
-                              JOIN adra.aula a
-                                ON a.turma_id = ta.turma_id
-                               AND a.status_aula = 'REALIZADA'
-                               AND a.data_aula BETWEEN :desde AND :hoje
-                               AND a.data_aula >= ta.data_entrada
-                               AND (ta.data_saida IS NULL OR a.data_aula <= ta.data_saida)
+                              JOIN adra.chamada ch
+                                ON ch.turma_id = ta.turma_id
+                               AND ch.data_chamada BETWEEN :desde AND :hoje
+                               AND ch.data_chamada >= ta.data_entrada
+                               AND (ta.data_saida IS NULL OR ch.data_chamada <= ta.data_saida)
                               LEFT JOIN adra.presenca p
-                                ON p.aula_id = a.aula_id AND p.assistido_id = ta.assistido_id
+                                ON p.chamada_id = ch.chamada_id AND p.assistido_id = ta.assistido_id
                         ),
                         com_quebras AS (
                             SELECT *, SUM(CASE WHEN status <> 'FALTA' THEN 1 ELSE 0 END)
                                           OVER (PARTITION BY assistido_id ORDER BY ordem) AS quebras
-                              FROM aulas_do_aluno
+                              FROM chamadas_do_atendido
                         )
                         SELECT c.assistido_id, s.nome_completo, t.nome_turma,
-                               COUNT(*) AS faltas, MAX(c.data_aula) AS ultima
+                               COUNT(*) AS faltas, MAX(c.data_chamada) AS ultima
                           FROM com_quebras c
                           JOIN adra.assistido s ON s.assistido_id = c.assistido_id
                           LEFT JOIN adra.turma t ON t.turma_id = s.turma_id
@@ -284,30 +277,6 @@ public class PainelRepository {
                 .query((rs, i) -> new FaltasSeguidas(
                         rs.getLong("assistido_id"), rs.getString("nome_completo"), rs.getString("nome_turma"),
                         rs.getLong("faltas"), rs.getObject("ultima", LocalDate.class)))
-                .list();
-    }
-
-    public record AulaPendente(Long aulaId, LocalDate data, String horarioInicio, String turma, long total) {
-    }
-
-    /** Chamadas atrasadas (aula planejada que já passou), mais recentes primeiro; `total` vem da janela. */
-    public List<AulaPendente> chamadasPendentes(LocalDate desde, LocalDate hoje, int limite) {
-        return jdbc.sql("""
-                        SELECT a.aula_id, a.data_aula, to_char(a.horario_inicio, 'HH24:MI') AS inicio,
-                               t.nome_turma, COUNT(*) OVER () AS total
-                          FROM adra.aula a
-                          LEFT JOIN adra.turma t ON t.turma_id = a.turma_id
-                         WHERE a.status_aula = 'PLANEJADA'
-                           AND a.data_aula >= :desde AND a.data_aula < :hoje
-                         ORDER BY a.data_aula DESC, a.horario_inicio DESC NULLS LAST
-                         LIMIT :limite
-                        """)
-                .param("desde", desde)
-                .param("hoje", hoje)
-                .param("limite", limite)
-                .query((rs, i) -> new AulaPendente(
-                        rs.getLong("aula_id"), rs.getObject("data_aula", LocalDate.class),
-                        rs.getString("inicio"), rs.getString("nome_turma"), rs.getLong("total")))
                 .list();
     }
 
@@ -360,18 +329,18 @@ public class PainelRepository {
     /**
      * Últimos acontecimentos, direto das tabelas de domínio (o log de
      * auditoria grava uma linha por falta e viraria ruído): chamada lançada
-     * (aula realizada), registro disciplinar manual e assistido cadastrado.
+     * (referenciaId = grupo, detalhe = data yyyy-MM-dd), registro disciplinar
+     * manual e assistido cadastrado.
      * Cada ramo já vem ordenado e limitado; o conjunto final é cortado em
      * `limite`. Sem texto livre (a descrição disciplinar fica fora — DT-01).
      */
     public List<Atividade> atividadesRecentes(int limite) {
         return jdbc.sql("""
-                        (SELECT 'CHAMADA' AS tipo, a.aula_id AS ref, NULL::bigint AS assistido_id,
-                                t.nome_turma AS titulo, to_char(a.data_aula, 'DD/MM') AS detalhe,
-                                a.atualizado_em AS quando
-                           FROM adra.aula a JOIN adra.turma t ON t.turma_id = a.turma_id
-                          WHERE a.status_aula = 'REALIZADA'
-                          ORDER BY a.atualizado_em DESC LIMIT :limite)
+                        (SELECT 'CHAMADA' AS tipo, c.turma_id AS ref, NULL::bigint AS assistido_id,
+                                t.nome_turma AS titulo, to_char(c.data_chamada, 'YYYY-MM-DD') AS detalhe,
+                                c.atualizado_em AS quando
+                           FROM adra.chamada c JOIN adra.turma t ON t.turma_id = c.turma_id
+                          ORDER BY c.atualizado_em DESC LIMIT :limite)
                         UNION ALL
                         (SELECT 'DISCIPLINAR', r.registro_id, r.assistido_id,
                                 s.nome_completo, r.nivel, r.criado_em
