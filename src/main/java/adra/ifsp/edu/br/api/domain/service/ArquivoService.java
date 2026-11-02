@@ -7,6 +7,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 
+import adra.ifsp.edu.br.api.config.CacheConfig;
 import adra.ifsp.edu.br.api.domain.dto.arquivo.AulaArquivoDTO;
 import adra.ifsp.edu.br.api.domain.model.Aula;
 import adra.ifsp.edu.br.api.domain.model.Turma;
@@ -14,6 +15,8 @@ import adra.ifsp.edu.br.api.domain.repository.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -68,12 +71,14 @@ public class ArquivoService {
      * transação de quem chamou (ex.: cadastro do assistido): se ela falhar
      * depois do upload, o binário é apagado do storage.
      */
+    @CacheEvict(cacheNames = {CacheConfig.FOTOS_PERFIL, CacheConfig.URLS_ARQUIVO}, allEntries = true)
     public ArquivoResponseDTO salvar(EntidadeArquivo entidadeTipo, Long entidadeId,
                                      CategoriaArquivo categoria, MultipartFile arquivo) {
         return gravar(entidadeTipo, entidadeId, categoria, arquivo, usuarioAutenticadoService.getUsuarioAtual());
     }
 
     /** Link público do pré-cadastro: sem login, então sem "enviado por". */
+    @CacheEvict(cacheNames = {CacheConfig.FOTOS_PERFIL, CacheConfig.URLS_ARQUIVO}, allEntries = true)
     public ArquivoResponseDTO salvarDoLinkPublico(Long preCadastroId, CategoriaArquivo categoria, MultipartFile arquivo) {
         return gravar(EntidadeArquivo.PRE_CADASTRO, preCadastroId, categoria, arquivo, null);
     }
@@ -126,6 +131,8 @@ public class ArquivoService {
         return ArquivoResponseDTO.de(salvo);
     }
 
+    @Cacheable(cacheNames = CacheConfig.FOTOS_PERFIL,
+            condition = "#categoria == T(adra.ifsp.edu.br.api.domain.enums.CategoriaArquivo).FOTO_PERFIL")
     @Transactional(readOnly = true)
     public List<ArquivoResponseDTO> listar(EntidadeArquivo entidadeTipo, Long entidadeId, CategoriaArquivo categoria) {
         List<Arquivo> arquivos = categoria == null
@@ -181,6 +188,7 @@ public class ArquivoService {
 
 
 
+    @Cacheable(CacheConfig.URLS_ARQUIVO)
     @Transactional(readOnly = true)
     public UrlArquivoDTO gerarUrl(Long arquivoId) {
         Arquivo arquivo = buscarAtivo(arquivoId);
@@ -204,6 +212,7 @@ public class ArquivoService {
      * Passa os arquivos de um dono para outro (pré-cadastro aprovado → assistido/responsável).
      * O binário fica onde está no storage; só a linha muda de dono.
      */
+    @CacheEvict(cacheNames = {CacheConfig.FOTOS_PERFIL, CacheConfig.URLS_ARQUIVO}, allEntries = true)
     public void transferir(EntidadeArquivo deTipo, Long deId, CategoriaArquivo deCategoria,
                            EntidadeArquivo paraTipo, Long paraId, CategoriaArquivo paraCategoria) {
         arquivoRepository.transferirDono(deTipo, deId, deCategoria, paraTipo, paraId, paraCategoria);
@@ -215,6 +224,7 @@ public class ArquivoService {
     }
 
     /** Some da listagem na hora; o binário só sai do storage depois do commit. */
+    @CacheEvict(cacheNames = {CacheConfig.FOTOS_PERFIL, CacheConfig.URLS_ARQUIVO}, allEntries = true)
     public void remover(Long arquivoId) {
         Arquivo arquivo = buscarAtivo(arquivoId);
         arquivo.marcarComoExcluido();
