@@ -1,7 +1,5 @@
 package adra.ifsp.edu.br.api.domain.service;
 
-import adra.ifsp.edu.br.api.domain.repository.AssistidoResponsavelRepository;
-import adra.ifsp.edu.br.api.domain.model.AssistidoResponsavel;
 import adra.ifsp.edu.br.api.domain.dto.presenca.AutorizadoRetiradaDTO;
 import adra.ifsp.edu.br.api.domain.dto.presenca.FrequenciaAulaDTO;
 import adra.ifsp.edu.br.api.domain.dto.presenca.AlunoGradeMensalDTO;
@@ -68,7 +66,6 @@ import java.util.stream.Collectors;
 @Transactional
 public class PresencaService {
 
-    private final AssistidoResponsavelRepository assistidoResponsavelRepository;
     private final AssistidoIndicadoresService indicadoresService;
     private final PresencaRepository presencaRepository;
     private final AulaRepository aulaRepository;
@@ -277,20 +274,8 @@ public class PresencaService {
         Map<Long, IndicadorFrequencia> frequencias = indicadoresService.frequencias(assistidosDoRoster);
         int aulasPrevistas = (int) aulaRepository.countByTurmaAndStatusAulaNot(aula.getTurma(), StatusAula.CANCELADA);
 
-        // Quem pode buscar cada aluno (1 query para o roster todo); principal primeiro.
-        Map<Long, List<AutorizadoRetiradaDTO>> autorizadosPorAssistido = assistidosDoRoster.isEmpty()
-                ? Map.of()
-                : assistidoResponsavelRepository.findComResponsavelByAssistidoIds(
-                                assistidosDoRoster.stream().map(Assistido::getAssistidoId).toList()).stream()
-                        .filter(AssistidoResponsavel::isAutorizadoRetirada)
-                        .sorted(Comparator.comparing(AssistidoResponsavel::isResponsavelPrincipal).reversed()
-                                .thenComparing(v -> v.getResponsavel().getNomeCompleto()))
-                        .collect(Collectors.groupingBy(
-                                v -> v.getAssistido().getAssistidoId(),
-                                Collectors.mapping(v -> new AutorizadoRetiradaDTO(
-                                        v.getResponsavel().getNomeCompleto(),
-                                        v.getParentesco(),
-                                        v.getResponsavel().getTelefone()), Collectors.toList())));
+        Map<Long, List<AutorizadoRetiradaDTO>> autorizadosPorAssistido =
+                indicadoresService.autorizadosRetirada(assistidosDoRoster);
 
         return chamada.stream()
                 .map(dto -> {

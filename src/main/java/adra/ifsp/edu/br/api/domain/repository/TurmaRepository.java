@@ -17,6 +17,9 @@ public interface TurmaRepository extends JpaRepository<Turma, Long>, JpaSpecific
     /** Este usuário é o oficineiro responsável pela turma? (ver AcessoTurmaService) */
     boolean existsByTurmaIdAndOficineiroResponsavelUsuarioId(Long turmaId, Long usuarioId);
 
+    @Query("SELECT t FROM Turma t WHERE t.ativo = true AND :diaSemana MEMBER OF t.diasDaSemana ORDER BY t.nomeTurma")
+    List<Turma> findAtivasComChamadaNoDia(@Param("diaSemana") DayOfWeek diaSemana);
+
     @Query("SELECT COUNT(t) > 0 FROM Turma t " +
            "WHERE t.oficineiroResponsavel.usuarioId = :oficineiroId " +
            "AND :diaSemana MEMBER OF t.diasDaSemana " +

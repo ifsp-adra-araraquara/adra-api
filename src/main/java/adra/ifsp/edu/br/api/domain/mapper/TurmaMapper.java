@@ -39,6 +39,7 @@ public class TurmaMapper {
         nova.setFaixaEtaria(dto.faixaEtaria());
         nova.setCapacidade(dto.capacidade());
         nova.setObservacoes(dto.observacoes());
+        nova.setDiasDaSemana(dto.diasDaSemana());
         nova.setAtivo(true);
 
         return nova;
@@ -90,6 +91,9 @@ public class TurmaMapper {
         turma.setFaixaEtaria(dto.faixaEtaria());
         turma.setCapacidade(dto.capacidade());
         turma.setObservacoes(dto.observacoes());
+        if (dto.diasDaSemana() != null) {
+            turma.setDiasDaSemana(dto.diasDaSemana());
+        }
     }
 
     public TurmaResponseDTO paraDTO(Turma turma) {

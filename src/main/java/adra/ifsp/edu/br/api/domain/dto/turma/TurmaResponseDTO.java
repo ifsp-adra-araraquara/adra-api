@@ -3,6 +3,9 @@ package adra.ifsp.edu.br.api.domain.dto.turma;
 import adra.ifsp.edu.br.api.domain.enums.Turno;
 import adra.ifsp.edu.br.api.domain.model.Turma;
 
+import java.time.DayOfWeek;
+import java.util.List;
+
 public record TurmaResponseDTO(
         Long turmaId,
         Long oficinaId,
@@ -13,7 +16,8 @@ public record TurmaResponseDTO(
         Integer capacidade,
         Boolean ativo,
         String observacoes,
-        Integer quantidadeAlunos
+        Integer quantidadeAlunos,
+        List<DayOfWeek> diasDaSemana
 ) {
 
     /**
@@ -42,7 +46,8 @@ public record TurmaResponseDTO(
                 turma.getCapacidade(),
                 turma.getAtivo(),
                 turma.getObservacoes(),
-                quantidadeAlunos
+                quantidadeAlunos,
+                turma.getDiasDaSemana() != null ? List.copyOf(turma.getDiasDaSemana()) : List.of()
         );
     }
 }

@@ -32,8 +32,12 @@ public class Presenca {
     private Long presencaId;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "aula_id", nullable = false)
+    @JoinColumn(name = "aula_id")
     private Aula aula;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "chamada_id")
+    private Chamada chamada;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "assistido_id", nullable = false)

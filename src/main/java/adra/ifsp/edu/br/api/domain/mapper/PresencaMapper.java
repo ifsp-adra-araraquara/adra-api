@@ -57,16 +57,20 @@ public class PresencaMapper {
      * reenvio anterior (CA-65.4 — reenvio atualiza, não deixa lixo pra trás).
      */
     public void sincronizarFaltaJustificada(Presenca presenca, PresencaRequestDTO dto) {
+        sincronizarFaltaJustificada(presenca, dto.motivoFalta(), dto.observacao());
+    }
+
+    public void sincronizarFaltaJustificada(Presenca presenca, MotivoFalta motivoFalta, String observacao) {
         if (presenca.getStatusPresenca() != StatusPresenca.FALTA_JUSTIFICADA) {
             faltaJustificadaRepository.deleteByPresenca_PresencaId(presenca.getPresencaId());
             return;
         }
 
-        if (dto.motivoFalta() == null) {
+        if (motivoFalta == null) {
             throw new RegraNegocioException("Falta justificada exige o motivo da falta.");
         }
-        if (dto.motivoFalta() == MotivoFalta.OUTRO
-                && (dto.observacao() == null || dto.observacao().isBlank())) {
+        if (motivoFalta == MotivoFalta.OUTRO
+                && (observacao == null || observacao.isBlank())) {
             throw new RegraNegocioException("Motivo OUTRO exige observação preenchida.");
         }
 
@@ -78,8 +82,8 @@ public class PresencaMapper {
                     return nova;
                 });
 
-        faltaJustificada.setMotivoFalta(dto.motivoFalta());
-        faltaJustificada.setObservacao(dto.observacao());
+        faltaJustificada.setMotivoFalta(motivoFalta);
+        faltaJustificada.setObservacao(observacao);
         faltaJustificadaRepository.save(faltaJustificada);
     }
 

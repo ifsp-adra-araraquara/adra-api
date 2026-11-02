@@ -5,6 +5,9 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.*;
 
+import java.time.DayOfWeek;
+import java.util.List;
+
 public record TurmaRequestDTO(
 
         @NotNull(message = "Informe a oficina.")
@@ -27,6 +30,8 @@ public record TurmaRequestDTO(
         @Positive(message = "A capacidade deve ser maior que zero.")
         Integer capacidade,
 
-        String observacoes
+        String observacoes,
+
+        List<DayOfWeek> diasDaSemana
 ) {
 }

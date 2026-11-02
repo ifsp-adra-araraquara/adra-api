@@ -1,9 +1,13 @@
 package adra.ifsp.edu.br.api.web.controller;
 
+import adra.ifsp.edu.br.api.domain.dto.chamada.ChamadaGrupoDTO;
+import adra.ifsp.edu.br.api.domain.dto.chamada.ChamadasDoDiaDTO;
+import adra.ifsp.edu.br.api.domain.dto.chamada.PresencaChamadaRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.presenca.FrequenciaAulaDTO;
 import adra.ifsp.edu.br.api.domain.dto.presenca.GradeMensalTurmaDTO;
 import adra.ifsp.edu.br.api.domain.dto.presenca.PresencaRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.presenca.PresencaResponseDTO;
+import adra.ifsp.edu.br.api.domain.service.ChamadaService;
 import adra.ifsp.edu.br.api.domain.service.PresencaService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -12,6 +16,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.List;
 
@@ -25,6 +30,7 @@ import java.util.List;
 public class ChamadaController {
 
     private final PresencaService presencaService;
+    private final ChamadaService chamadaService;
 
     @PreAuthorize("hasAnyRole('COORDENADOR', 'EDUCADOR_SOCIAL')")
     @PostMapping
@@ -75,6 +81,35 @@ public class ChamadaController {
             @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM") YearMonth mes
     ) {
         return ResponseEntity.ok(presencaService.buscarGradeMensalTurma(idTurma, mes != null ? mes : YearMonth.now()));
+    }
+
+    /** FT-12: grupos com chamada no dia e se ela já foi lançada. */
+    @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL', 'EDUCADOR_SOCIAL')")
+    @GetMapping("/dia")
+    public ResponseEntity<ChamadasDoDiaDTO> chamadasDoDia(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate data
+    ) {
+        return ResponseEntity.ok(chamadaService.chamadasDoDia(data));
+    }
+
+    @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL', 'EDUCADOR_SOCIAL')")
+    @GetMapping("/turma/{idTurma}/dia/{data}")
+    public ResponseEntity<ChamadaGrupoDTO> buscarChamadaDoGrupo(
+            @PathVariable Long idTurma,
+            @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate data
+    ) {
+        return ResponseEntity.ok(chamadaService.buscar(idTurma, data));
+    }
+
+    /** Grava a chamada inteira do grupo no dia; regravar atualiza a mesma chamada. */
+    @PreAuthorize("hasAnyRole('COORDENADOR', 'EDUCADOR_SOCIAL')")
+    @PutMapping("/turma/{idTurma}/dia/{data}")
+    public ResponseEntity<ChamadaGrupoDTO> gravarChamadaDoGrupo(
+            @PathVariable Long idTurma,
+            @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate data,
+            @RequestBody List<@Valid PresencaChamadaRequestDTO> presencas
+    ) {
+        return ResponseEntity.ok(chamadaService.gravar(idTurma, data, presencas));
     }
 
     @PreAuthorize("hasAnyRole('COORDENADOR', 'EDUCADOR_SOCIAL')")
