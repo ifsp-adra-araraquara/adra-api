@@ -95,6 +95,8 @@ class AcessoPorPerfilIT {
 
                 arguments(HttpMethod.GET, "/api/aulas", Set.of(COORDENADOR, ASSISTENTE_SOCIAL, EDUCADOR_SOCIAL, OFICINEIRO)),
                 arguments(HttpMethod.GET, "/api/excecoes-calendario", Set.of(COORDENADOR, ASSISTENTE_SOCIAL, EDUCADOR_SOCIAL, OFICINEIRO)),
+                arguments(HttpMethod.GET, "/api/notas-calendario", Set.of(COORDENADOR, ASSISTENTE_SOCIAL, EDUCADOR_SOCIAL, OFICINEIRO)),
+                arguments(HttpMethod.DELETE, "/api/notas-calendario/" + INEXISTENTE, Set.of(COORDENADOR)),
                 arguments(HttpMethod.DELETE, "/api/aulas/" + INEXISTENTE, Set.of(COORDENADOR)),
 
                 arguments(HttpMethod.GET, "/api/painel/hoje", Set.of(COORDENADOR)),
@@ -161,6 +163,33 @@ class AcessoPorPerfilIT {
     void administradorEntraComOModuloUsuarios() throws Exception {
         assertThat(modulosNoLogin(criarUsuario(COORDENADOR, true))).contains("USUARIOS");
         assertThat(modulosNoLogin(criarUsuario(COORDENADOR, false))).doesNotContain("USUARIOS");
+    }
+
+    @Test
+    void coordenadorCriaNotaNoCalendarioETodosPodemVer() throws Exception {
+        String corpo = """
+                {"dataNota": "2026-11-15", "horario": "19:00", "titulo": "Reunião geral", "descricao": "Auditório principal"}
+                """;
+
+        mvc.perform(post("/api/notas-calendario").with(comPerfil(OFICINEIRO)).contentType(MediaType.APPLICATION_JSON).content(corpo))
+                .andExpect(status().isForbidden());
+
+        String criadaJson = mvc.perform(post("/api/notas-calendario").with(comPerfil(COORDENADOR)).contentType(MediaType.APPLICATION_JSON).content(corpo))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+
+        Number notaId = JsonPath.read(criadaJson, "$.notaId");
+        assertThat((String) JsonPath.read(criadaJson, "$.titulo")).isEqualTo("Reunião geral");
+        assertThat((String) JsonPath.read(criadaJson, "$.horario")).startsWith("19:00");
+
+        String listaJson = mvc.perform(request(HttpMethod.GET, "/api/notas-calendario").with(comPerfil(OFICINEIRO)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        List<String> titulos = JsonPath.read(listaJson, "$[*].titulo");
+        assertThat(titulos).contains("Reunião geral");
+
+        mvc.perform(request(HttpMethod.DELETE, "/api/notas-calendario/" + notaId).with(comPerfil(COORDENADOR)))
+                .andExpect(status().isNoContent());
     }
 
     private Usuario criarUsuario(NomeNivelPermissao perfil, boolean administrador) {
