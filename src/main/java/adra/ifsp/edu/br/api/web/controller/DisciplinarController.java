@@ -6,11 +6,14 @@ import adra.ifsp.edu.br.api.domain.dto.disciplinar.PendenciasDisciplinaresDTO;
 import adra.ifsp.edu.br.api.domain.enums.NivelDisciplinar;
 import adra.ifsp.edu.br.api.domain.dto.disciplinar.DocumentoDevolvidoRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.disciplinar.FichaDisciplinarDTO;
+import adra.ifsp.edu.br.api.domain.dto.disciplinar.GerarPelaRecomendacaoRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.disciplinar.MotivoDisciplinarRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.disciplinar.MotivoDisciplinarResponseDTO;
 import adra.ifsp.edu.br.api.domain.dto.disciplinar.PeriodoSuspensaoRequestDTO;
+import adra.ifsp.edu.br.api.domain.dto.disciplinar.RegistroCriadoDTO;
 import adra.ifsp.edu.br.api.domain.dto.disciplinar.RegistroDisciplinarRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.disciplinar.RegistroDisciplinarResponseDTO;
+import adra.ifsp.edu.br.api.domain.dto.disciplinar.RegistroVariosRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.disciplinar.ResolverConsequenciaRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.disciplinar.SinalizacaoDisciplinarDTO;
 import adra.ifsp.edu.br.api.domain.dto.disciplinar.ZerarContagemRequestDTO;
@@ -70,12 +73,20 @@ public class DisciplinarController {
             @RequestParam(required = false) String busca,
             @RequestParam(required = false) NivelDisciplinar nivel,
             @RequestParam(defaultValue = "false") boolean somentePendencias,
+            @RequestParam(defaultValue = "false") boolean somenteRecomendacoes,
             @RequestParam(defaultValue = "false") boolean incluirArquivados,
             @RequestParam(defaultValue = "0") int pagina,
             @RequestParam(defaultValue = "20") int tamanho
     ) {
-        return ResponseEntity.ok(disciplinarService.listar(busca, nivel, somentePendencias, incluirArquivados,
+        return ResponseEntity.ok(disciplinarService.listar(busca, nivel, somentePendencias, somenteRecomendacoes, incluirArquivados,
                 Math.max(pagina, 0), Math.min(Math.max(tamanho, 1), 100)));
+    }
+
+    /** FT-22: um fato com vários atendidos — um registro por atendido, tudo ou nada. */
+    @PreAuthorize("hasAnyRole('COORDENADOR', 'EDUCADOR_SOCIAL')")
+    @PostMapping("/disciplinar/registros")
+    public ResponseEntity<List<RegistroCriadoDTO>> registrarVarios(@Valid @RequestBody RegistroVariosRequestDTO dto) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(disciplinarService.registrarVarios(dto));
     }
 
     @GetMapping("/disciplinar/pendencias")
@@ -90,10 +101,10 @@ public class DisciplinarController {
         return ResponseEntity.ok(disciplinarService.buscarFicha(assistidoId));
     }
 
-    /** Devolve o registro lançado e os gerados pela progressão (advertência/suspensão automáticas). */
+    /** Devolve o registro lançado e a recomendação pendente do assistido, se houver. */
     @PreAuthorize("hasAnyRole('COORDENADOR', 'EDUCADOR_SOCIAL')")
     @PostMapping("/assistidos/{assistidoId}/disciplinar")
-    public ResponseEntity<List<RegistroDisciplinarResponseDTO>> registrar(
+    public ResponseEntity<RegistroCriadoDTO> registrar(
             @PathVariable Long assistidoId,
             @Valid @RequestBody RegistroDisciplinarRequestDTO dto
     ) {
@@ -133,6 +144,16 @@ public class DisciplinarController {
             @Valid @RequestBody PeriodoSuspensaoRequestDTO dto
     ) {
         return ResponseEntity.ok(disciplinarService.alterarPeriodoSuspensao(registroId, dto));
+    }
+
+    /** FT-22: gera a advertência/suspensão recomendada pelo registro. Dispensar é o PATCH de consequência. */
+    @PreAuthorize("hasRole('COORDENADOR')")
+    @PostMapping("/disciplinar/{registroId}/recomendacao")
+    public ResponseEntity<RegistroCriadoDTO> gerarPelaRecomendacao(
+            @PathVariable Long registroId,
+            @Valid @RequestBody GerarPelaRecomendacaoRequestDTO dto
+    ) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(disciplinarService.gerarPelaRecomendacao(registroId, dto));
     }
 
     @PreAuthorize("hasRole('COORDENADOR')")

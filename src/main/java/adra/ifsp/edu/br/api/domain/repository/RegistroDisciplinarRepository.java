@@ -17,6 +17,7 @@ import org.springframework.data.repository.query.Param;
 import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 
 public interface RegistroDisciplinarRepository extends JpaRepository<RegistroDisciplinar, Long>,
         JpaSpecificationExecutor<RegistroDisciplinar> {
@@ -48,6 +49,10 @@ public interface RegistroDisciplinarRepository extends JpaRepository<RegistroDis
     long countByAssistidoAndNivelAndArquivadoFalse(Assistido assistido, NivelDisciplinar nivel);
 
     List<RegistroDisciplinar> findByAssistidoAndArquivadoFalse(Assistido assistido);
+
+    /** Recomendação/consequência pendente mais recente do assistido (devolvida ao registrar). */
+    Optional<RegistroDisciplinar> findFirstByAssistidoAndArquivadoFalseAndConsequenciaIsNotNullAndConsequenciaResolvidaEmIsNullOrderByRegistroIdDesc(
+            Assistido assistido);
 
     /** Histórico da ficha, mais recente primeiro, já com motivo e autores (evita N+1). */
     @Query("""
