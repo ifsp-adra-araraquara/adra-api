@@ -30,7 +30,7 @@ import java.util.stream.Collectors;
  * Dados derivados das linhas da listagem de assistidos — responsável principal
  * e indicadores de frequência — calculados em lote (4 queries por página, não
  * 1 por aluno). Frequência com a mesma reconstituição de
- * {@link PresencaService#buscarFrequenciaAssistido}, pra lista e ficha nunca
+ * {@link FrequenciaService#historicoDoAtendido}, pra lista e ficha nunca
  * divergirem.
  */
 @Service

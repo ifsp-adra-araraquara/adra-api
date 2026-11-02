@@ -92,7 +92,7 @@ public class ChamadaService {
 
         Map<Long, Assistido> atendidosPorId = atendidosNoDia(turma, data).stream()
                 .collect(Collectors.toMap(Assistido::getAssistidoId, Function.identity()));
-        validarAtendidos(presencas, atendidosPorId);
+        validarPresencas(presencas, atendidosPorId);
 
         Chamada existente = chamadaRepository.findByTurmaAndDataChamada(turma, data).orElse(null);
         Chamada chamada = existente != null ? existente : novaChamada(turma, data, usuario);
@@ -263,11 +263,15 @@ public class ChamadaService {
         }
     }
 
-    private void validarAtendidos(List<PresencaChamadaRequestDTO> presencas, Map<Long, Assistido> atendidosPorId) {
+    /** Valida a lista inteira antes de gravar qualquer coisa: a chamada entra completa ou não entra (CA-FT12.5). */
+    private void validarPresencas(List<PresencaChamadaRequestDTO> presencas, Map<Long, Assistido> atendidosPorId) {
         for (PresencaChamadaRequestDTO dto : presencas) {
             if (!atendidosPorId.containsKey(dto.assistidoId())) {
                 throw new RegraNegocioException(
                         "O atendido id " + dto.assistidoId() + " não estava no grupo nesta data.");
+            }
+            if (dto.statusPresenca() == StatusPresenca.FALTA_JUSTIFICADA) {
+                PresencaMapper.validarJustificativa(dto.motivoFalta(), dto.observacao());
             }
         }
     }

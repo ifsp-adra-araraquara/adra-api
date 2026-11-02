@@ -17,7 +17,7 @@ import java.util.List;
  * carrega alunos nem presenças na memória da API. Índices em
  * V20261026200504__indices_dashboard.sql.
  *
- * <p>Regras iguais às da chamada (PresencaService/IndicadorFrequencia):
+ * <p>Regras iguais às da chamada (ChamadaService/IndicadorFrequencia):
  * <ul>
  *   <li>presença é esparsa — sem linha em {@code presenca} = PRESENTE;</li>
  *   <li>atendido esperado numa chamada = vínculo com o grupo cobrindo a data

@@ -1,42 +1,18 @@
 package adra.ifsp.edu.br.api.domain.repository;
 
-import adra.ifsp.edu.br.api.domain.model.Presenca;
-import adra.ifsp.edu.br.api.domain.model.Aula;
 import adra.ifsp.edu.br.api.domain.model.Assistido;
 import adra.ifsp.edu.br.api.domain.model.Chamada;
+import adra.ifsp.edu.br.api.domain.model.Presenca;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
 
 import java.util.Collection;
 import java.util.List;
-import java.util.Optional;
 
+/** Modelo esparso: só faltas viram linha; sem linha na chamada = presente. */
 public interface PresencaRepository extends JpaRepository<Presenca, Long> {
-
-    List<Presenca> findByAula(Aula aula);
-
-    /** US-68: busca presenças da aula com JOIN FETCH dos usuários (criadoPor e atualizadoPor) para evitar N+1 queries. */
-    @Query("SELECT p FROM Presenca p LEFT JOIN FETCH p.criadoPor LEFT JOIN FETCH p.atualizadoPor WHERE p.aula = :aula")
-    List<Presenca> findByAulaWithUsuarios(@Param("aula") Aula aula);
-
-    List<Presenca> findByAssistido(Assistido assistido);
-
-    /** US-68: busca presenças do assistido com JOIN FETCH dos usuários. */
-    @Query("SELECT p FROM Presenca p LEFT JOIN FETCH p.criadoPor LEFT JOIN FETCH p.atualizadoPor WHERE p.assistido = :assistido")
-    List<Presenca> findByAssistidoWithUsuarios(@Param("assistido") Assistido assistido);
-
-    Optional<Presenca> findByAulaAndAssistido(Aula aula, Assistido assistido);
-
-    /**
-     * Faltas (FALTA/FALTA_JUSTIFICADA) de vários assistidos num conjunto de
-     * aulas, numa query só — usado pra calcular faltas consecutivas e
-     * histórico de frequência sem 1 query por aluno/aula (modelo esparso:
-     * ausência de linha aqui = presente).
-     */
-    List<Presenca> findByAulaInAndAssistidoIn(Collection<Aula> aulas, Collection<Assistido> assistidos);
 
     List<Presenca> findByChamada(Chamada chamada);
 
+    /** Faltas de vários atendidos em várias chamadas numa query só (faltas seguidas, frequência, grade). */
     List<Presenca> findByChamadaInAndAssistidoIn(Collection<Chamada> chamadas, Collection<Assistido> assistidos);
 }

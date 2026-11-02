@@ -56,7 +56,7 @@ public interface TurmaAlunosRepository extends JpaRepository<TurmaAlunos, Long> 
      * pra isso (turma pequena, filtro em memória é irrelevante em custo).
      */
     default List<TurmaAlunos> findElegiveisParaChamada(Turma turma, LocalDate data) {
-        return findVinculosAtivosNaData(turma, StatusGeral.ATIVO, data).stream()
+        return findVinculosNoPeriodo(turma, data, data).stream()
                 .filter(vinculo -> AssistidoSpecification.elegivelParaChamada(vinculo.getAssistido(), data))
                 .toList();
     }
