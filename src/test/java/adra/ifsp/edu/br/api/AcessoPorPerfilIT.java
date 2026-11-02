@@ -88,6 +88,8 @@ class AcessoPorPerfilIT {
                 arguments(HttpMethod.GET, "/api/chamadas/turma/" + INEXISTENTE + "/dia/2026-10-30", Set.of(COORDENADOR, ASSISTENTE_SOCIAL, EDUCADOR_SOCIAL)),
                 arguments(HttpMethod.GET, "/api/chamadas/status?inicio=2026-10-01&fim=2026-10-31", Set.of(COORDENADOR)),
 
+                arguments(HttpMethod.GET, "/api/avisos", Set.of(COORDENADOR, ASSISTENTE_SOCIAL, EDUCADOR_SOCIAL, OFICINEIRO)),
+
                 arguments(HttpMethod.GET, "/api/disciplinar/registros", Set.of(COORDENADOR, ASSISTENTE_SOCIAL, EDUCADOR_SOCIAL)),
                 arguments(HttpMethod.PATCH, "/api/disciplinar/" + INEXISTENTE + "/documento-devolvido", Set.of(COORDENADOR)),
 

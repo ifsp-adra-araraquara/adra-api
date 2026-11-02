@@ -8,4 +8,6 @@ import java.util.List;
 
 public interface PreCadastroRepository extends JpaRepository<PreCadastro, Long> {
     List<PreCadastro> findByStatusOrderByCriadoEmDesc(StatusPreCadastro status);
+
+    long countByStatus(StatusPreCadastro status);
 }
