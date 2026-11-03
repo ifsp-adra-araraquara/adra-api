@@ -1,8 +1,10 @@
 package adra.ifsp.edu.br.api.domain.service;
 
+import adra.ifsp.edu.br.api.config.CacheConfig;
 import adra.ifsp.edu.br.api.domain.dto.aviso.AvisoDTO;
 import adra.ifsp.edu.br.api.domain.enums.ConsequenciaDisciplinar;
 import adra.ifsp.edu.br.api.domain.enums.NivelDisciplinar;
+import adra.ifsp.edu.br.api.domain.enums.NomeNivelPermissao;
 import adra.ifsp.edu.br.api.domain.enums.Sexo;
 import adra.ifsp.edu.br.api.domain.enums.StatusChamada;
 import adra.ifsp.edu.br.api.domain.enums.StatusDocumentoDisciplinar;
@@ -15,6 +17,7 @@ import adra.ifsp.edu.br.api.domain.repository.PainelRepository;
 import adra.ifsp.edu.br.api.domain.repository.PreCadastroRepository;
 import adra.ifsp.edu.br.api.domain.repository.RegistroDisciplinarRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,7 +43,6 @@ public class AvisoService {
     /** O Educador Social vê o que muda o dia dele; o resto do disciplinar é do Coordenador. */
     private static final Set<TipoAviso> DISCIPLINARES_DO_EDUCADOR = Set.of(TipoAviso.SUSPENSO_HOJE, TipoAviso.RETORNO_COM_RESPONSAVEL);
 
-    private final UsuarioAutenticadoService usuarioAutenticadoService;
     private final RegistroDisciplinarRepository registroRepository;
     private final StatusChamadaService statusChamadaService;
     private final ChamadaService chamadaService;
@@ -48,10 +50,11 @@ public class AvisoService {
     private final PreCadastroRepository preCadastroRepository;
     private final AssistidoRepository assistidoRepository;
 
-    public List<AvisoDTO> doUsuarioAtual() {
+    @Cacheable(CacheConfig.PAINEL)
+    public List<AvisoDTO> doPerfil(NomeNivelPermissao perfil) {
         LocalDate hoje = LocalDate.now();
         List<AvisoDTO> avisos = new ArrayList<>();
-        switch (usuarioAutenticadoService.getUsuarioAtual().getNivelPermissao().getNome()) {
+        switch (perfil) {
             case COORDENADOR -> {
                 avisos.addAll(disciplinares(hoje));
                 avisos.addAll(chamadasAtrasadas(hoje));

@@ -4,12 +4,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import adra.ifsp.edu.br.api.config.CacheConfig;
 import adra.ifsp.edu.br.api.domain.dto.PaginaDTO;
 import adra.ifsp.edu.br.api.domain.dto.usuario.UsuarioRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.usuario.UsuarioResponseDTO;
@@ -51,6 +54,7 @@ public class UsuarioService {
         }
     }
 
+    @CacheEvict(cacheNames = CacheConfig.REFERENCIAS, allEntries = true)
     public UsuarioResponseDTO cadastrar(UsuarioRequestDTO dto, UUID authUid) {
         NivelPermissao nivelPermissao = buscarNivelPermissao(dto.nivelPermissao());
 
@@ -96,6 +100,7 @@ public class UsuarioService {
      * Lista enxuta (sem paginação) dos oficineiros ativos, usada pra
      * preencher selects no front (ex.: modal de criar turma).
      */
+    @Cacheable(CacheConfig.REFERENCIAS)
     @Transactional(readOnly = true)
     public List<UsuarioResponseDTO> listarOficineiros() {
         Specification<Usuario> spec = UsuarioSpecification.comFiltros(null, NomeNivelPermissao.OFICINEIRO, true);
@@ -105,6 +110,7 @@ public class UsuarioService {
                 .toList();
     }
 
+    @CacheEvict(cacheNames = CacheConfig.REFERENCIAS, allEntries = true)
     public UsuarioResponseDTO atualizar(Long id, UsuarioRequestDTO dto) {
         Usuario usuario = buscarEntidadePorId(id);
 
@@ -144,6 +150,7 @@ public class UsuarioService {
     }
 
     /** Ativa/inativa - nunca ha' delete fisico (ver comentario na entidade Usuario). */
+    @CacheEvict(cacheNames = CacheConfig.REFERENCIAS, allEntries = true)
     public UsuarioResponseDTO alterarStatus(Long id, UsuarioStatusRequestDTO dto) {
         Usuario usuario = buscarEntidadePorId(id);
         boolean statusAnterior = usuario.isAtivo();

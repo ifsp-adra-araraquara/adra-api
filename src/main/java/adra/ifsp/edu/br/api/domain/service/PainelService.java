@@ -1,11 +1,13 @@
 package adra.ifsp.edu.br.api.domain.service;
 
+import adra.ifsp.edu.br.api.config.CacheConfig;
 import adra.ifsp.edu.br.api.domain.dto.chamada.StatusChamadaDiaDTO;
 import adra.ifsp.edu.br.api.domain.dto.painel.PainelHojeDTO;
 import adra.ifsp.edu.br.api.domain.dto.painel.PainelMensalDTO;
 import adra.ifsp.edu.br.api.domain.repository.PainelRepository;
 import adra.ifsp.edu.br.api.domain.repository.PainelRepository.FrequenciaTurmaMes;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -51,6 +53,7 @@ public class PainelService {
     private final DisciplinarService disciplinarService;
     private final StatusChamadaService statusChamadaService;
 
+    @Cacheable(CacheConfig.PAINEL)
     @Transactional(readOnly = true)
     public PainelMensalDTO mensal(YearMonth mes, Long oficinaId) {
         LocalDate hoje = LocalDate.now();
@@ -132,6 +135,7 @@ public class PainelService {
                         new PainelMensalDTO.FaixaEtaria("Sem data", assistidos.semData())));
     }
 
+    @Cacheable(CacheConfig.PAINEL)
     @Transactional(readOnly = true)
     public PainelHojeDTO hoje() {
         LocalDate hoje = LocalDate.now();

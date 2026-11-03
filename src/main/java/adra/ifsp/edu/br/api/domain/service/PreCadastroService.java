@@ -1,5 +1,6 @@
 package adra.ifsp.edu.br.api.domain.service;
 
+import adra.ifsp.edu.br.api.config.CacheConfig;
 import adra.ifsp.edu.br.api.domain.dto.arquivo.ArquivoResponseDTO;
 import adra.ifsp.edu.br.api.domain.dto.arquivo.UrlArquivoDTO;
 import adra.ifsp.edu.br.api.domain.dto.assistido.AssistidoRequestDTO;
@@ -32,6 +33,7 @@ import adra.ifsp.edu.br.api.exception.AssistidoJaCadastradoException;
 import adra.ifsp.edu.br.api.exception.EntidadeNaoEncontradaException;
 import adra.ifsp.edu.br.api.exception.RegraNegocioException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -83,6 +85,7 @@ public class PreCadastroService {
     }
 
     /** Devolve o id (protocolo para a família); null quando o honeypot pegou um robô. */
+    @CacheEvict(cacheNames = CacheConfig.PAINEL, allEntries = true)
     public Long registrarPublico(PreCadastroRequestDTO dto, AnexosPreCadastro anexos, String ip) {
         // Honeypot: campo invisível pro humano: se veio preenchido, é robô — finge sucesso.
         if (dto.site() != null && !dto.site().isBlank()) {
@@ -257,6 +260,7 @@ public class PreCadastroService {
     }
 
     /** Cria o assistido (com os responsáveis) a partir do rascunho revisado pela equipe, numa transação só. */
+    @CacheEvict(cacheNames = {CacheConfig.ESTRUTURA, CacheConfig.PAINEL}, allEntries = true)
     public PreCadastroResponseDTO aprovar(Long preCadastroId, AssistidoRequestDTO dto) {
         PreCadastro registro = buscarPendente(preCadastroId);
         assistidoRepository.findByCpf(dto.cpf()).ifPresent(existente -> {
@@ -290,6 +294,7 @@ public class PreCadastroService {
                         responsavel.getResponsavelId(), CategoriaArquivo.DOCUMENTO_IDENTIDADE));
     }
 
+    @CacheEvict(cacheNames = CacheConfig.PAINEL, allEntries = true)
     public PreCadastroResponseDTO reprovar(Long preCadastroId, ReprovarPreCadastroRequestDTO dto) {
         PreCadastro registro = buscarPendente(preCadastroId);
         registro.setStatus(StatusPreCadastro.DESCARTADO);
