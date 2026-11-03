@@ -240,7 +240,7 @@ class PainelServiceIT {
         chamada(MES.atDay(5));
 
         entityManager.flush();
-        PainelMensalDTO futebol = painelService.mensal(MES, futebol.getOficinaId());
+        PainelMensalDTO futebol = painelService.mensal(MES, this.futebol.getOficinaId());
         PainelMensalDTO soTeatro = painelService.mensal(MES, teatro.getOficinaId());
 
         assertThat(futebol.turmas()).hasSize(1);

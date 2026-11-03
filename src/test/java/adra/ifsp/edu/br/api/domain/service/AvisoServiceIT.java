@@ -146,8 +146,7 @@ class AvisoServiceIT {
     }
 
     private List<AvisoDTO> avisosComo(Usuario usuario) {
-        autenticarComo(usuario);
-        return avisoService.doUsuarioAtual();
+        return avisoService.doPerfil(usuario.getNivelPermissao().getNome());
     }
 
     private Long registrar(MotivoDisciplinar motivo) {

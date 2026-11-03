@@ -1,5 +1,6 @@
 package adra.ifsp.edu.br.api.domain.service;
 
+import adra.ifsp.edu.br.api.config.CacheConfig;
 import adra.ifsp.edu.br.api.domain.dto.nota.NotaCalendarioRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.nota.NotaCalendarioResponseDTO;
 import adra.ifsp.edu.br.api.domain.enums.AcaoSistema;
@@ -10,6 +11,8 @@ import adra.ifsp.edu.br.api.domain.repository.NotaCalendarioRepository;
 import adra.ifsp.edu.br.api.exception.AutenticacaoException;
 import adra.ifsp.edu.br.api.exception.EntidadeNaoEncontradaException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,6 +30,7 @@ public class NotaCalendarioService {
     private final AuditoriaService auditoriaService;
     private final UsuarioAutenticadoService usuarioAutenticadoService;
 
+    @CacheEvict(cacheNames = CacheConfig.CALENDARIO, allEntries = true)
     public NotaCalendarioResponseDTO cadastrar(NotaCalendarioRequestDTO dto) {
         NotaCalendario nota = new NotaCalendario();
         nota.setDataNota(dto.dataNota());
@@ -50,6 +54,7 @@ public class NotaCalendarioService {
         return NotaCalendarioResponseDTO.fromEntity(salva);
     }
 
+    @CacheEvict(cacheNames = CacheConfig.CALENDARIO, allEntries = true)
     public NotaCalendarioResponseDTO atualizar(Long id, NotaCalendarioRequestDTO dto) {
         NotaCalendario nota = buscarEntidadePorId(id);
         Map<String, Object> valorAnterior = mapaAuditoria(nota);
@@ -74,6 +79,7 @@ public class NotaCalendarioService {
         return NotaCalendarioResponseDTO.fromEntity(salva);
     }
 
+    @Cacheable(CacheConfig.CALENDARIO)
     @Transactional(readOnly = true)
     public List<NotaCalendarioResponseDTO> listar(LocalDate dataInicio, LocalDate dataFim) {
         List<NotaCalendario> notas;
@@ -85,11 +91,13 @@ public class NotaCalendarioService {
         return notas.stream().map(NotaCalendarioResponseDTO::fromEntity).toList();
     }
 
+    @Cacheable(CacheConfig.CALENDARIO)
     @Transactional(readOnly = true)
     public NotaCalendarioResponseDTO buscarPorId(Long id) {
         return NotaCalendarioResponseDTO.fromEntity(buscarEntidadePorId(id));
     }
 
+    @CacheEvict(cacheNames = CacheConfig.CALENDARIO, allEntries = true)
     public void deletar(Long id) {
         NotaCalendario nota = buscarEntidadePorId(id);
         Map<String, Object> valorAnterior = mapaAuditoria(nota);

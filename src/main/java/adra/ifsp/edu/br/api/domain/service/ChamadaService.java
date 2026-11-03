@@ -1,5 +1,6 @@
 package adra.ifsp.edu.br.api.domain.service;
 
+import adra.ifsp.edu.br.api.config.CacheConfig;
 import adra.ifsp.edu.br.api.domain.dto.chamada.AtendidoChamadaDTO;
 import adra.ifsp.edu.br.api.domain.dto.chamada.ChamadaGrupoDTO;
 import adra.ifsp.edu.br.api.domain.dto.chamada.ChamadasDoDiaDTO;
@@ -29,6 +30,7 @@ import adra.ifsp.edu.br.api.exception.AcessoNegadoException;
 import adra.ifsp.edu.br.api.exception.EntidadeNaoEncontradaException;
 import adra.ifsp.edu.br.api.exception.RegraNegocioException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -85,6 +87,7 @@ public class ChamadaService {
         return montarChamada(turma, data, chamada);
     }
 
+    @CacheEvict(cacheNames = CacheConfig.PAINEL, allEntries = true)
     public ChamadaGrupoDTO gravar(Long turmaId, LocalDate data, List<PresencaChamadaRequestDTO> presencas) {
         Turma turma = buscarTurma(turmaId);
         Usuario usuario = usuarioAutenticadoService.getUsuarioAtual();

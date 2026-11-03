@@ -1,10 +1,12 @@
 package adra.ifsp.edu.br.api.domain.service;
 
+import adra.ifsp.edu.br.api.config.CacheConfig;
 import adra.ifsp.edu.br.api.domain.dto.assistido.ElegibilidadeDTO;
 import adra.ifsp.edu.br.api.domain.model.ParametroSistema;
 import adra.ifsp.edu.br.api.domain.repository.ParametroSistemaRepository;
 import adra.ifsp.edu.br.api.exception.RegraNegocioException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,6 +26,7 @@ public class ElegibilidadeService {
 
     private final ParametroSistemaRepository parametroRepository;
 
+    @Cacheable(CacheConfig.REFERENCIAS)
     public ElegibilidadeDTO criterios() {
         return new ElegibilidadeDTO(limiteRendaFamiliar().orElse(null));
     }

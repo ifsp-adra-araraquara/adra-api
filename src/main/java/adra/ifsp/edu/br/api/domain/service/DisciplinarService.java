@@ -1,5 +1,6 @@
 package adra.ifsp.edu.br.api.domain.service;
 
+import adra.ifsp.edu.br.api.config.CacheConfig;
 import adra.ifsp.edu.br.api.domain.dto.PaginaDTO;
 import adra.ifsp.edu.br.api.domain.dto.disciplinar.ArquivarRegistroRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.disciplinar.PendenciasDisciplinaresDTO;
@@ -39,6 +40,8 @@ import adra.ifsp.edu.br.api.domain.repository.MotivoDisciplinarRepository;
 import adra.ifsp.edu.br.api.domain.repository.RegistroDisciplinarRepository;
 import adra.ifsp.edu.br.api.domain.repository.RegistroDisciplinarSpecification;
 import adra.ifsp.edu.br.api.domain.repository.TurmaRepository;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -95,6 +98,7 @@ public class DisciplinarService {
     // Motivos
     // ------------------------------------------------------------------
 
+    @Cacheable(CacheConfig.REFERENCIAS)
     @Transactional(readOnly = true)
     public List<MotivoDisciplinarResponseDTO> listarMotivos(boolean incluirInativos) {
         List<MotivoDisciplinar> motivos = incluirInativos
@@ -103,6 +107,7 @@ public class DisciplinarService {
         return motivos.stream().map(MotivoDisciplinarResponseDTO::de).toList();
     }
 
+    @CacheEvict(cacheNames = CacheConfig.REFERENCIAS, allEntries = true)
     public MotivoDisciplinarResponseDTO criarMotivo(MotivoDisciplinarRequestDTO dto) {
         MotivoDisciplinar motivo = MotivoDisciplinar.builder()
                 .nome(dto.nome().trim())
@@ -118,6 +123,7 @@ public class DisciplinarService {
     }
 
     /** Mudar o nível de um motivo não altera os registros antigos (o nível fica gravado no registro). */
+    @CacheEvict(cacheNames = CacheConfig.REFERENCIAS, allEntries = true)
     public MotivoDisciplinarResponseDTO atualizarMotivo(Long motivoId, MotivoDisciplinarRequestDTO dto) {
         MotivoDisciplinar motivo = buscarMotivo(motivoId);
         Map<String, Object> anterior = Map.of("nome", motivo.getNome(), "nivel", motivo.getNivel().name(),
@@ -143,6 +149,7 @@ public class DisciplinarService {
      * Registra um fato e marca a recomendação, se completou 3 do nível.
      * Devolve o registro lançado e a recomendação pendente do assistido (para o front avisar).
      */
+    @CacheEvict(cacheNames = CacheConfig.PAINEL, allEntries = true)
     public RegistroCriadoDTO registrar(Long assistidoId, RegistroDisciplinarRequestDTO dto) {
         Assistido assistido = buscarAssistidoAtivo(assistidoId);
 
@@ -176,6 +183,7 @@ public class DisciplinarService {
     }
 
     /** Um fato com vários atendidos: um registro por atendido, tudo ou nada (mesma transação). */
+    @CacheEvict(cacheNames = CacheConfig.PAINEL, allEntries = true)
     public List<RegistroCriadoDTO> registrarVarios(RegistroVariosRequestDTO dto) {
         if (dto.assistidoIds().stream().distinct().count() != dto.assistidoIds().size()) {
             throw new RegraNegocioException("Há atendidos repetidos na lista.");
@@ -190,6 +198,7 @@ public class DisciplinarService {
      * Só o Coordenador (ver DisciplinarController). Gera a advertência ou a
      * suspensão que o registro de origem recomendou e dá a recomendação por resolvida.
      */
+    @CacheEvict(cacheNames = CacheConfig.PAINEL, allEntries = true)
     public RegistroCriadoDTO gerarPelaRecomendacao(Long registroOrigemId, GerarPelaRecomendacaoRequestDTO dto) {
         RegistroDisciplinar origem = buscarRegistroAtivo(registroOrigemId);
         NivelDisciplinar nivel = origem.getConsequencia() == null ? null : origem.getConsequencia().nivelRecomendado();
@@ -282,6 +291,7 @@ public class DisciplinarService {
     // Ações sobre um registro
     // ------------------------------------------------------------------
 
+    @CacheEvict(cacheNames = CacheConfig.PAINEL, allEntries = true)
     public RegistroDisciplinarResponseDTO marcarDocumentoDevolvido(Long registroId, DocumentoDevolvidoRequestDTO dto) {
         RegistroDisciplinar registro = buscarRegistroAtivo(registroId);
         if (registro.getDocumentoStatus() == null) {
@@ -309,6 +319,7 @@ public class DisciplinarService {
         return RegistroDisciplinarResponseDTO.de(registro);
     }
 
+    @CacheEvict(cacheNames = CacheConfig.PAINEL, allEntries = true)
     public RegistroDisciplinarResponseDTO alterarPeriodoSuspensao(Long registroId, PeriodoSuspensaoRequestDTO dto) {
         RegistroDisciplinar registro = buscarRegistroAtivo(registroId);
         if (registro.getNivel() != NivelDisciplinar.SUSPENSAO) {
@@ -328,6 +339,7 @@ public class DisciplinarService {
     }
 
     /** Conversa com o responsável (3ª de uniforme) ou passeio perdido (3ª suspensão). */
+    @CacheEvict(cacheNames = CacheConfig.PAINEL, allEntries = true)
     public RegistroDisciplinarResponseDTO resolverConsequencia(Long registroId, ResolverConsequenciaRequestDTO dto) {
         RegistroDisciplinar registro = buscarRegistroAtivo(registroId);
         if (!registro.temConsequenciaPendente()) {
@@ -345,6 +357,7 @@ public class DisciplinarService {
     }
 
     /** Só o Coordenador (ver DisciplinarController). Não exclui e não desfaz consequências já aplicadas. */
+    @CacheEvict(cacheNames = CacheConfig.PAINEL, allEntries = true)
     public RegistroDisciplinarResponseDTO arquivar(Long registroId, ArquivarRegistroRequestDTO dto) {
         RegistroDisciplinar registro = buscarRegistroAtivo(registroId);
         marcarArquivado(registro, dto.motivo().trim(), usuarioAutenticadoService.getUsuarioAtual());
@@ -364,6 +377,7 @@ public class DisciplinarService {
      * assistido (de um nível ou de todos), então a próxima ocorrência volta a
      * ser a 1ª. O histórico continua visível como arquivado.
      */
+    @CacheEvict(cacheNames = CacheConfig.PAINEL, allEntries = true)
     public FichaDisciplinarDTO zerarContagem(Long assistidoId, ZerarContagemRequestDTO dto) {
         Assistido assistido = buscarAssistido(assistidoId);
         List<RegistroDisciplinar> ativos = registroRepository.findByAssistidoAndArquivadoFalse(assistido).stream()

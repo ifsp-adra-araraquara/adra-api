@@ -1,5 +1,6 @@
 package adra.ifsp.edu.br.api.domain.service;
 
+import adra.ifsp.edu.br.api.config.CacheConfig;
 import adra.ifsp.edu.br.api.domain.dto.oficina.OficinaRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.oficina.OficinaResponseDTO;
 import adra.ifsp.edu.br.api.domain.dto.oficina.OficinaResumoDTO;
@@ -17,6 +18,8 @@ import adra.ifsp.edu.br.api.domain.repository.OficinaTurmaRepository;
 import adra.ifsp.edu.br.api.domain.repository.TurmaRepository;
 import adra.ifsp.edu.br.api.exception.EntidadeNaoEncontradaException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -44,6 +47,7 @@ public class OficinaService {
     private final OficinaTurmaRepository oficinaTurmaRepository;
     private final TurmaRepository turmaRepository;
 
+    @Cacheable(CacheConfig.ESTRUTURA)
     public List<OficinaResponseDTO> minhasOficinas(Long idOficineiro) {
         List<Oficina> oficinas = oficinaRepository.findByOficineiroResponsavelUsuarioId(idOficineiro);
 
@@ -54,6 +58,7 @@ public class OficinaService {
         return paraDTOs(oficinas);
     }
 
+    @CacheEvict(cacheNames = {CacheConfig.ESTRUTURA, CacheConfig.PAINEL}, allEntries = true)
     public OficinaResponseDTO cadastrar(OficinaRequestDTO dto) {
         Oficina oficina = oficinaMapper.paraNovaEntidade(dto);
         oficina = oficinaRepository.save(oficina);
@@ -75,10 +80,12 @@ public class OficinaService {
         return paraDTO(oficina);
     }
 
+    @Cacheable(CacheConfig.ESTRUTURA)
     public OficinaResponseDTO buscarPorId(Long id) {
         return paraDTO(buscarEntidadePorId(id));
     }
 
+    @Cacheable(CacheConfig.ESTRUTURA)
     public List<OficinaResponseDTO> listarComFiltros(String nome, Boolean ativo) {
         Specification<Oficina> spec = OficinaSpecification.comFiltros(nome, ativo);
         return paraDTOs(oficinaRepository.findAll(spec));
@@ -130,6 +137,7 @@ public class OficinaService {
      * Resumo dos grupos por oficina para os cards da listagem: dias e
      * vagas. Uma consulta para todas as oficinas, agrupada aqui.
      */
+    @Cacheable(CacheConfig.ESTRUTURA)
     @Transactional(readOnly = true)
     public List<OficinaResumoDTO> resumo() {
         return oficinaResumoRepository.turmasAtivas(LocalDate.now()).stream()
@@ -179,6 +187,7 @@ public class OficinaService {
                 .orElseThrow(() -> new EntidadeNaoEncontradaException("Oficina nao encontrada: id " + id));
     }
 
+    @CacheEvict(cacheNames = {CacheConfig.ESTRUTURA, CacheConfig.PAINEL}, allEntries = true)
     public OficinaResponseDTO editar(Long id, OficinaRequestDTO dto) {
 
         Oficina oficina = buscarEntidadePorId(id);
@@ -222,6 +231,7 @@ public class OficinaService {
         return paraDTO(oficina);
     }
 
+    @CacheEvict(cacheNames = {CacheConfig.ESTRUTURA, CacheConfig.PAINEL}, allEntries = true)
     public OficinaResponseDTO inativar(Long id) {
         Oficina oficina = buscarEntidadePorId(id);
 
@@ -244,6 +254,7 @@ public class OficinaService {
         return paraDTO(oficina);
     }
 
+    @CacheEvict(cacheNames = {CacheConfig.ESTRUTURA, CacheConfig.PAINEL}, allEntries = true)
     public OficinaResponseDTO reativar(Long id) {
 
         Oficina oficina = buscarEntidadePorId(id);

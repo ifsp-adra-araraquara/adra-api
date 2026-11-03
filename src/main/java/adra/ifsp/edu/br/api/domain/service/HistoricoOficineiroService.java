@@ -1,11 +1,13 @@
 package adra.ifsp.edu.br.api.domain.service;
 
+import adra.ifsp.edu.br.api.config.CacheConfig;
 import adra.ifsp.edu.br.api.domain.dto.historico.OficineiroHistoricoDTO;
 import adra.ifsp.edu.br.api.domain.model.Oficina;
 import adra.ifsp.edu.br.api.domain.model.OficinaOficineiroHistorico;
 import adra.ifsp.edu.br.api.domain.model.Usuario;
 import adra.ifsp.edu.br.api.domain.repository.OficinaOficineiroHistoricoRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -44,6 +46,7 @@ public class HistoricoOficineiroService {
         }
     }
 
+    @Cacheable(CacheConfig.ESTRUTURA)
     @Transactional(readOnly = true)
     public List<OficineiroHistoricoDTO> listarPorOficina(Long oficinaId) {
         return oficinaHistoricoRepository.findByOficina_OficinaIdOrderByDataInicioDescHistoricoIdDesc(oficinaId).stream()
