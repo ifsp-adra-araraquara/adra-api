@@ -1,5 +1,6 @@
 package adra.ifsp.edu.br.api.domain.service;
 
+import adra.ifsp.edu.br.api.config.CacheConfig;
 import adra.ifsp.edu.br.api.domain.dto.PaginaDTO;
 import adra.ifsp.edu.br.api.domain.dto.assistido.AssistidoContagemDTO;
 import adra.ifsp.edu.br.api.domain.dto.assistido.AssistidoRequestDTO;
@@ -29,6 +30,7 @@ import adra.ifsp.edu.br.api.exception.AcessoNegadoException;
 import adra.ifsp.edu.br.api.exception.EntidadeNaoEncontradaException;
 import adra.ifsp.edu.br.api.exception.RegraNegocioException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -235,6 +237,7 @@ public class AssistidoService {
      * a classe e' @Transactional, entao qualquer excecao aqui reverte as
      * tres partes juntas (CA-A04.4).
      */
+    @CacheEvict(cacheNames = {CacheConfig.ESTRUTURA, CacheConfig.PAINEL}, allEntries = true)
     public AssistidoResponseDTO atualizar(Long id, AssistidoRequestDTO dto) {
         Assistido assistido = buscarEntidadePorId(id);
 
@@ -388,6 +391,7 @@ public class AssistidoService {
     }
 
     /** Muda o status (ex.: encerrar vinculo com a instituicao) - fluxo separado da edicao cadastral. */
+    @CacheEvict(cacheNames = {CacheConfig.ESTRUTURA, CacheConfig.PAINEL}, allEntries = true)
     public AssistidoResponseDTO alterarStatus(Long id, AssistidoStatusRequestDTO dto) {
         Assistido assistido = buscarEntidadePorId(id);
 
@@ -533,6 +537,7 @@ public class AssistidoService {
     private static final int MAXIMO_DOCUMENTOS_IDENTIDADE = 1;
 
     /** Cadastro + RG/CPF (obrigatório) + foto de perfil (opcional), tudo na mesma transação. */
+    @CacheEvict(cacheNames = {CacheConfig.ESTRUTURA, CacheConfig.PAINEL}, allEntries = true)
     public AssistidoResponseDTO cadastrarComArquivos(AssistidoRequestDTO dto, MultipartFile foto,
                                                      List<MultipartFile> documentos) {
         List<MultipartFile> docs = documentos == null ? List.of()

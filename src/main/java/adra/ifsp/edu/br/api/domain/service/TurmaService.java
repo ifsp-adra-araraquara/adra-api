@@ -1,5 +1,6 @@
 package adra.ifsp.edu.br.api.domain.service;
 
+import adra.ifsp.edu.br.api.config.CacheConfig;
 import adra.ifsp.edu.br.api.domain.dto.assistido.AssistidoResponseDTO;
 import adra.ifsp.edu.br.api.domain.dto.turma.CriacaoTurmaDTO;
 import adra.ifsp.edu.br.api.domain.dto.turma.TurmaComAlunosResponseDTO;
@@ -22,6 +23,8 @@ import adra.ifsp.edu.br.api.domain.repository.TurmaSpecification;
 import adra.ifsp.edu.br.api.exception.EntidadeNaoEncontradaException;
 import adra.ifsp.edu.br.api.exception.RegraNegocioException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -65,6 +68,7 @@ public class TurmaService {
                 .collect(Collectors.toList());
     }
 
+    @Cacheable(CacheConfig.ESTRUTURA)
     public List<TurmaResponseDTO> minhasTurmasPorOficina(Long idOficina){
         List<Turma> minhasTurmas = turmaRepository.findByOficinaOficinaId(idOficina);
 
@@ -77,6 +81,7 @@ public class TurmaService {
                 .collect(Collectors.toList());
     }
 
+    @CacheEvict(cacheNames = {CacheConfig.ESTRUTURA, CacheConfig.PAINEL}, allEntries = true)
     public TurmaResponseDTO cadastrar(TurmaRequestDTO dto) {
         Turma turma = turmaMapper.paraNovaEntidade(dto);
         turma = turmaRepository.save(turma);
@@ -99,6 +104,7 @@ public class TurmaService {
         return turmaMapper.paraDTO(turma);
     }
 
+    @CacheEvict(cacheNames = {CacheConfig.ESTRUTURA, CacheConfig.PAINEL}, allEntries = true)
     public TurmaResponseDTO cadastrarComHorario(CriacaoTurmaDTO dto) {
         for (DayOfWeek dia : dto.getDiasDaSemana()) {
             if (turmaRepository.existsConflitoHorarioOficineiro(
@@ -136,6 +142,7 @@ public class TurmaService {
         return turmaMapper.paraDTO(turma);
     }
 
+    @Cacheable(CacheConfig.ESTRUTURA)
     public TurmaResponseDTO buscarPorId(Long id) {
         return turmaMapper.paraDTO(buscarEntidadePorId(id));
     }
@@ -146,6 +153,7 @@ public class TurmaService {
                 .collect(Collectors.toList());
     }
 
+    @Cacheable(CacheConfig.ESTRUTURA)
     public List<TurmaResponseDTO> listarComFiltros(String nome, Turno turno, Boolean ativo) {
         Specification<Turma> spec = TurmaSpecification.comFiltros(nome, turno, ativo);
         List<Turma> turmas = turmaRepository.findAll(spec);
@@ -177,6 +185,7 @@ public class TurmaService {
                 ));
     }
 
+    @CacheEvict(cacheNames = {CacheConfig.ESTRUTURA, CacheConfig.PAINEL}, allEntries = true)
     public TurmaResponseDTO atualizar(Long id, TurmaRequestDTO dto) {
         Turma turma = buscarEntidadePorId(id);
 
@@ -207,6 +216,7 @@ public class TurmaService {
         return turmaMapper.paraDTO(turma);
     }
 
+    @CacheEvict(cacheNames = {CacheConfig.ESTRUTURA, CacheConfig.PAINEL}, allEntries = true)
     public TurmaResponseDTO alterarStatus(Long id, TurmaStatusRequestDTO dto) {
         Turma turma = buscarEntidadePorId(id);
 
@@ -234,6 +244,7 @@ public class TurmaService {
      * roster de uma aula — e mantém Assistido.turma em sincronia (outras
      * telas/queries do sistema ainda leem esse ponteiro direto).
      */
+    @CacheEvict(cacheNames = {CacheConfig.ESTRUTURA, CacheConfig.PAINEL}, allEntries = true)
     public List<AssistidoResponseDTO> vincularAlunos(Long turmaId, VincularAlunosTurmaDTO dto) {
         Turma turma = buscarEntidadePorId(turmaId);
 
