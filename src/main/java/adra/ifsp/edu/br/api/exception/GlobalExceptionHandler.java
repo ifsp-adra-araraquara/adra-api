@@ -76,9 +76,24 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ErroRespostaDTO> tratarCorpoInvalido(HttpMessageNotReadableException ex,
                                                                HttpServletRequest request) {
+        String detalhe = mencionaMotivoFalta(ex)
+                ? "Motivo da falta inválido: use ATESTADO (a Suspensão vem do Sistema Disciplinar)."
+                : "Um ou mais campos possuem valor invalido";
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
-                ErroRespostaDTO.de(400, "Dados invalidos", "Um ou mais campos possuem valor invalido",
-                        request.getRequestURI()));
+                ErroRespostaDTO.de(400, "Dados invalidos", detalhe, request.getRequestURI()));
+    }
+
+    /** FT-13 (CA-FT13.1): motivo de falta fora de ATESTADO/SUSPENSAO ganha mensagem própria. */
+    private static boolean mencionaMotivoFalta(Throwable ex) {
+        for (Throwable causa = ex; causa != null; causa = causa.getCause()) {
+            if (causa.getMessage() != null && causa.getMessage().contains("MotivoFalta")) {
+                return true;
+            }
+            if (causa.getCause() == causa) {
+                break;
+            }
+        }
+        return false;
     }
 
     /**

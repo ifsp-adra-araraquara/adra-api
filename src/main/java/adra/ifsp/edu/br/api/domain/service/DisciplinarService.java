@@ -93,6 +93,7 @@ public class DisciplinarService {
     private final ArquivoRepository arquivoRepository;
     private final AuditoriaService auditoriaService;
     private final UsuarioAutenticadoService usuarioAutenticadoService;
+    private final FaltaPorSuspensaoService faltaPorSuspensaoService;
 
     // ------------------------------------------------------------------
     // Motivos
@@ -179,6 +180,9 @@ public class DisciplinarService {
                 OrigemRegistroDisciplinar.MANUAL, null, dto.data(), dto.descricao().trim(), turma, inicio, fim,
                 usuario);
         marcarRecomendacao(registro);
+        if (inicio != null) {
+            faltaPorSuspensaoService.sincronizar(assistido, inicio, fim, usuario); // FT-13: suspensão retroativa
+        }
         return montarRespostaERecalcular(registro);
     }
 
@@ -222,6 +226,9 @@ public class DisciplinarService {
                 OrigemRegistroDisciplinar.RECOMENDACAO, origem, dto.data(), dto.descricao().trim(), null,
                 inicio, fim, usuario);
         marcarRecomendacao(registro);
+        if (inicio != null) {
+            faltaPorSuspensaoService.sincronizar(origem.getAssistido(), inicio, fim, usuario);
+        }
 
         origem.setConsequenciaResolvidaEm(dto.data());
         origem.setConsequenciaResolvidaPor(usuario);
@@ -327,10 +334,16 @@ public class DisciplinarService {
         }
         validarPeriodo(dto.inicio(), dto.fim());
 
-        Map<String, Object> anterior = Map.of("inicio", registro.getSuspensaoInicio().toString(),
-                "fim", registro.getSuspensaoFim().toString());
+        LocalDate inicioAntes = registro.getSuspensaoInicio();
+        LocalDate fimAntes = registro.getSuspensaoFim();
+        Map<String, Object> anterior = Map.of("inicio", inicioAntes.toString(), "fim", fimAntes.toString());
         registro.setSuspensaoInicio(dto.inicio());
         registro.setSuspensaoFim(dto.fim());
+        // FT-13: acerta as chamadas do período antigo e do novo (encurtar devolve à Falta).
+        faltaPorSuspensaoService.sincronizar(registro.getAssistido(),
+                inicioAntes.isBefore(dto.inicio()) ? inicioAntes : dto.inicio(),
+                fimAntes.isAfter(dto.fim()) ? fimAntes : dto.fim(),
+                usuarioAutenticadoService.getUsuarioAtual());
 
         auditoriaService.registrar(ModuloSistema.DISCIPLINA, "registro_disciplinar", registroId, AcaoSistema.EDITAR,
                 anterior, Map.of("inicio", dto.inicio().toString(), "fim", dto.fim().toString()),
@@ -360,7 +373,9 @@ public class DisciplinarService {
     @CacheEvict(cacheNames = CacheConfig.PAINEL, allEntries = true)
     public RegistroDisciplinarResponseDTO arquivar(Long registroId, ArquivarRegistroRequestDTO dto) {
         RegistroDisciplinar registro = buscarRegistroAtivo(registroId);
-        marcarArquivado(registro, dto.motivo().trim(), usuarioAutenticadoService.getUsuarioAtual());
+        Usuario usuario = usuarioAutenticadoService.getUsuarioAtual();
+        marcarArquivado(registro, dto.motivo().trim(), usuario);
+        sincronizarFaltasSeSuspensao(registro, usuario);
 
         Long assistidoId = registro.getAssistido().getAssistidoId();
         auditoriaService.registrar(ModuloSistema.DISCIPLINA, "registro_disciplinar", registroId, AcaoSistema.EXCLUIR,
@@ -390,6 +405,7 @@ public class DisciplinarService {
         String motivo = dto.motivo().trim();
         Usuario usuario = usuarioAutenticadoService.getUsuarioAtual();
         ativos.forEach(r -> marcarArquivado(r, motivo, usuario));
+        ativos.forEach(r -> sincronizarFaltasSeSuspensao(r, usuario));
 
         auditoriaService.registrar(ModuloSistema.DISCIPLINA, "assistido", assistidoId, AcaoSistema.EXCLUIR, null,
                 Map.of("nivel", dto.nivel() == null ? "TODOS" : dto.nivel().name(),
@@ -399,6 +415,14 @@ public class DisciplinarService {
 
         assistidoRepository.recalcularContadoresDisciplinares(assistidoId);
         return buscarFicha(assistidoId);
+    }
+
+    /** FT-13: suspensão arquivada deixa de justificar as faltas do período (voltam a Falta). */
+    private void sincronizarFaltasSeSuspensao(RegistroDisciplinar registro, Usuario usuario) {
+        if (registro.getNivel() == NivelDisciplinar.SUSPENSAO) {
+            faltaPorSuspensaoService.sincronizar(registro.getAssistido(),
+                    registro.getSuspensaoInicio(), registro.getSuspensaoFim(), usuario);
+        }
     }
 
     private static void marcarArquivado(RegistroDisciplinar registro, String motivo, Usuario usuario) {

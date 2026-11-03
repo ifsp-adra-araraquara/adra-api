@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 
 /** Modelo esparso: só faltas viram linha; sem linha na chamada = presente. */
 public interface PresencaRepository extends JpaRepository<Presenca, Long> {
@@ -15,4 +16,6 @@ public interface PresencaRepository extends JpaRepository<Presenca, Long> {
 
     /** Faltas de vários atendidos em várias chamadas numa query só (faltas seguidas, frequência, grade). */
     List<Presenca> findByChamadaInAndAssistidoIn(Collection<Chamada> chamadas, Collection<Assistido> assistidos);
+
+    Optional<Presenca> findByChamadaAndAssistido(Chamada chamada, Assistido assistido);
 }
