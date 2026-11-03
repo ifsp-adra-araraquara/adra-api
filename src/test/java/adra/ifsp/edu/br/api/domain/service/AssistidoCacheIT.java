@@ -112,8 +112,7 @@ class AssistidoCacheIT {
         oficina.setAtivo(true);
 
         Turma turma = new Turma();
-        turma.setOficina(oficinaRepository.save(oficina));
-        turma.setOficineiroResponsavel(oficineiro);
+        oficinaRepository.save(oficina);
         turma.setNomeTurma("Turma Cache");
         turma.setTurno(Turno.MANHA);
         turma.setCapacidade(10);

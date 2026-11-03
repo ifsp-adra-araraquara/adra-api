@@ -190,8 +190,6 @@ class StatusChamadaIT {
 
     private Turma criarGrupo(String nome) {
         Turma grupo = new Turma();
-        grupo.setOficina(oficina);
-        grupo.setOficineiroResponsavel(coordenador);
         grupo.setNomeTurma(nome);
         grupo.setTurno(Turno.MANHA);
         grupo.setCapacidade(20);

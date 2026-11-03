@@ -8,9 +8,6 @@ import java.time.Instant;
 import java.util.*;
 
 import adra.ifsp.edu.br.api.config.CacheConfig;
-import adra.ifsp.edu.br.api.domain.dto.arquivo.AulaArquivoDTO;
-import adra.ifsp.edu.br.api.domain.model.Aula;
-import adra.ifsp.edu.br.api.domain.model.Turma;
 import adra.ifsp.edu.br.api.domain.repository.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -50,9 +47,8 @@ public class ArquivoService {
     private final AssistidoRepository assistidoRepository;
     private final UsuarioRepository usuarioRepository;
     private final ResponsavelRepository responsavelRepository;
-    private final AulaRepository aulaRepository;
+    private final SemanarioRepository semanarioRepository;
     private final PreCadastroRepository preCadastroRepository;
-    private final TurmaRepository turmaRepository;
     private final AcessoTurmaService acessoTurma;
     private final ProcessadorArquivo processador;
     private final List<ArmazenamentoArquivos> armazenamentos;
@@ -140,14 +136,14 @@ public class ArquivoService {
                 entidadeTipo, entidadeId)
                 : arquivoRepository.findByEntidadeTipoAndEntidadeIdAndCategoriaAndExcluidoEmIsNullOrderByCriadoEmDesc(
                 entidadeTipo, entidadeId, categoria);
-        if (entidadeTipo == EntidadeArquivo.AULA) {
+        if (entidadeTipo == EntidadeArquivo.SEMANARIO) {
             arquivos = somenteVisiveisAoUsuario(arquivos);
         }
         return arquivos.stream().map(ArquivoResponseDTO::de).toList();
     }
 
     /**
-     * Material de aula: o Oficineiro só enxerga o que ELE enviou;
+     * Material do semanário: o Oficineiro só enxerga o que ELE enviou;
      * Coordenação/Sociopedagógico/Admin enxergam tudo (com o nome de quem enviou).
      */
     private List<Arquivo> somenteVisiveisAoUsuario(List<Arquivo> arquivos) {
@@ -157,36 +153,6 @@ public class ArquivoService {
                 .filter(a -> a.getEnviadoPor() != null && a.getEnviadoPor().getUsuarioId().equals(eu))
                 .toList();
     }
-
-    /**
-     * Aulas da turma que têm material, cada uma com seus arquivos (mais recentes primeiro).
-     * Aula sem material não entra. Uma consulta de arquivos por aula — ok pro volume atual;
-     * se pesar, trocar por uma busca com EntidadeIdIn e agrupar por entidadeId.
-     */
-    @Transactional(readOnly = true)
-    public List<AulaArquivoDTO> listarArquivosPorAula(Long turmaId) {
-        List<AulaArquivoDTO> aulasArquivos = new ArrayList<>();
-
-        Turma turma = turmaRepository.findById(turmaId)
-                .orElseThrow(() -> new EntidadeNaoEncontradaException("Turma nao encontrada: id " + turmaId));
-
-        List<Aula> aulas = aulaRepository.findByTurmaOrderByDataAulaDescHorarioInicioDesc(turma);
-
-        for (Aula aula : aulas) {
-            List<Arquivo> arquivos = arquivoRepository
-                    .findByEntidadeTipoAndEntidadeIdAndCategoriaAndExcluidoEmIsNullOrderByCriadoEmDesc(
-                            EntidadeArquivo.AULA, aula.getAulaId(), CategoriaArquivo.MATERIAL_AULA);
-            arquivos = somenteVisiveisAoUsuario(arquivos);
-
-            if (!arquivos.isEmpty()) {
-                aulasArquivos.add(AulaArquivoDTO.de(aula, arquivos));
-            }
-        }
-        return aulasArquivos;
-    }
-
-
-
 
     @Cacheable(CacheConfig.URLS_ARQUIVO)
     @Transactional(readOnly = true)
@@ -272,8 +238,8 @@ public class ArquivoService {
             if (!responsavelRepository.existsById(entidadeId)) {
                 throw new EntidadeNaoEncontradaException(entidadeTipo + " nao encontrado: id " + entidadeId);
             }
-        } else if(entidadeTipo==EntidadeArquivo.AULA){
-            if (!aulaRepository.existsById(entidadeId)) {
+        } else if(entidadeTipo==EntidadeArquivo.SEMANARIO){
+            if (!semanarioRepository.existsById(entidadeId)) {
                 throw new EntidadeNaoEncontradaException(entidadeTipo + " nao encontrado: id " + entidadeId);
             }
         } else if(entidadeTipo==EntidadeArquivo.PRE_CADASTRO){
@@ -281,7 +247,7 @@ public class ArquivoService {
                 throw new EntidadeNaoEncontradaException(entidadeTipo + " nao encontrado: id " + entidadeId);
             }
         } else {
-            throw new ArquivoInvalidoException("Arquivos so podem ser enviados para assistidos, responsaveis, usuarios e aulas.");
+            throw new ArquivoInvalidoException("Arquivos so podem ser enviados para assistidos, responsaveis, usuarios e semanarios.");
         }
     }
 

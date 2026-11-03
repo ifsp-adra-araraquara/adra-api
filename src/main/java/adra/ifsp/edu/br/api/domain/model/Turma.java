@@ -6,7 +6,6 @@ import lombok.Data;
 
 import java.time.DayOfWeek;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.util.List;
 
 @Data
@@ -18,14 +17,6 @@ public class Turma {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "turma_id")
     private Long turmaId;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "oficina_id", nullable = false)
-    private Oficina oficina;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "oficineiro_id", nullable = false)
-    private Usuario oficineiroResponsavel;
 
     @Column(name = "nome_turma", nullable = false, length = 100)
     private String nomeTurma;
@@ -51,12 +42,6 @@ public class Turma {
     @Column(name = "dia_semana")
     @Enumerated(EnumType.STRING)
     private List<DayOfWeek> diasDaSemana;
-
-    @Column(name = "horario_inicio")
-    private LocalTime horarioInicio;
-
-    @Column(name = "horario_fim")
-    private LocalTime horarioFim;
 
     @Column(name = "criado_em", nullable = false, updatable = false)
     private LocalDateTime criadoEm;

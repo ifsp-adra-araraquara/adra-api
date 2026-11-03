@@ -9,6 +9,8 @@ import adra.ifsp.edu.br.api.exception.EntidadeNaoEncontradaException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
+
 @Component
 @RequiredArgsConstructor
 public class OficinaMapper {
@@ -43,13 +45,14 @@ public class OficinaMapper {
         }
     }
 
-    public OficinaResponseDTO paraDTO(Oficina oficina) {
+    public OficinaResponseDTO paraDTO(Oficina oficina, List<Long> turmaIds) {
         return new OficinaResponseDTO(
                 oficina.getOficinaId(),
                 oficina.getNomeOficina(),
                 oficina.getOficineiroResponsavel() != null ? oficina.getOficineiroResponsavel().getUsuarioId() : null,
                 oficina.getLocal(),
-                oficina.getAtivo()
+                oficina.getAtivo(),
+                turmaIds
         );
     }
 

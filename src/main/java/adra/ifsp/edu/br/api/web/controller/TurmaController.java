@@ -2,20 +2,18 @@
 package adra.ifsp.edu.br.api.web.controller;
 
 import adra.ifsp.edu.br.api.domain.dto.assistido.AssistidoResponseDTO;
-import adra.ifsp.edu.br.api.domain.dto.turma.CriacaoTurmaDTO;
 import adra.ifsp.edu.br.api.domain.dto.turma.TurmaComAlunosResponseDTO;
 import adra.ifsp.edu.br.api.domain.dto.turma.TurmaRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.turma.TurmaResponseDTO;
 import adra.ifsp.edu.br.api.domain.dto.turma.TurmaStatusRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.turma.VincularAlunosTurmaDTO;
+import adra.ifsp.edu.br.api.domain.dto.turma.VincularOficinasTurmaDTO;
 import adra.ifsp.edu.br.api.domain.enums.Turno;
 import adra.ifsp.edu.br.api.domain.service.TurmaService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import adra.ifsp.edu.br.api.domain.dto.historico.OficineiroHistoricoDTO;
-import adra.ifsp.edu.br.api.domain.service.HistoricoOficineiroService;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -26,14 +24,6 @@ import java.util.List;
 public class TurmaController {
 
     private final TurmaService turmaService;
-    private final HistoricoOficineiroService historicoOficineiroService;
-
-    /** Quem foi o oficineiro responsável e em qual período (mais recente primeiro). */
-    @PreAuthorize("hasAnyRole('EDUCADOR_SOCIAL', 'ASSISTENTE_SOCIAL', 'COORDENADOR')")
-    @GetMapping("/{id}/oficineiros-historico")
-    public ResponseEntity<List<OficineiroHistoricoDTO>> historicoOficineiros(@PathVariable Long id) {
-        return ResponseEntity.ok(historicoOficineiroService.listarPorTurma(id));
-    }
 
     @PreAuthorize("hasAnyRole('EDUCADOR_SOCIAL', 'ASSISTENTE_SOCIAL', 'COORDENADOR')")
     @GetMapping
@@ -86,15 +76,6 @@ public class TurmaController {
             @Valid @RequestBody TurmaRequestDTO turmaRequestDTO
     ) {
         TurmaResponseDTO turmaCriada = turmaService.cadastrar(turmaRequestDTO);
-        return ResponseEntity.ok(turmaCriada);
-    }
-
-    @PreAuthorize("hasRole('COORDENADOR')")
-    @PostMapping("/com-horario")
-    public ResponseEntity<TurmaResponseDTO> cadastrarComHorario(
-            @Valid @RequestBody CriacaoTurmaDTO criacaoTurmaDTO
-    ) {
-        TurmaResponseDTO turmaCriada = turmaService.cadastrarComHorario(criacaoTurmaDTO);
         return ResponseEntity.ok(turmaCriada);
     }
 
@@ -155,5 +136,15 @@ public class TurmaController {
     @GetMapping("/{id}/alunos")
     public ResponseEntity<List<AssistidoResponseDTO>> listarAlunosVinculados(@PathVariable Long id) {
         return ResponseEntity.ok(turmaService.listarAlunosVinculados(id));
+    }
+
+    /** Ação "Ver oficinas" do grupo: escolhe as oficinas que atendem o grupo. */
+    @PreAuthorize("hasRole('COORDENADOR')")
+    @PutMapping("/{id}/oficinas")
+    public ResponseEntity<TurmaResponseDTO> vincularOficinas(
+            @PathVariable Long id,
+            @Valid @RequestBody VincularOficinasTurmaDTO dto
+    ) {
+        return ResponseEntity.ok(turmaService.vincularOficinas(id, dto));
     }
 }

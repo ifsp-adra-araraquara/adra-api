@@ -1,26 +1,13 @@
 package adra.ifsp.edu.br.api.domain.dto.oficina;
 
-import adra.ifsp.edu.br.api.domain.model.Oficina;
+import java.util.List;
 
 public record OficinaResponseDTO(
         Long oficinaId,
         String nomeOficina,
         Long oficineiroResponsavelId,
         String local,
-        Boolean ativo
+        Boolean ativo,
+        List<Long> turmaIds
 ) {
-
-    /**
-     * Fábrica de conveniência para converter a entidade em DTO de resposta,
-     * evitando expor a entidade JPA diretamente pelo controller.
-     */
-    public static OficinaResponseDTO fromEntity(Oficina oficina) {
-        return new OficinaResponseDTO(
-                oficina.getOficinaId(),
-                oficina.getNomeOficina(),
-                oficina.getOficineiroResponsavel() != null ? oficina.getOficineiroResponsavel().getUsuarioId() : null,
-                oficina.getLocal(),
-                oficina.getAtivo()
-        );
-    }
 }

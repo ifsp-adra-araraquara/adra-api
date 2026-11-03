@@ -34,7 +34,7 @@ public enum CategoriaArquivo {
             1600,
             false),
 
-    MATERIAL_AULA(
+    MATERIAL_SEMANARIO(
             Set.of("application/pdf"),
             2*1024*1024,
         1600, false

@@ -1,17 +1,16 @@
 package adra.ifsp.edu.br.api.domain.dto.oficina;
 
 import java.time.DayOfWeek;
-import java.time.LocalTime;
 import java.util.List;
 
 /**
- * Números das turmas de uma oficina para o card da listagem.
+ * Números dos grupos de uma oficina para o card da listagem.
  *
- * @param turmasAtivas turmas ativas da oficina
- * @param alunos       alunos nas turmas ativas hoje (vagas ocupadas)
- * @param capacidade   soma das capacidades das turmas ativas
- * @param horarios     combinações de dias + horário das turmas ativas, a
- *                     mais comum primeiro
+ * @param turmasAtivas grupos ativos atendidos pela oficina
+ * @param alunos       alunos nos grupos ativos hoje (vagas ocupadas)
+ * @param capacidade   soma das capacidades dos grupos ativos
+ * @param horarios     combinações de dias dos grupos ativos, a mais
+ *                     comum primeiro
  */
 public record OficinaResumoDTO(
         Long oficinaId,
@@ -21,7 +20,7 @@ public record OficinaResumoDTO(
         List<Horario> horarios
 ) {
 
-    /** Dias ordenados de segunda a domingo; {@code turmas} = quantas turmas usam esse horário. */
-    public record Horario(List<DayOfWeek> dias, LocalTime inicio, int turmas) {
+    /** Dias ordenados de segunda a domingo; {@code turmas} = quantos grupos usam esses dias. */
+    public record Horario(List<DayOfWeek> dias, int turmas) {
     }
 }

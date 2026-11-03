@@ -2,6 +2,7 @@ package adra.ifsp.edu.br.api.domain.repository;
 
 import adra.ifsp.edu.br.api.domain.enums.StatusGeral;
 import adra.ifsp.edu.br.api.domain.model.Assistido;
+import adra.ifsp.edu.br.api.domain.model.OficinaTurma;
 import adra.ifsp.edu.br.api.domain.model.TurmaAlunos;
 import jakarta.persistence.criteria.Expression;
 import jakarta.persistence.criteria.Predicate;
@@ -96,9 +97,15 @@ public class AssistidoSpecification {
                         cb.exists(vinculo)));
             }
 
-            // Filtro por oficina (via turma atual do assistido)
+            // Filtro por oficina: o grupo atual do assistido é atendido pela oficina
             if (oficinaId != null) {
-                predicates.add(cb.equal(root.get("turma").get("oficina").get("oficinaId"), oficinaId));
+                Subquery<Long> grupoDaOficina = query.subquery(Long.class);
+                Root<OficinaTurma> vinculo = grupoDaOficina.from(OficinaTurma.class);
+                grupoDaOficina.select(vinculo.get("turma").get("turmaId"))
+                        .where(cb.equal(vinculo.get("oficina").get("oficinaId"), oficinaId),
+                               cb.isTrue(vinculo.get("ativo")),
+                               cb.equal(vinculo.get("turma"), root.get("turma")));
+                predicates.add(cb.exists(grupoDaOficina));
             }
 
             // CA-A03.2: Filtro por status
