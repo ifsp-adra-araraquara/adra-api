@@ -103,8 +103,6 @@ class TurmaAlunosRepositoryIT {
         oficina = oficinaRepository.save(oficina);
 
         turma = new Turma();
-        turma.setOficina(oficina);
-        turma.setOficineiroResponsavel(oficineiro);
         turma.setNomeTurma("Turma Teste");
         turma.setTurno(Turno.MANHA);
         turma.setCapacidade(20);

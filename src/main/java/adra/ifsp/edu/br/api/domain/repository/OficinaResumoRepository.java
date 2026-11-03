@@ -5,11 +5,10 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
-import java.time.LocalTime;
 import java.util.List;
 
 /**
- * Dados de turma que os cards de oficina mostram (dias, horário, vagas),
+ * Dados de grupo que os cards de oficina mostram (dias, vagas),
  * numa consulta só para todas as oficinas — a tela não busca as turmas de
  * cada oficina uma a uma.
  */
@@ -24,14 +23,13 @@ public class OficinaResumoRepository {
      * @param alunos  alunos com vínculo vigente e elegíveis na data de referência
      */
     public record TurmaDaOficina(Long oficinaId, Long turmaId, Integer capacidade,
-                                 LocalTime horarioInicio, String diasIso, long alunos) {
+                                 String diasIso, long alunos) {
     }
 
-    /** Turmas ativas com oficina. Dias = dias de chamada do grupo (turma_dia_semana); horário = o da turma. */
+    /** Grupos ativos atendidos por cada oficina. Dias = dias de chamada do grupo (turma_dia_semana). */
     public List<TurmaDaOficina> turmasAtivas(LocalDate referencia) {
         return jdbc.sql("""
-                        SELECT t.oficina_id, t.turma_id, t.capacidade,
-                               t.horario_inicio AS horario,
+                        SELECT ot.oficina_id, t.turma_id, t.capacidade,
                                (SELECT string_agg(CASE d.dia_semana
                                            WHEN 'MONDAY' THEN '1' WHEN 'TUESDAY' THEN '2'
                                            WHEN 'WEDNESDAY' THEN '3' WHEN 'THURSDAY' THEN '4'
@@ -46,15 +44,15 @@ public class OficinaResumoRepository {
                                    AND ta.data_entrada <= :referencia
                                    AND (ta.data_saida IS NULL OR ta.data_saida >= :referencia)
                                    AND (s.status = 'ATIVO' OR s.data_saida > :referencia)) AS alunos
-                          FROM adra.turma t
-                         WHERE t.ativo AND t.oficina_id IS NOT NULL
+                          FROM adra.oficina_turma ot
+                          JOIN adra.turma t ON t.turma_id = ot.turma_id
+                         WHERE t.ativo AND ot.ativo
                         """)
                 .param("referencia", referencia)
                 .query((rs, i) -> new TurmaDaOficina(
                         rs.getLong("oficina_id"),
                         rs.getLong("turma_id"),
                         rs.getObject("capacidade", Integer.class),
-                        rs.getObject("horario", LocalTime.class),
                         rs.getString("dias"),
                         rs.getLong("alunos")))
                 .list();

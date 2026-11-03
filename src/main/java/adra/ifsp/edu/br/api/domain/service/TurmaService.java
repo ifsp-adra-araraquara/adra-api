@@ -1,12 +1,12 @@
 package adra.ifsp.edu.br.api.domain.service;
 
 import adra.ifsp.edu.br.api.domain.dto.assistido.AssistidoResponseDTO;
-import adra.ifsp.edu.br.api.domain.dto.turma.CriacaoTurmaDTO;
 import adra.ifsp.edu.br.api.domain.dto.turma.TurmaComAlunosResponseDTO;
 import adra.ifsp.edu.br.api.domain.dto.turma.TurmaRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.turma.TurmaResponseDTO;
 import adra.ifsp.edu.br.api.domain.dto.turma.TurmaStatusRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.turma.VincularAlunosTurmaDTO;
+import adra.ifsp.edu.br.api.domain.dto.turma.VincularOficinasTurmaDTO;
 import adra.ifsp.edu.br.api.domain.enums.AcaoSistema;
 import adra.ifsp.edu.br.api.domain.enums.ModuloSistema;
 import adra.ifsp.edu.br.api.domain.enums.StatusGeral;
@@ -14,8 +14,12 @@ import adra.ifsp.edu.br.api.domain.enums.Turno;
 import adra.ifsp.edu.br.api.domain.mapper.AssistidoMapper;
 import adra.ifsp.edu.br.api.domain.mapper.TurmaMapper;
 import adra.ifsp.edu.br.api.domain.model.Assistido;
+import adra.ifsp.edu.br.api.domain.model.Oficina;
+import adra.ifsp.edu.br.api.domain.model.OficinaTurma;
 import adra.ifsp.edu.br.api.domain.model.Turma;
 import adra.ifsp.edu.br.api.domain.repository.AssistidoRepository;
+import adra.ifsp.edu.br.api.domain.repository.OficinaRepository;
+import adra.ifsp.edu.br.api.domain.repository.OficinaTurmaRepository;
 import adra.ifsp.edu.br.api.domain.repository.TurmaAlunosRepository;
 import adra.ifsp.edu.br.api.domain.repository.TurmaRepository;
 import adra.ifsp.edu.br.api.domain.repository.TurmaSpecification;
@@ -26,9 +30,9 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.DayOfWeek;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -43,44 +47,33 @@ public class TurmaService {
     private final AssistidoMapper assistidoMapper;
     private final TurmaAlunosRepository turmaAlunosRepository;
     private final VinculoTurmaService vinculoTurmaService;
-    private final HistoricoOficineiroService historicoOficineiroService;
+    private final OficinaTurmaRepository oficinaTurmaRepository;
+    private final OficinaRepository oficinaRepository;
 
     /**
-     * Igual a minhasTurmas, mas ja traz o nome da oficina e a quantidade de
-     * alunos ativos resolvidos — usado na aba "Minhas turmas" do oficineiro,
-     * que precisa mostrar isso direto na tabela sem chamada extra por turma.
+     * Grupos atendidos pelas oficinas do oficineiro, já com o nome da oficina
+     * e a quantidade de alunos ativos — aba "Minhas turmas" do oficineiro.
      */
-    public List<TurmaComAlunosResponseDTO> minhasTurmas(Long idOficineiros){
-        List<Turma> minhasTurmas = turmaRepository.findByOficineiroResponsavelUsuarioId(idOficineiros);
-
-        if(minhasTurmas == null){
-            return null;
-        }
-
-        return minhasTurmas.stream()
-                .map(turma -> TurmaComAlunosResponseDTO.fromEntity(
-                        turma,
-                        assistidoRepository.countByTurma_TurmaIdAndStatus(turma.getTurmaId(), StatusGeral.ATIVO)
+    public List<TurmaComAlunosResponseDTO> minhasTurmas(Long idOficineiro) {
+        return oficinaTurmaRepository.findByOficina_OficineiroResponsavel_UsuarioIdAndAtivoTrue(idOficineiro).stream()
+                .map(vinculo -> TurmaComAlunosResponseDTO.fromVinculo(
+                        vinculo,
+                        assistidoRepository.countByTurma_TurmaIdAndStatus(vinculo.getTurma().getTurmaId(), StatusGeral.ATIVO)
                 ))
                 .collect(Collectors.toList());
     }
 
-    public List<TurmaResponseDTO> minhasTurmasPorOficina(Long idOficina){
-        List<Turma> minhasTurmas = turmaRepository.findByOficinaOficinaId(idOficina);
-
-        if(minhasTurmas == null){
-            return null;
-        }
-
-        return minhasTurmas.stream()
-                .map(turmaMapper::paraDTO)
-                .collect(Collectors.toList());
+    public List<TurmaResponseDTO> minhasTurmasPorOficina(Long idOficina) {
+        List<Turma> grupos = oficinaTurmaRepository.findByOficina_OficinaIdAndAtivoTrue(idOficina).stream()
+                .map(OficinaTurma::getTurma)
+                .toList();
+        return paraDTOs(grupos);
     }
 
     public TurmaResponseDTO cadastrar(TurmaRequestDTO dto) {
         Turma turma = turmaMapper.paraNovaEntidade(dto);
         turma = turmaRepository.save(turma);
-        historicoOficineiroService.registrar(turma);
+        atualizarOficinas(turma, dto.oficinaIds());
 
         auditoriaService.registrar(
                 ModuloSistema.TURMAS,
@@ -96,54 +89,15 @@ public class TurmaService {
                 "Cadastro de turma"
         );
 
-        return turmaMapper.paraDTO(turma);
-    }
-
-    public TurmaResponseDTO cadastrarComHorario(CriacaoTurmaDTO dto) {
-        for (DayOfWeek dia : dto.getDiasDaSemana()) {
-            if (turmaRepository.existsConflitoHorarioOficineiro(
-                    dto.getOficineiroResponsavelId(),
-                    dia,
-                    dto.getHorarioInicio(),
-                    dto.getHorarioFim())) {
-                throw new IllegalStateException(
-                        "Conflito de horário: O oficineiro já possui uma turma ativa " +
-                        "no dia " + dia.name() + " no horário solicitado."
-                );
-            }
-        }
-
-        Turma turma = turmaMapper.paraNovaEntidadeComHorario(dto);
-        turma = turmaRepository.save(turma);
-        historicoOficineiroService.registrar(turma);
-
-        auditoriaService.registrar(
-                ModuloSistema.TURMAS,
-                "turma",
-                turma.getTurmaId(),
-                AcaoSistema.CRIAR,
-                null,
-                Map.of(
-                        "nomeTurma", turma.getNomeTurma(),
-                        "turno", turma.getTurno().name(),
-                        "diasDaSemana", turma.getDiasDaSemana().toString(),
-                        "horarioInicio", turma.getHorarioInicio().toString(),
-                        "horarioFim", turma.getHorarioFim().toString()
-                ),
-                "Cadastro de turma com horário"
-        );
-
-        return turmaMapper.paraDTO(turma);
+        return paraDTO(turma);
     }
 
     public TurmaResponseDTO buscarPorId(Long id) {
-        return turmaMapper.paraDTO(buscarEntidadePorId(id));
+        return paraDTO(buscarEntidadePorId(id));
     }
 
     public List<TurmaResponseDTO> listarTodas() {
-        return turmaRepository.findAll().stream()
-                .map(turmaMapper::paraDTO)
-                .collect(Collectors.toList());
+        return paraDTOs(turmaRepository.findAll());
     }
 
     public List<TurmaResponseDTO> listarComFiltros(String nome, Turno turno, Boolean ativo) {
@@ -151,10 +105,71 @@ public class TurmaService {
         List<Turma> turmas = turmaRepository.findAll(spec);
 
         Map<Long, Integer> matriculadosPorTurma = contarAtivosPorTurma(turmas);
+        Map<Long, List<Long>> oficinasPorTurma = oficinasPorTurma(turmas);
 
         return turmas.stream()
-                .map(turma -> turmaMapper.paraDTO(turma, matriculadosPorTurma.getOrDefault(turma.getTurmaId(), 0)))
+                .map(turma -> turmaMapper.paraDTO(
+                        turma,
+                        matriculadosPorTurma.getOrDefault(turma.getTurmaId(), 0),
+                        oficinasPorTurma.getOrDefault(turma.getTurmaId(), List.of())))
                 .collect(Collectors.toList());
+    }
+
+    /** Ações "Ver oficinas" do grupo: troca as oficinas que atendem o grupo. */
+    public TurmaResponseDTO vincularOficinas(Long turmaId, VincularOficinasTurmaDTO dto) {
+        Turma turma = buscarEntidadePorId(turmaId);
+        atualizarOficinas(turma, dto.oficinaIds());
+        return paraDTO(turma);
+    }
+
+    /**
+     * As oficinas da lista passam a atender o grupo; as que saíram da lista têm
+     * o vínculo inativado. Lista nula não mexe nas oficinas.
+     */
+    private void atualizarOficinas(Turma turma, List<Long> oficinaIds) {
+        if (oficinaIds == null) {
+            return;
+        }
+
+        List<OficinaTurma> vinculos = oficinaTurmaRepository.findByTurma_TurmaId(turma.getTurmaId());
+        vinculos.forEach(vinculo -> vinculo.setAtivo(oficinaIds.contains(vinculo.getOficina().getOficinaId())));
+
+        Set<Long> jaVinculadas = vinculos.stream()
+                .map(vinculo -> vinculo.getOficina().getOficinaId())
+                .collect(Collectors.toSet());
+        List<Long> novas = oficinaIds.stream().filter(id -> !jaVinculadas.contains(id)).distinct().toList();
+
+        List<Oficina> oficinasNovas = oficinaRepository.findAllById(novas);
+        if (oficinasNovas.size() != novas.size()) {
+            throw new EntidadeNaoEncontradaException("Uma ou mais oficinas informadas não foram encontradas.");
+        }
+        oficinasNovas.forEach(oficina -> oficinaTurmaRepository.save(new OficinaTurma(oficina, turma)));
+    }
+
+    /** Oficinas ativas de cada grupo, numa query só. */
+    private Map<Long, List<Long>> oficinasPorTurma(List<Turma> turmas) {
+        if (turmas.isEmpty()) {
+            return Map.of();
+        }
+
+        List<Long> turmaIds = turmas.stream().map(Turma::getTurmaId).toList();
+
+        return oficinaTurmaRepository.findByTurma_TurmaIdInAndAtivoTrue(turmaIds).stream()
+                .collect(Collectors.groupingBy(
+                        vinculo -> vinculo.getTurma().getTurmaId(),
+                        Collectors.mapping(vinculo -> vinculo.getOficina().getOficinaId(), Collectors.toList())
+                ));
+    }
+
+    private List<TurmaResponseDTO> paraDTOs(List<Turma> turmas) {
+        Map<Long, List<Long>> oficinasPorTurma = oficinasPorTurma(turmas);
+        return turmas.stream()
+                .map(turma -> turmaMapper.paraDTO(turma, null, oficinasPorTurma.getOrDefault(turma.getTurmaId(), List.of())))
+                .collect(Collectors.toList());
+    }
+
+    private TurmaResponseDTO paraDTO(Turma turma) {
+        return paraDTOs(List.of(turma)).get(0);
     }
 
     /**
@@ -188,7 +203,7 @@ public class TurmaService {
 
         turmaMapper.atualizarEntidade(turma, dto);
         turma = turmaRepository.save(turma);
-        historicoOficineiroService.registrar(turma);
+        atualizarOficinas(turma, dto.oficinaIds());
 
         auditoriaService.registrar(
                 ModuloSistema.TURMAS,
@@ -204,7 +219,7 @@ public class TurmaService {
                 "Atualizacao de dados da turma"
         );
 
-        return turmaMapper.paraDTO(turma);
+        return paraDTO(turma);
     }
 
     public TurmaResponseDTO alterarStatus(Long id, TurmaStatusRequestDTO dto) {
@@ -224,7 +239,7 @@ public class TurmaService {
                 dto.ativo() ? "Reativacao de turma" : "Inativacao de turma"
         );
 
-        return turmaMapper.paraDTO(turma);
+        return paraDTO(turma);
     }
 
     /**

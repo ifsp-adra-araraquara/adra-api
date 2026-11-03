@@ -4,10 +4,7 @@ import adra.ifsp.edu.br.api.domain.dto.excecao.ExcecaoCalendarioRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.excecao.ExcecaoCalendarioResponseDTO;
 import adra.ifsp.edu.br.api.domain.enums.AcaoSistema;
 import adra.ifsp.edu.br.api.domain.enums.ModuloSistema;
-import adra.ifsp.edu.br.api.domain.enums.StatusAula;
-import adra.ifsp.edu.br.api.domain.model.Aula;
 import adra.ifsp.edu.br.api.domain.model.ExcecaoCalendario;
-import adra.ifsp.edu.br.api.domain.repository.AulaRepository;
 import adra.ifsp.edu.br.api.domain.repository.ExcecaoCalendarioRepository;
 import adra.ifsp.edu.br.api.exception.EntidadeNaoEncontradaException;
 import adra.ifsp.edu.br.api.exception.RegraNegocioException;
@@ -30,13 +27,10 @@ public class ExcecaoCalendarioService {
 
     private final ExcecaoCalendarioRepository excecaoCalendarioRepository;
     private final AuditoriaService auditoriaService;
-    private final AulaRepository aulaRepository;
 
     /**
      * Cadastra um dia sem aula — ou um período (dataFim), um registro por dia.
-     * Dias que já têm exceção são mantidos como estão. Aulas PLANEJADA nesses
-     * dias passam para CANCELADA (feriado, férias, ponto facultativo ou
-     * evento/passeio no lugar da aula).
+     * Dias que já têm exceção são mantidos como estão.
      */
     public List<ExcecaoCalendarioResponseDTO> cadastrar(ExcecaoCalendarioRequestDTO dto) {
         LocalDate inicio = dto.dataExcecao();
@@ -59,11 +53,6 @@ public class ExcecaoCalendarioService {
             criadas.add(excecaoCalendarioRepository.save(excecao));
         }
 
-        List<Aula> aulasCanceladas = aulaRepository.findByDataAulaBetweenAndStatusAula(inicio, fim, StatusAula.PLANEJADA).stream()
-                .filter(aula -> criadas.stream().anyMatch(e -> e.getDataExcecao().equals(aula.getDataAula())))
-                .toList();
-        aulasCanceladas.forEach(aula -> aula.setStatusAula(StatusAula.CANCELADA));
-
         for (ExcecaoCalendario excecao : criadas) {
             Map<String, Object> valorNovo = new HashMap<>();
             valorNovo.put("dataExcecao", excecao.getDataExcecao().toString());
@@ -77,17 +66,6 @@ public class ExcecaoCalendarioService {
                     null,
                     valorNovo,
                     "Cadastro de exceção de calendário"
-            );
-        }
-        for (Aula aula : aulasCanceladas) {
-            auditoriaService.registrar(
-                    ModuloSistema.AULAS,
-                    "aula",
-                    aula.getAulaId(),
-                    AcaoSistema.EDITAR,
-                    Map.of("statusAula", StatusAula.PLANEJADA.name()),
-                    Map.of("statusAula", StatusAula.CANCELADA.name()),
-                    "Aula cancelada: dia sem aula (" + dto.tipo().name() + ")"
             );
         }
 

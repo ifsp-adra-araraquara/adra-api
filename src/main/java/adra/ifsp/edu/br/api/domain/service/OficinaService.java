@@ -7,10 +7,14 @@ import adra.ifsp.edu.br.api.domain.enums.AcaoSistema;
 import adra.ifsp.edu.br.api.domain.enums.ModuloSistema;
 import adra.ifsp.edu.br.api.domain.mapper.OficinaMapper;
 import adra.ifsp.edu.br.api.domain.model.Oficina;
+import adra.ifsp.edu.br.api.domain.model.OficinaTurma;
+import adra.ifsp.edu.br.api.domain.model.Turma;
 import adra.ifsp.edu.br.api.domain.repository.OficinaRepository;
 import adra.ifsp.edu.br.api.domain.repository.OficinaResumoRepository;
 import adra.ifsp.edu.br.api.domain.repository.OficinaResumoRepository.TurmaDaOficina;
 import adra.ifsp.edu.br.api.domain.repository.OficinaSpecification;
+import adra.ifsp.edu.br.api.domain.repository.OficinaTurmaRepository;
+import adra.ifsp.edu.br.api.domain.repository.TurmaRepository;
 import adra.ifsp.edu.br.api.exception.EntidadeNaoEncontradaException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.jpa.domain.Specification;
@@ -19,12 +23,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
-import java.time.LocalTime;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -37,6 +41,8 @@ public class OficinaService {
     private final AuditoriaService auditoriaService;
     private final HistoricoOficineiroService historicoOficineiroService;
     private final OficinaResumoRepository oficinaResumoRepository;
+    private final OficinaTurmaRepository oficinaTurmaRepository;
+    private final TurmaRepository turmaRepository;
 
     public List<OficinaResponseDTO> minhasOficinas(Long idOficineiro) {
         List<Oficina> oficinas = oficinaRepository.findByOficineiroResponsavelUsuarioId(idOficineiro);
@@ -45,15 +51,14 @@ public class OficinaService {
             return null;
         }
 
-        return oficinas.stream()
-                .map(oficinaMapper::paraDTO)
-                .collect(Collectors.toList());
+        return paraDTOs(oficinas);
     }
 
     public OficinaResponseDTO cadastrar(OficinaRequestDTO dto) {
         Oficina oficina = oficinaMapper.paraNovaEntidade(dto);
         oficina = oficinaRepository.save(oficina);
         historicoOficineiroService.registrar(oficina);
+        atualizarGrupos(oficina, dto.turmaIds());
 
         auditoriaService.registrar(
                 ModuloSistema.OFICINAS,
@@ -67,23 +72,63 @@ public class OficinaService {
                         "ativo", oficina.getAtivo().toString()),
                 "Cadastro de oficina");
 
-        return oficinaMapper.paraDTO(oficina);
+        return paraDTO(oficina);
     }
 
     public OficinaResponseDTO buscarPorId(Long id) {
-        return oficinaMapper.paraDTO(buscarEntidadePorId(id));
+        return paraDTO(buscarEntidadePorId(id));
     }
 
     public List<OficinaResponseDTO> listarComFiltros(String nome, Boolean ativo) {
         Specification<Oficina> spec = OficinaSpecification.comFiltros(nome, ativo);
-        return oficinaRepository.findAll(spec).stream()
-                .map(oficinaMapper::paraDTO)
-                .collect(Collectors.toList());
+        return paraDTOs(oficinaRepository.findAll(spec));
     }
 
     /**
-     * Resumo de turmas por oficina para os cards da listagem: dias e
-     * horário e vagas. Uma consulta para todas as oficinas, agrupada aqui.
+     * Os grupos da lista passam a ser atendidos pela oficina; os que saíram da
+     * lista têm o vínculo inativado. Lista nula não mexe nos grupos.
+     */
+    private void atualizarGrupos(Oficina oficina, List<Long> turmaIds) {
+        if (turmaIds == null) {
+            return;
+        }
+
+        List<OficinaTurma> vinculos = oficinaTurmaRepository.findByOficina_OficinaId(oficina.getOficinaId());
+        vinculos.forEach(vinculo -> vinculo.setAtivo(turmaIds.contains(vinculo.getTurma().getTurmaId())));
+
+        Set<Long> jaVinculados = vinculos.stream()
+                .map(vinculo -> vinculo.getTurma().getTurmaId())
+                .collect(Collectors.toSet());
+        List<Long> novos = turmaIds.stream().filter(id -> !jaVinculados.contains(id)).distinct().toList();
+
+        List<Turma> gruposNovos = turmaRepository.findAllById(novos);
+        if (gruposNovos.size() != novos.size()) {
+            throw new EntidadeNaoEncontradaException("Um ou mais grupos informados não foram encontrados.");
+        }
+        gruposNovos.forEach(grupo -> oficinaTurmaRepository.save(new OficinaTurma(oficina, grupo)));
+    }
+
+    /** Grupos ativos de cada oficina, numa query só. */
+    private List<OficinaResponseDTO> paraDTOs(List<Oficina> oficinas) {
+        List<Long> oficinaIds = oficinas.stream().map(Oficina::getOficinaId).toList();
+        Map<Long, List<Long>> gruposPorOficina = oficinaIds.isEmpty() ? Map.of()
+                : oficinaTurmaRepository.findByOficina_OficinaIdInAndAtivoTrue(oficinaIds).stream()
+                        .collect(Collectors.groupingBy(
+                                vinculo -> vinculo.getOficina().getOficinaId(),
+                                Collectors.mapping(vinculo -> vinculo.getTurma().getTurmaId(), Collectors.toList())));
+
+        return oficinas.stream()
+                .map(oficina -> oficinaMapper.paraDTO(oficina, gruposPorOficina.getOrDefault(oficina.getOficinaId(), List.of())))
+                .collect(Collectors.toList());
+    }
+
+    private OficinaResponseDTO paraDTO(Oficina oficina) {
+        return paraDTOs(List.of(oficina)).get(0);
+    }
+
+    /**
+     * Resumo dos grupos por oficina para os cards da listagem: dias e
+     * vagas. Uma consulta para todas as oficinas, agrupada aqui.
      */
     @Transactional(readOnly = true)
     public List<OficinaResumoDTO> resumo() {
@@ -99,17 +144,15 @@ public class OficinaService {
                 .toList();
     }
 
-    /** Turmas com os mesmos dias e horário viram uma linha só; a mais comum primeiro. */
+    /** Grupos com os mesmos dias viram uma linha só; a mais comum primeiro. */
     private static List<OficinaResumoDTO.Horario> horarios(List<TurmaDaOficina> turmas) {
-        record Chave(List<DayOfWeek> dias, LocalTime inicio) {
-        }
-        Map<Chave, Long> contagem = turmas.stream()
-                .map(t -> new Chave(dias(t.diasIso()), t.horarioInicio()))
-                .filter(c -> !c.dias().isEmpty() || c.inicio() != null)
-                .collect(Collectors.groupingBy(c -> c, LinkedHashMap::new, Collectors.counting()));
+        Map<List<DayOfWeek>, Long> contagem = turmas.stream()
+                .map(t -> dias(t.diasIso()))
+                .filter(dias -> !dias.isEmpty())
+                .collect(Collectors.groupingBy(dias -> dias, LinkedHashMap::new, Collectors.counting()));
         return contagem.entrySet().stream()
-                .sorted(Map.Entry.<Chave, Long>comparingByValue().reversed())
-                .map(e -> new OficinaResumoDTO.Horario(e.getKey().dias(), e.getKey().inicio(), e.getValue().intValue()))
+                .sorted(Map.Entry.<List<DayOfWeek>, Long>comparingByValue().reversed())
+                .map(e -> new OficinaResumoDTO.Horario(e.getKey(), e.getValue().intValue()))
                 .toList();
     }
 
@@ -157,6 +200,7 @@ public class OficinaService {
 
         oficina = oficinaRepository.save(oficina);
         historicoOficineiroService.registrar(oficina);
+        atualizarGrupos(oficina, dto.turmaIds());
 
         Map<String, Object> valorNovo = new HashMap<>();
         valorNovo.put("nomeOficina", oficina.getNomeOficina());
@@ -175,7 +219,7 @@ public class OficinaService {
                 valorNovo,
                 "Edição de oficina");
 
-        return oficinaMapper.paraDTO(oficina);
+        return paraDTO(oficina);
     }
 
     public OficinaResponseDTO inativar(Long id) {
@@ -197,7 +241,7 @@ public class OficinaService {
                 Map.of("ativo", false),
                 "Oficina inativada");
 
-        return oficinaMapper.paraDTO(oficina);
+        return paraDTO(oficina);
     }
 
     public OficinaResponseDTO reativar(Long id) {
@@ -221,7 +265,7 @@ public class OficinaService {
                 Map.of("ativo", true),
                 "Oficina reativada");
 
-        return oficinaMapper.paraDTO(oficina);
+        return paraDTO(oficina);
     }
 
 }

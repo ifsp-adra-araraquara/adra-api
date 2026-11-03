@@ -3,7 +3,6 @@ package adra.ifsp.edu.br.api.web.controller;
 import java.net.URI;
 import java.util.List;
 
-import adra.ifsp.edu.br.api.domain.dto.arquivo.AulaArquivoDTO;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -40,8 +39,8 @@ public class ArquivoController {
 
     private final ArquivoService arquivoService;
 
-    @PreAuthorize("(hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL') and #entidadeTipo != T(adra.ifsp.edu.br.api.domain.enums.EntidadeArquivo).AULA) "
-            + "or (hasRole('OFICINEIRO') and #entidadeTipo == T(adra.ifsp.edu.br.api.domain.enums.EntidadeArquivo).AULA and @acessoTurma.podeAcessarAula(#entidadeId))")
+    @PreAuthorize("(hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL') and #entidadeTipo != T(adra.ifsp.edu.br.api.domain.enums.EntidadeArquivo).SEMANARIO) "
+            + "or (hasRole('OFICINEIRO') and #entidadeTipo == T(adra.ifsp.edu.br.api.domain.enums.EntidadeArquivo).SEMANARIO and @acessoTurma.podeAcessarSemanario(#entidadeId))")
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ArquivoResponseDTO> enviar(@RequestParam EntidadeArquivo entidadeTipo,
                                                      @RequestParam Long entidadeId,
@@ -53,7 +52,7 @@ public class ArquivoController {
 
     // Arquivos de pré-cadastro só pela tela de pré-cadastros (GET /api/pre-cadastro/{id}).
     @PreAuthorize("(hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL', 'EDUCADOR_SOCIAL') and #entidadeTipo != T(adra.ifsp.edu.br.api.domain.enums.EntidadeArquivo).PRE_CADASTRO) "
-            + "or (hasRole('OFICINEIRO') and #entidadeTipo == T(adra.ifsp.edu.br.api.domain.enums.EntidadeArquivo).AULA and @acessoTurma.podeAcessarAula(#entidadeId))")
+            + "or (hasRole('OFICINEIRO') and #entidadeTipo == T(adra.ifsp.edu.br.api.domain.enums.EntidadeArquivo).SEMANARIO and @acessoTurma.podeAcessarSemanario(#entidadeId))")
     @GetMapping
     public ResponseEntity<List<ArquivoResponseDTO>> listar(@RequestParam EntidadeArquivo entidadeTipo,
                                                            @RequestParam Long entidadeId,
@@ -62,30 +61,17 @@ public class ArquivoController {
     }
 
     @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL', 'EDUCADOR_SOCIAL') "
-            + "or (hasRole('OFICINEIRO') and @acessoTurma.ehAutorDoArquivoDeAula(#id))")
+            + "or (hasRole('OFICINEIRO') and @acessoTurma.ehAutorDoArquivoDeSemanario(#id))")
     @GetMapping("/{id}/url")
     public ResponseEntity<UrlArquivoDTO> gerarUrl(@PathVariable Long id) {
         return ResponseEntity.ok(arquivoService.gerarUrl(id));
     }
 
-    @PreAuthorize("(hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL') and !@acessoTurma.ehArquivoDeAula(#id)) "
-            + "or (hasRole('OFICINEIRO') and @acessoTurma.ehAutorDoArquivoDeAula(#id))")
+    @PreAuthorize("(hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL') and !@acessoTurma.ehArquivoDeSemanario(#id)) "
+            + "or (hasRole('OFICINEIRO') and @acessoTurma.ehAutorDoArquivoDeSemanario(#id))")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> remover(@PathVariable Long id) {
         arquivoService.remover(id);
         return ResponseEntity.noContent().build();
-    }
-
-
-    /**
-     * Materiais da turma agrupados por aula: GET /api/arquivos/turma/{turmaId}/materiais.
-     * Caminho próprio: um 2º @GetMapping sem path colidia com o listar() e a API não subia.
-     * Oficineiro só da turma em que é o responsável (403 nas outras).
-     */
-    @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL', 'EDUCADOR_SOCIAL') "
-            + "or (hasRole('OFICINEIRO') and @acessoTurma.podeAcessarTurma(#turmaId))")
-    @GetMapping("/turma/{turmaId}/materiais")
-    public ResponseEntity<List<AulaArquivoDTO>> listarArquivosPorAula(@PathVariable Long turmaId) {
-        return ResponseEntity.ok(arquivoService.listarArquivosPorAula(turmaId));
     }
 }

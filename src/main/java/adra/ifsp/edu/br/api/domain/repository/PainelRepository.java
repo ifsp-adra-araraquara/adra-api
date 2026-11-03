@@ -36,13 +36,18 @@ public class PainelRepository {
      * Filtro opcional de oficina (null = todas). O CAST tipa o parâmetro
      * para o Postgres mesmo quando ele vem nulo.
      */
-    private static final String NA_OFICINA = "(CAST(:oficinaId AS bigint) IS NULL OR t.oficina_id = :oficinaId)";
+    private static final String NA_OFICINA = """
+            (CAST(:oficinaId AS bigint) IS NULL OR EXISTS (
+                SELECT 1 FROM adra.oficina_turma ot
+                 WHERE ot.turma_id = t.turma_id AND ot.ativo AND ot.oficina_id = :oficinaId))
+            """;
 
-    /** Assistido com vínculo (em qualquer data) numa turma da oficina filtrada; %s = coluna do assistido. */
+    /** Assistido com vínculo (em qualquer data) num grupo da oficina filtrada; %s = coluna do assistido. */
     private static final String ASSISTIDO_NA_OFICINA = """
             (CAST(:oficinaId AS bigint) IS NULL OR EXISTS (
-                SELECT 1 FROM adra.turma_aluno ta JOIN adra.turma t ON t.turma_id = ta.turma_id
-                 WHERE ta.assistido_id = %s AND t.oficina_id = :oficinaId))
+                SELECT 1 FROM adra.turma_aluno ta
+                  JOIN adra.oficina_turma ot ON ot.turma_id = ta.turma_id AND ot.ativo
+                 WHERE ta.assistido_id = %s AND ot.oficina_id = :oficinaId))
             """;
 
     /** Atendido esperado numa chamada lançada (CTE reaproveitada pelas consultas de frequência). */
@@ -108,7 +113,11 @@ public class PainelRepository {
      */
     public List<TurmaResumo> turmas(LocalDate inicio, LocalDate fim, LocalDate referencia, Long oficinaId) {
         return jdbc.sql("""
-                        SELECT t.turma_id, t.nome_turma, o.nome_oficina, t.capacidade,
+                        SELECT t.turma_id, t.nome_turma, t.capacidade,
+                               (SELECT string_agg(o.nome_oficina, ', ' ORDER BY o.nome_oficina)
+                                  FROM adra.oficina_turma ot
+                                  JOIN adra.oficina o ON o.oficina_id = ot.oficina_id
+                                 WHERE ot.turma_id = t.turma_id AND ot.ativo) AS nome_oficina,
                                (SELECT COUNT(*)
                                   FROM adra.turma_aluno ta
                                   JOIN adra.assistido s ON s.assistido_id = ta.assistido_id
@@ -118,7 +127,6 @@ public class PainelRepository {
                                    AND (s.status = 'ATIVO' OR s.data_saida > :referencia)) AS alunos,
                                COALESCE(c.lancadas, 0) AS lancadas
                           FROM adra.turma t
-                          LEFT JOIN adra.oficina o ON o.oficina_id = t.oficina_id
                           LEFT JOIN (
                                 SELECT turma_id, COUNT(*) AS lancadas
                                   FROM adra.chamada

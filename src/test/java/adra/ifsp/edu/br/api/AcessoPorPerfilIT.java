@@ -97,11 +97,11 @@ class AcessoPorPerfilIT {
                 arguments(HttpMethod.GET, "/api/oficinas", Set.of(COORDENADOR, ASSISTENTE_SOCIAL, EDUCADOR_SOCIAL)),
                 arguments(HttpMethod.PATCH, "/api/oficinas/" + INEXISTENTE + "/inativar", Set.of(COORDENADOR)),
 
-                arguments(HttpMethod.GET, "/api/aulas", Set.of(COORDENADOR, ASSISTENTE_SOCIAL, EDUCADOR_SOCIAL, OFICINEIRO)),
+                arguments(HttpMethod.GET, "/api/semanarios/oficina/" + INEXISTENTE, Set.of(COORDENADOR, ASSISTENTE_SOCIAL, EDUCADOR_SOCIAL)),
+                arguments(HttpMethod.GET, "/api/semanarios/meus", Set.of(OFICINEIRO)),
                 arguments(HttpMethod.GET, "/api/excecoes-calendario", Set.of(COORDENADOR, ASSISTENTE_SOCIAL, EDUCADOR_SOCIAL, OFICINEIRO)),
                 arguments(HttpMethod.GET, "/api/notas-calendario", Set.of(COORDENADOR, ASSISTENTE_SOCIAL, EDUCADOR_SOCIAL, OFICINEIRO)),
                 arguments(HttpMethod.DELETE, "/api/notas-calendario/" + INEXISTENTE, Set.of(COORDENADOR)),
-                arguments(HttpMethod.DELETE, "/api/aulas/" + INEXISTENTE, Set.of(COORDENADOR)),
 
                 arguments(HttpMethod.GET, "/api/painel/hoje", Set.of(COORDENADOR)),
                 arguments(HttpMethod.GET, "/api/usuarios", Set.of()),

@@ -2,8 +2,9 @@ package adra.ifsp.edu.br.api.domain.service;
 
 import adra.ifsp.edu.br.api.domain.enums.EntidadeArquivo;
 import adra.ifsp.edu.br.api.domain.repository.ArquivoRepository;
-import adra.ifsp.edu.br.api.domain.repository.AulaRepository;
-import adra.ifsp.edu.br.api.domain.repository.TurmaRepository;
+import adra.ifsp.edu.br.api.domain.repository.OficinaRepository;
+import adra.ifsp.edu.br.api.domain.repository.OficinaTurmaRepository;
+import adra.ifsp.edu.br.api.domain.repository.SemanarioRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -12,60 +13,68 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Regra "o Oficineiro só acessa as turmas em que é o responsável" (turma.oficineiro_id).
+ * Regra "o Oficineiro só acessa os grupos atendidos pelas oficinas dele" (oficina_turma).
  * Usada direto no @PreAuthorize, ex.:
- *   hasRole('OFICINEIRO') and @acessoTurma.podeAcessarAula(#idAula)
+ *   hasRole('OFICINEIRO') and @acessoTurma.podeAcessarSemanario(#idSemanario)
  * Sem permissão -> o Spring Security devolve 403 antes de entrar no método.
- * Reaproveitar nos materiais por aula.
+ * Reaproveitar nos materiais do semanário.
  */
 @Service("acessoTurma")
 @RequiredArgsConstructor
 public class AcessoTurmaService {
 
-    private final AulaRepository aulaRepository;
-    private final TurmaRepository turmaRepository;
+    private final OficinaRepository oficinaRepository;
+    private final SemanarioRepository semanarioRepository;
+    private final OficinaTurmaRepository oficinaTurmaRepository;
     private final ArquivoRepository arquivoRepository;
 
     @Transactional(readOnly = true)
-    public boolean podeAcessarAula(Long aulaId) {
+    public boolean podeAcessarSemanario(Long semanarioId) {
         Long usuarioId = usuarioIdAtual();
-        return aulaId != null && usuarioId != null
-                && aulaRepository.existsByAulaIdAndTurmaOficineiroResponsavelUsuarioId(aulaId, usuarioId);
+        return semanarioId != null && usuarioId != null
+                && semanarioRepository.existsBySemanarioIdAndOficina_OficineiroResponsavel_UsuarioId(semanarioId, usuarioId);
+    }
+
+    @Transactional(readOnly = true)
+    public boolean ehOficineiroDaOficina(Long oficinaId) {
+        Long usuarioId = usuarioIdAtual();
+        return oficinaId != null && usuarioId != null
+                && oficinaRepository.existsByOficinaIdAndOficineiroResponsavelUsuarioId(oficinaId, usuarioId);
     }
 
     @Transactional(readOnly = true)
     public boolean podeAcessarTurma(Long turmaId) {
         Long usuarioId = usuarioIdAtual();
         return turmaId != null && usuarioId != null
-                && turmaRepository.existsByTurmaIdAndOficineiroResponsavelUsuarioId(turmaId, usuarioId);
+                && oficinaTurmaRepository.existsByTurma_TurmaIdAndOficina_OficineiroResponsavel_UsuarioIdAndAtivoTrue(turmaId, usuarioId);
     }
 
-    /** O arquivo é material de uma aula de turma deste oficineiro? */
+    /** O arquivo é material de um semanário deste oficineiro? */
     @Transactional(readOnly = true)
-    public boolean podeAcessarArquivoDeAula(Long arquivoId) {
+    public boolean podeAcessarArquivoDeSemanario(Long arquivoId) {
         if (arquivoId == null) return false;
         return arquivoRepository.findByArquivoIdAndExcluidoEmIsNull(arquivoId)
-                .filter(a -> a.getEntidadeTipo() == EntidadeArquivo.AULA)
-                .map(a -> podeAcessarAula(a.getEntidadeId()))
+                .filter(a -> a.getEntidadeTipo() == EntidadeArquivo.SEMANARIO)
+                .map(a -> podeAcessarSemanario(a.getEntidadeId()))
                 .orElse(false);
     }
 
-    /** É material de aula? (a Coordenação só vê esses, não exclui) */
+    /** É material de semanário? (a Coordenação só vê esses, não exclui) */
     @Transactional(readOnly = true)
-    public boolean ehArquivoDeAula(Long arquivoId) {
+    public boolean ehArquivoDeSemanario(Long arquivoId) {
         if (arquivoId == null) return false;
         return arquivoRepository.findByArquivoIdAndExcluidoEmIsNull(arquivoId)
-                .map(a -> a.getEntidadeTipo() == EntidadeArquivo.AULA)
+                .map(a -> a.getEntidadeTipo() == EntidadeArquivo.SEMANARIO)
                 .orElse(false);
     }
 
-    /** É material de aula ENVIADO por este usuário? (oficineiro só vê/abre/exclui os próprios) */
+    /** É material de semanário ENVIADO por este usuário? (oficineiro só vê/abre/exclui os próprios) */
     @Transactional(readOnly = true)
-    public boolean ehAutorDoArquivoDeAula(Long arquivoId) {
+    public boolean ehAutorDoArquivoDeSemanario(Long arquivoId) {
         Long usuarioId = usuarioIdAtual();
         if (arquivoId == null || usuarioId == null) return false;
         return arquivoRepository.findByArquivoIdAndExcluidoEmIsNull(arquivoId)
-                .filter(a -> a.getEntidadeTipo() == EntidadeArquivo.AULA)
+                .filter(a -> a.getEntidadeTipo() == EntidadeArquivo.SEMANARIO)
                 .map(a -> a.getEnviadoPor() != null && usuarioId.equals(a.getEnviadoPor().getUsuarioId()))
                 .orElse(false);
     }

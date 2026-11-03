@@ -14,6 +14,7 @@ import adra.ifsp.edu.br.api.domain.model.Chamada;
 import adra.ifsp.edu.br.api.domain.model.MotivoDisciplinar;
 import adra.ifsp.edu.br.api.domain.model.NivelPermissao;
 import adra.ifsp.edu.br.api.domain.model.Oficina;
+import adra.ifsp.edu.br.api.domain.model.OficinaTurma;
 import adra.ifsp.edu.br.api.domain.model.Presenca;
 import adra.ifsp.edu.br.api.domain.model.Turma;
 import adra.ifsp.edu.br.api.domain.model.TurmaAlunos;
@@ -23,6 +24,7 @@ import adra.ifsp.edu.br.api.domain.repository.ChamadaRepository;
 import adra.ifsp.edu.br.api.domain.repository.MotivoDisciplinarRepository;
 import adra.ifsp.edu.br.api.domain.repository.NivelPermissaoRepository;
 import adra.ifsp.edu.br.api.domain.repository.OficinaRepository;
+import adra.ifsp.edu.br.api.domain.repository.OficinaTurmaRepository;
 import adra.ifsp.edu.br.api.domain.repository.PresencaRepository;
 import adra.ifsp.edu.br.api.domain.repository.TurmaAlunosRepository;
 import adra.ifsp.edu.br.api.domain.repository.TurmaRepository;
@@ -78,6 +80,7 @@ class PainelServiceIT {
     @Autowired private UsuarioRepository usuarioRepository;
     @Autowired private AssistidoRepository assistidoRepository;
     @Autowired private OficinaRepository oficinaRepository;
+    @Autowired private OficinaTurmaRepository oficinaTurmaRepository;
     @Autowired private TurmaRepository turmaRepository;
     @Autowired private TurmaAlunosRepository turmaAlunosRepository;
     @Autowired private ChamadaRepository chamadaRepository;
@@ -95,6 +98,7 @@ class PainelServiceIT {
 
     private Usuario coordenador;
     private Usuario educadorSocial;
+    private Oficina futebol;
     private Turma turma;
     private Assistido ana;
     private Assistido bruno;
@@ -113,19 +117,18 @@ class PainelServiceIT {
         educadorSocial = criarUsuario(NomeNivelPermissao.EDUCADOR_SOCIAL, "socio-ft05@teste.local");
         autenticarComo(coordenador);
 
-        Oficina oficina = new Oficina();
-        oficina.setNomeOficina("Futebol");
-        oficina.setOficineiroResponsavel(coordenador);
-        oficina = oficinaRepository.save(oficina);
+        futebol = new Oficina();
+        futebol.setNomeOficina("Futebol");
+        futebol.setOficineiroResponsavel(coordenador);
+        futebol = oficinaRepository.save(futebol);
 
         turma = new Turma();
-        turma.setOficina(oficina);
-        turma.setOficineiroResponsavel(coordenador);
         turma.setNomeTurma("Turma A - Futebol");
         turma.setTurno(Turno.MANHA);
         turma.setCapacidade(20);
         turma.setDiasDaSemana(new ArrayList<>(List.of(MES.atDay(5).getDayOfWeek())));
         turma = turmaRepository.save(turma);
+        oficinaTurmaRepository.save(new OficinaTurma(futebol, turma));
         fundarGrupoEm(MES.atDay(1).minusMonths(3));
 
         LocalDate entrada = MES.atDay(1).minusMonths(3);
@@ -237,7 +240,7 @@ class PainelServiceIT {
         chamada(MES.atDay(5));
 
         entityManager.flush();
-        PainelMensalDTO futebol = painelService.mensal(MES, turma.getOficina().getOficinaId());
+        PainelMensalDTO futebol = painelService.mensal(MES, futebol.getOficinaId());
         PainelMensalDTO soTeatro = painelService.mensal(MES, teatro.getOficinaId());
 
         assertThat(futebol.turmas()).hasSize(1);
