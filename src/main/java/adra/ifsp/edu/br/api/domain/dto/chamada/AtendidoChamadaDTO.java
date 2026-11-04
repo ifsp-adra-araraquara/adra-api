@@ -18,6 +18,8 @@ public record AtendidoChamadaDTO(
         String observacao,
         List<HistoricoChamadaDTO> historicoRecente,
         Integer frequenciaPercentual,
-        List<AutorizadoRetiradaDTO> autorizadosRetirada
+        List<AutorizadoRetiradaDTO> autorizadosRetirada,
+        /** FT-13: fim da suspensão que cobre o dia (a linha vem travada em FJ por Suspensão), ou null. */
+        LocalDate suspensoAte
 ) {
 }

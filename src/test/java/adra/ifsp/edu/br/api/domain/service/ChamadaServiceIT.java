@@ -5,12 +5,17 @@ import adra.ifsp.edu.br.api.domain.dto.assistido.AssistidoStatusRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.chamada.AtendidoChamadaDTO;
 import adra.ifsp.edu.br.api.domain.dto.chamada.ChamadaGrupoDTO;
 import adra.ifsp.edu.br.api.domain.dto.chamada.PresencaChamadaRequestDTO;
+import adra.ifsp.edu.br.api.domain.dto.disciplinar.ArquivarRegistroRequestDTO;
+import adra.ifsp.edu.br.api.domain.dto.disciplinar.PeriodoSuspensaoRequestDTO;
+import adra.ifsp.edu.br.api.domain.dto.disciplinar.RegistroDisciplinarRequestDTO;
 import adra.ifsp.edu.br.api.domain.enums.MotivoFalta;
+import adra.ifsp.edu.br.api.domain.enums.NivelDisciplinar;
 import adra.ifsp.edu.br.api.domain.enums.NomeNivelPermissao;
 import adra.ifsp.edu.br.api.domain.enums.StatusGeral;
 import adra.ifsp.edu.br.api.domain.enums.StatusPresenca;
 import adra.ifsp.edu.br.api.domain.enums.Turno;
 import adra.ifsp.edu.br.api.domain.model.Assistido;
+import adra.ifsp.edu.br.api.domain.model.MotivoDisciplinar;
 import adra.ifsp.edu.br.api.domain.model.NivelPermissao;
 import adra.ifsp.edu.br.api.domain.model.Oficina;
 import adra.ifsp.edu.br.api.domain.model.Turma;
@@ -18,6 +23,8 @@ import adra.ifsp.edu.br.api.domain.model.TurmaAlunos;
 import adra.ifsp.edu.br.api.domain.model.Usuario;
 import adra.ifsp.edu.br.api.domain.repository.AssistidoRepository;
 import adra.ifsp.edu.br.api.domain.repository.ChamadaRepository;
+import adra.ifsp.edu.br.api.domain.repository.FaltaJustificadaRepository;
+import adra.ifsp.edu.br.api.domain.repository.MotivoDisciplinarRepository;
 import adra.ifsp.edu.br.api.domain.repository.NivelPermissaoRepository;
 import adra.ifsp.edu.br.api.domain.repository.OficinaRepository;
 import adra.ifsp.edu.br.api.domain.repository.PresencaRepository;
@@ -83,6 +90,9 @@ class ChamadaServiceIT {
     @Autowired private AssistidoService assistidoService;
     @Autowired private VinculoTurmaService vinculoTurmaService;
     @Autowired private DataSource dataSource;
+    @Autowired private DisciplinarService disciplinarService;
+    @Autowired private MotivoDisciplinarRepository motivoDisciplinarRepository;
+    @Autowired private FaltaJustificadaRepository faltaJustificadaRepository;
 
     private static final LocalDate HOJE = LocalDate.now();
 
@@ -209,13 +219,13 @@ class ChamadaServiceIT {
     void faltaJustificadaComMotivo() {
         LocalDate dia = diaSemFeriado(1);
         PresencaChamadaRequestDTO justificada =
-                new PresencaChamadaRequestDTO(ana.getAssistidoId(), StatusPresenca.FALTA_JUSTIFICADA, MotivoFalta.SAUDE, null);
+                new PresencaChamadaRequestDTO(ana.getAssistidoId(), StatusPresenca.FALTA_JUSTIFICADA, MotivoFalta.ATESTADO, null);
 
         ChamadaGrupoDTO chamada = chamadaService.gravar(turma.getTurmaId(), dia, List.of(justificada));
 
         AtendidoChamadaDTO linha = linha(chamada, ana);
         assertThat(linha.statusPresenca()).isEqualTo(StatusPresenca.FALTA_JUSTIFICADA);
-        assertThat(linha.motivoFalta()).isEqualTo(MotivoFalta.SAUDE);
+        assertThat(linha.motivoFalta()).isEqualTo(MotivoFalta.ATESTADO);
     }
 
     @Test
@@ -229,6 +239,104 @@ class ChamadaServiceIT {
                 .singleElement()
                 .extracting(v -> v.getTurma().getTurmaId())
                 .isEqualTo(outro.getTurmaId());
+    }
+
+    // ---- FT-13: falta justificada só por Atestado ou Suspensão ----
+
+    @Test
+    @DisplayName("CA-FT13.2: o suspenso aparece como FJ por Suspensão em todas as chamadas do período, e o envio não troca")
+    void suspensoVemComoFaltaJustificada() {
+        LocalDate inicio = HOJE.minusDays(3);
+        LocalDate fim = HOJE.minusDays(1);
+        suspender(ana, inicio, fim);
+
+        for (LocalDate dia : diasComChamada(inicio, fim)) {
+            AtendidoChamadaDTO aberta = linha(chamadaService.buscar(turma.getTurmaId(), dia), ana);
+            assertThat(aberta.statusPresenca()).isEqualTo(StatusPresenca.FALTA_JUSTIFICADA);
+            assertThat(aberta.motivoFalta()).isEqualTo(MotivoFalta.SUSPENSAO);
+            assertThat(aberta.suspensoAte()).isEqualTo(fim);
+
+            ChamadaGrupoDTO gravada = chamadaService.gravar(turma.getTurmaId(), dia, List.of(presente(ana), falta(bruno)));
+            assertThat(linha(gravada, ana).motivoFalta()).isEqualTo(MotivoFalta.SUSPENSAO);
+            assertThat(status(gravada, bruno)).isEqualTo(StatusPresenca.FALTA);
+            assertThat(linha(gravada, bruno).suspensoAte()).isNull();
+        }
+    }
+
+    @Test
+    @DisplayName("CA-FT13.3: suspensão retroativa corrige as chamadas já lançadas")
+    void suspensaoRetroativaCorrigeChamadas() {
+        LocalDate inicio = HOJE.minusDays(3);
+        LocalDate fim = HOJE.minusDays(1);
+        List<LocalDate> dias = diasComChamada(inicio, fim);
+        for (LocalDate dia : dias) {
+            chamadaService.gravar(turma.getTurmaId(), dia, List.of(dia.equals(dias.get(0)) ? falta(ana) : presente(ana)));
+        }
+
+        suspender(ana, inicio, fim);
+
+        for (LocalDate dia : dias) {
+            assertThat(motivoGravado(dia, ana)).isEqualTo(MotivoFalta.SUSPENSAO);
+        }
+    }
+
+    @Test
+    @DisplayName("Encurtar ou arquivar a suspensão devolve as faltas por Suspensão a Falta")
+    void encurtarOuArquivarVoltaAFalta() {
+        LocalDate inicio = HOJE.minusDays(3);
+        LocalDate fim = HOJE.minusDays(1);
+        List<LocalDate> dias = diasComChamada(inicio, fim);
+        assumeFalse(dias.size() < 2, "precisa de dois dias sem feriado no período");
+        dias.forEach(dia -> chamadaService.gravar(turma.getTurmaId(), dia, List.of(presente(ana))));
+        Long registroId = suspender(ana, inicio, fim);
+
+        LocalDate ultimo = dias.get(dias.size() - 1);
+        disciplinarService.alterarPeriodoSuspensao(registroId, new PeriodoSuspensaoRequestDTO(ultimo, ultimo));
+        assertThat(statusGravado(dias.get(0), ana)).isEqualTo(StatusPresenca.FALTA);
+        assertThat(motivoGravado(ultimo, ana)).isEqualTo(MotivoFalta.SUSPENSAO);
+
+        disciplinarService.arquivar(registroId, new ArquivarRegistroRequestDTO("Lançado no atendido errado"));
+        assertThat(statusGravado(ultimo, ana)).isEqualTo(StatusPresenca.FALTA);
+        assertThat(linha(chamadaService.buscar(turma.getTurmaId(), ultimo), ana).suspensoAte()).isNull();
+    }
+
+    @Test
+    @DisplayName("Suspensão não é escolhida à mão para quem não está suspenso")
+    void suspensaoAMaoERecusada() {
+        LocalDate dia = diaSemFeriado(1);
+        PresencaChamadaRequestDTO aMao =
+                new PresencaChamadaRequestDTO(bruno.getAssistidoId(), StatusPresenca.FALTA_JUSTIFICADA, MotivoFalta.SUSPENSAO, null);
+
+        assertThatThrownBy(() -> chamadaService.gravar(turma.getTurmaId(), dia, List.of(aMao)))
+                .isInstanceOf(RegraNegocioException.class)
+                .hasMessageContaining("use Atestado");
+    }
+
+    private Long suspender(Assistido assistido, LocalDate inicio, LocalDate fim) {
+        MotivoDisciplinar motivo = motivoDisciplinarRepository.save(
+                MotivoDisciplinar.builder().nome("Bullying FT-13").nivel(NivelDisciplinar.SUSPENSAO).build());
+        return disciplinarService.registrar(assistido.getAssistidoId(), new RegistroDisciplinarRequestDTO(
+                motivo.getMotivoId(), inicio, "Suspensão de teste", null, inicio, fim)).registro().registroId();
+    }
+
+    /** Dias do intervalo que têm chamada (sem feriado nacional). */
+    private static List<LocalDate> diasComChamada(LocalDate inicio, LocalDate fim) {
+        return inicio.datesUntil(fim.plusDays(1)).filter(dia -> !FeriadosNacionais.ehFeriado(dia)).toList();
+    }
+
+    private StatusPresenca statusGravado(LocalDate dia, Assistido assistido) {
+        return chamadaRepository.findByTurmaAndDataChamada(turma, dia)
+                .flatMap(chamada -> presencaRepository.findByChamadaAndAssistido(chamada, assistido))
+                .map(presenca -> presenca.getStatusPresenca())
+                .orElse(StatusPresenca.PRESENTE);
+    }
+
+    private MotivoFalta motivoGravado(LocalDate dia, Assistido assistido) {
+        return chamadaRepository.findByTurmaAndDataChamada(turma, dia)
+                .flatMap(chamada -> presencaRepository.findByChamadaAndAssistido(chamada, assistido))
+                .flatMap(presenca -> faltaJustificadaRepository.findByPresenca_PresencaId(presenca.getPresencaId()))
+                .map(fj -> fj.getMotivoFalta())
+                .orElse(null);
     }
 
     private List<Long> idsNaChamada(LocalDate dia) {

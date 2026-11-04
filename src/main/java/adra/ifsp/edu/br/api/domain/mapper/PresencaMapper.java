@@ -18,7 +18,7 @@ public class PresencaMapper {
     /**
      * Sincroniza o satélite FaltaJustificada com o status já salvo em `presenca`.
      * Só chame depois do save (precisa de presenca.getPresencaId() != null).
-     * CA-65.2: FALTA_JUSTIFICADA exige motivo_falta; motivo OUTRO exige observacao.
+     * CA-65.2: FALTA_JUSTIFICADA exige motivo_falta (FT-13: Atestado ou Suspensão; observação opcional).
      * Fora de FALTA_JUSTIFICADA, remove qualquer FaltaJustificada residual de um
      * reenvio anterior (CA-65.4 — reenvio atualiza, não deixa lixo pra trás).
      */
@@ -43,13 +43,10 @@ public class PresencaMapper {
         faltaJustificadaRepository.save(faltaJustificada);
     }
 
-    /** CA-65.2: falta justificada exige o motivo; motivo OUTRO exige observação. */
+    /** CA-65.2: falta justificada exige o motivo (FT-13: a observação é opcional). */
     public static void validarJustificativa(MotivoFalta motivoFalta, String observacao) {
         if (motivoFalta == null) {
             throw new RegraNegocioException("Falta justificada exige o motivo da falta.");
-        }
-        if (motivoFalta == MotivoFalta.OUTRO && (observacao == null || observacao.isBlank())) {
-            throw new RegraNegocioException("Motivo OUTRO exige observação preenchida.");
-        }
+        }
     }
 }

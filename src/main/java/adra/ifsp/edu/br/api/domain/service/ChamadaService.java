@@ -10,6 +10,7 @@ import adra.ifsp.edu.br.api.domain.dto.chamada.PresencaChamadaRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.presenca.AutorizadoRetiradaDTO;
 import adra.ifsp.edu.br.api.domain.enums.AcaoSistema;
 import adra.ifsp.edu.br.api.domain.enums.ModuloSistema;
+import adra.ifsp.edu.br.api.domain.enums.MotivoFalta;
 import adra.ifsp.edu.br.api.domain.enums.NomeNivelPermissao;
 import adra.ifsp.edu.br.api.domain.enums.StatusChamada;
 import adra.ifsp.edu.br.api.domain.enums.StatusPresenca;
@@ -38,6 +39,7 @@ import java.time.LocalDate;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -62,6 +64,7 @@ public class ChamadaService {
     private final PresencaMapper presencaMapper;
     private final AuditoriaService auditoriaService;
     private final UsuarioAutenticadoService usuarioAutenticadoService;
+    private final FaltaPorSuspensaoService faltaPorSuspensaoService;
 
     @Transactional(readOnly = true)
     public ChamadasDoDiaDTO chamadasDoDia(LocalDate data) {
@@ -95,14 +98,15 @@ public class ChamadaService {
 
         Map<Long, Assistido> atendidosPorId = atendidosNoDia(turma, data).stream()
                 .collect(Collectors.toMap(Assistido::getAssistidoId, Function.identity()));
-        validarPresencas(presencas, atendidosPorId);
+        Map<Long, LocalDate> suspensos = faltaPorSuspensaoService.suspensosEm(atendidosPorId.keySet(), data);
+        validarPresencas(presencas, atendidosPorId, suspensos);
 
         Chamada existente = chamadaRepository.findByTurmaAndDataChamada(turma, data).orElse(null);
         Chamada chamada = existente != null ? existente : novaChamada(turma, data, usuario);
         chamada.setAtualizadoPor(usuario);
         chamada = chamadaRepository.save(chamada);
 
-        int faltas = gravarPresencas(chamada, presencas, atendidosPorId, usuario);
+        int faltas = gravarPresencas(chamada, comSuspensos(presencas, suspensos), atendidosPorId, usuario);
         registrarAuditoria(chamada, existente == null, faltas);
 
         return montarChamada(turma, data, chamada);
@@ -127,22 +131,28 @@ public class ChamadaService {
         Map<Long, List<HistoricoChamadaDTO>> historicoPorAssistidoId = historicoRecente(turma, data, atendidos);
         Map<Long, IndicadorFrequencia> frequencias = indicadoresService.frequencias(atendidos);
         Map<Long, List<AutorizadoRetiradaDTO>> autorizados = indicadoresService.autorizadosRetirada(atendidos);
+        Map<Long, LocalDate> suspensos = faltaPorSuspensaoService.suspensosEm(
+                atendidos.stream().map(Assistido::getAssistidoId).toList(), data);
 
         List<AtendidoChamadaDTO> linhas = atendidos.stream()
                 .map(assistido -> {
                     Presenca falta = faltasPorAssistidoId.get(assistido.getAssistidoId());
                     FaltaJustificada justificativa = falta != null ? justificativasPorPresencaId.get(falta.getPresencaId()) : null;
+                    LocalDate suspensoAte = suspensos.get(assistido.getAssistidoId());
                     return new AtendidoChamadaDTO(
                             assistido.getAssistidoId(),
                             assistido.getNomeCompleto(),
                             assistido.getDataNascimento(),
                             assistido.isPodeIrEmboraSozinho(),
-                            falta != null ? falta.getStatusPresenca() : StatusPresenca.PRESENTE,
-                            justificativa != null ? justificativa.getMotivoFalta() : null,
+                            suspensoAte != null ? StatusPresenca.FALTA_JUSTIFICADA
+                                    : falta != null ? falta.getStatusPresenca() : StatusPresenca.PRESENTE,
+                            suspensoAte != null ? MotivoFalta.SUSPENSAO
+                                    : justificativa != null ? justificativa.getMotivoFalta() : null,
                             justificativa != null ? justificativa.getObservacao() : null,
                             historicoPorAssistidoId.getOrDefault(assistido.getAssistidoId(), List.of()),
                             frequencias.getOrDefault(assistido.getAssistidoId(), IndicadorFrequencia.SEM_AULAS).percentual(),
-                            autorizados.getOrDefault(assistido.getAssistidoId(), List.of()));
+                            autorizados.getOrDefault(assistido.getAssistidoId(), List.of()),
+                            suspensoAte);
                 })
                 .toList();
 
@@ -191,6 +201,19 @@ public class ChamadaService {
                                         .getOrDefault(assistido.getAssistidoId(), Map.of())
                                         .getOrDefault(anterior.getChamadaId(), StatusPresenca.PRESENTE)))
                         .toList()));
+    }
+
+    /** FT-13: o suspenso fica sempre como falta justificada por Suspensão, venha o que vier (corrige-se a suspensão, não a chamada). */
+    private List<PresencaChamadaRequestDTO> comSuspensos(List<PresencaChamadaRequestDTO> presencas,
+                                                         Map<Long, LocalDate> suspensos) {
+        Map<Long, PresencaChamadaRequestDTO> porAssistidoId = new LinkedHashMap<>();
+        presencas.forEach(presenca -> porAssistidoId.put(presenca.assistidoId(), presenca));
+        suspensos.keySet().forEach(assistidoId -> {
+            PresencaChamadaRequestDTO enviada = porAssistidoId.get(assistidoId);
+            porAssistidoId.put(assistidoId, new PresencaChamadaRequestDTO(assistidoId,
+                    StatusPresenca.FALTA_JUSTIFICADA, MotivoFalta.SUSPENSAO, enviada != null ? enviada.observacao() : null));
+        });
+        return List.copyOf(porAssistidoId.values());
     }
 
     private int gravarPresencas(Chamada chamada, List<PresencaChamadaRequestDTO> presencas,
@@ -267,14 +290,22 @@ public class ChamadaService {
     }
 
     /** Valida a lista inteira antes de gravar qualquer coisa: a chamada entra completa ou não entra (CA-FT12.5). */
-    private void validarPresencas(List<PresencaChamadaRequestDTO> presencas, Map<Long, Assistido> atendidosPorId) {
+    private void validarPresencas(List<PresencaChamadaRequestDTO> presencas, Map<Long, Assistido> atendidosPorId,
+                                  Map<Long, LocalDate> suspensos) {
         for (PresencaChamadaRequestDTO dto : presencas) {
             if (!atendidosPorId.containsKey(dto.assistidoId())) {
                 throw new RegraNegocioException(
                         "O atendido id " + dto.assistidoId() + " não estava no grupo nesta data.");
             }
+            if (suspensos.containsKey(dto.assistidoId())) {
+                continue; // o back grava como falta justificada por Suspensão (comSuspensos)
+            }
             if (dto.statusPresenca() == StatusPresenca.FALTA_JUSTIFICADA) {
                 PresencaMapper.validarJustificativa(dto.motivoFalta(), dto.observacao());
+                if (dto.motivoFalta() == MotivoFalta.SUSPENSAO) {
+                    throw new RegraNegocioException("A falta por Suspensão vem do Sistema Disciplinar. "
+                            + "Para " + atendidosPorId.get(dto.assistidoId()).getNomeCompleto() + ", use Atestado.");
+                }
             }
         }
     }
