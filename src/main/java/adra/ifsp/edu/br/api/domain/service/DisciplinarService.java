@@ -313,7 +313,7 @@ public class DisciplinarService {
                     && arquivo.getCategoria() == CategoriaArquivo.DOCUMENTO_DISCIPLINAR_ASSINADO;
             if (!doAssistido) {
                 throw new RegraNegocioException(
-                        "O arquivo precisa ser um documento disciplinar assinado deste assistido.");
+                        "O arquivo precisa ser um documento disciplinar assinado deste atendido.");
             }
             registro.setDocumentoArquivo(arquivo);
         }
@@ -553,7 +553,7 @@ public class DisciplinarService {
 
     private Assistido buscarAssistido(Long assistidoId) {
         return assistidoRepository.findById(assistidoId)
-                .orElseThrow(() -> new EntidadeNaoEncontradaException("Assistido não encontrado: id " + assistidoId));
+                .orElseThrow(() -> new EntidadeNaoEncontradaException("Atendido não encontrado: id " + assistidoId));
     }
 
     private Assistido buscarAssistidoAtivo(Long assistidoId) {

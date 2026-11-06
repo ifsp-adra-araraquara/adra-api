@@ -25,11 +25,11 @@ public record PreCadastroRequestDTO(
         @Past(message = "Data de nascimento deve estar no passado.")
         LocalDate dataNascimento,
 
-        @NotBlank(message = "Informe o CPF da criança.")
-        @ValidCpf(message = "CPF da criança inválido.")
+        @NotBlank(message = "Informe o CPF do atendido.")
+        @ValidCpf(message = "CPF do atendido inválido.")
         String cpf,
 
-        @NotNull(message = "Informe o sexo da criança.")
+        @NotNull(message = "Informe o sexo do atendido.")
         Sexo sexo,
 
         @Email(message = "E-mail inválido.")

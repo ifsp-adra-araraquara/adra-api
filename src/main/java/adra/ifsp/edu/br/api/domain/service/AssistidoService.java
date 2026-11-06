@@ -93,9 +93,9 @@ public class AssistidoService {
         Turma turma = null;
         if (dto.turmaId() != null) {
             turma = turmaRepository.findById(dto.turmaId())
-                    .orElseThrow(() -> new EntidadeNaoEncontradaException("Turma nao encontrada: id " + dto.turmaId()));
+                    .orElseThrow(() -> new EntidadeNaoEncontradaException("Grupo nao encontrado: id " + dto.turmaId()));
             if (!turma.getAtivo()) {
-                throw new RegraNegocioException("A turma informada nao esta ativa");
+                throw new RegraNegocioException("O grupo informado nao esta ativo");
             }
         }
 
@@ -142,7 +142,7 @@ public class AssistidoService {
     public AssistidoResponseDTO buscarPorCpf(String cpf) {
         return assistidoRepository.findByCpf(cpf)
                 .map(assistidoMapper::paraDTO)
-                .orElseThrow(() -> new EntidadeNaoEncontradaException("Assistido nao encontrado para o CPF informado"));
+                .orElseThrow(() -> new EntidadeNaoEncontradaException("Atendido nao encontrado para o CPF informado"));
     }
 
     @Transactional(readOnly = true)
@@ -300,9 +300,9 @@ public class AssistidoService {
         Turma novaTurma = null;
         if (novaTurmaId != null) {
             novaTurma = turmaRepository.findById(novaTurmaId)
-                    .orElseThrow(() -> new EntidadeNaoEncontradaException("Turma nao encontrada: id " + novaTurmaId));
+                    .orElseThrow(() -> new EntidadeNaoEncontradaException("Grupo nao encontrado: id " + novaTurmaId));
             if (!Boolean.TRUE.equals(novaTurma.getAtivo())) {
-                throw new RegraNegocioException("A turma informada nao esta ativa");
+                throw new RegraNegocioException("O grupo informado nao esta ativo");
             }
             turmaHistoricoRepository.save(AssistidoTurmaHistorico.builder()
                     .assistido(assistido)
@@ -342,7 +342,7 @@ public class AssistidoService {
                 .toList();
 
         if (idsParaManter.size() + novos.size() == 0) {
-            throw new RegraNegocioException("O assistido deve manter pelo menos um responsavel vinculado");
+            throw new RegraNegocioException("O atendido deve manter pelo menos um responsavel vinculado");
         }
 
         if (!paraRemover.isEmpty() && !usuarioAtualTemPapel("ADMINISTRADOR")) {
@@ -440,7 +440,7 @@ public class AssistidoService {
 
     Assistido buscarEntidadePorId(Long id) {
         return assistidoRepository.findById(id)
-                .orElseThrow(() -> new EntidadeNaoEncontradaException("Assistido nao encontrado: id " + id));
+                .orElseThrow(() -> new EntidadeNaoEncontradaException("Atendido nao encontrado: id " + id));
     }
 
     /** CPF repetido bloqueia; mesmo nome + nascimento so passa se os dois tiverem CPFs diferentes. */
@@ -450,7 +450,7 @@ public class AssistidoService {
             Optional<Assistido> mesmoCpf = assistidoRepository.findByCpf(dto.cpf())
                     .filter(a -> !a.getAssistidoId().equals(idEmEdicao));
             if (mesmoCpf.isPresent()) {
-                return Optional.of("CPF ja cadastrado para o assistido " + mesmoCpf.get().getNomeCompleto());
+                return Optional.of("CPF ja cadastrado para o atendido " + mesmoCpf.get().getNomeCompleto());
             }
         }
 
@@ -460,7 +460,7 @@ public class AssistidoService {
                 .filter(a -> !a.getAssistidoId().equals(idEmEdicao))
                 .anyMatch(a -> !cpfsDiferentes(a.getCpf(), dto.cpf()));
         if (mesmaPessoa) {
-            return Optional.of("Ja existe assistido com mesmo nome e data de nascimento");
+            return Optional.of("Ja existe atendido com mesmo nome e data de nascimento");
         }
         return Optional.empty();
     }
@@ -530,10 +530,10 @@ public class AssistidoService {
      */
     private void validarDadosComplementares(AssistidoRequestDTO dto) {
         if (Boolean.TRUE.equals(dto.possuiProblemaSaude()) && !StringUtils.hasText(dto.problemaSaude())) {
-            throw new RegraNegocioException("Informe qual e' o problema de saude do assistido");
+            throw new RegraNegocioException("Informe qual e' o problema de saude do atendido");
         }
         if (Boolean.TRUE.equals(dto.pcd()) && !StringUtils.hasText(dto.deficiencia())) {
-            throw new RegraNegocioException("Informe qual e' a deficiencia do assistido");
+            throw new RegraNegocioException("Informe qual e' a deficiencia do atendido");
         }
         if (Boolean.TRUE.equals(dto.recebeProgramaTransferencia())) {
             Set<ProgramaTransferencia> programas = dto.programasTransferencia();
@@ -557,7 +557,7 @@ public class AssistidoService {
                 : documentos.stream().filter(d -> d != null && !d.isEmpty()).toList();
         // valida antes de criar o assistido, pra não gastar insert/upload à toa
         if (docs.isEmpty()) {
-            throw new ArquivoInvalidoException("Envie a foto do RG ou CPF do assistido.");
+            throw new ArquivoInvalidoException("Envie a foto do RG ou CPF do atendido.");
         }
         if (docs.size() > MAXIMO_DOCUMENTOS_IDENTIDADE) {
             throw new ArquivoInvalidoException("Envie apenas um arquivo do RG ou CPF.");

@@ -6,7 +6,7 @@ import java.util.List;
 
 /** Corpo do POST /api/turmas/{id}/alunos — botão "+ Vincular alunos" da tela de turmas. */
 public record VincularAlunosTurmaDTO(
-        @NotEmpty(message = "Selecione pelo menos um assistido.")
+        @NotEmpty(message = "Selecione pelo menos um atendido.")
         List<Long> assistidoIds
 ) {
 }

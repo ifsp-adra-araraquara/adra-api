@@ -70,7 +70,7 @@ public class AssistidoLoteService {
 
         List<String> cpfs = cpfsResponsaveis(item);
         if (Set.copyOf(cpfs).size() < cpfs.size()) {
-            erros.add("responsaveis: CPF de responsavel repetido no mesmo assistido");
+            erros.add("responsaveis: CPF de responsavel repetido no mesmo atendido");
         }
 
         for (int anterior = 0; anterior < indice; anterior++) {
@@ -80,7 +80,7 @@ public class AssistidoLoteService {
                 break;
             }
             if (mesmoNomeENascimento(outro, item) && !AssistidoService.cpfsDiferentes(outro.cpf(), item.cpf())) {
-                erros.add("nomeCompleto: Assistido repetido na linha " + (anterior + 1));
+                erros.add("nomeCompleto: Atendido repetido na linha " + (anterior + 1));
                 break;
             }
         }
@@ -116,7 +116,7 @@ public class AssistidoLoteService {
 
     private void verificarTamanho(List<AssistidoRequestDTO> itens) {
         if (itens == null || itens.isEmpty() || itens.size() > LIMITE_LINHAS) {
-            throw new RegraNegocioException("O lote deve ter entre 1 e " + LIMITE_LINHAS + " assistidos");
+            throw new RegraNegocioException("O lote deve ter entre 1 e " + LIMITE_LINHAS + " atendidos");
         }
     }
 }

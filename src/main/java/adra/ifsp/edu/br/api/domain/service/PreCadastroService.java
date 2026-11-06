@@ -182,7 +182,7 @@ public class PreCadastroService {
             throw new RegraNegocioException("Informe a rua do endereço da família.");
         }
         if (Boolean.TRUE.equals(dados.saude().possuiProblema()) && !StringUtils.hasText(dados.saude().descricao())) {
-            throw new RegraNegocioException("Informe qual é o problema de saúde da criança.");
+            throw new RegraNegocioException("Informe qual é o problema de saúde do atendido.");
         }
         if (Boolean.TRUE.equals(dados.transferencia().recebe())) {
             Set<ProgramaTransferencia> programas = dados.transferencia().programas();
@@ -195,7 +195,7 @@ public class PreCadastroService {
         }
         if (Boolean.FALSE.equals(dados.autorizacoes().irEmboraSozinho())
                 && !StringUtils.hasText(dados.autorizacoes().quemBusca())) {
-            throw new RegraNegocioException("Informe quem vem buscar a criança.");
+            throw new RegraNegocioException("Informe quem vem buscar o atendido.");
         }
     }
 

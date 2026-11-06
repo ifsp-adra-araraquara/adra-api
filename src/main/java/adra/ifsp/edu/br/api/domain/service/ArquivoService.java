@@ -308,7 +308,7 @@ public class ArquivoService {
                 throw new EntidadeNaoEncontradaException(entidadeTipo + " nao encontrado: id " + entidadeId);
             }
         } else {
-            throw new ArquivoInvalidoException("Arquivos so podem ser enviados para assistidos, responsaveis, usuarios e semanarios.");
+            throw new ArquivoInvalidoException("Arquivos so podem ser enviados para atendidos, responsaveis, usuarios e semanarios.");
         }
     }
 

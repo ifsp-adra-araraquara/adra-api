@@ -203,8 +203,8 @@ class AssistidoLoteIT {
         assertThat(resultados).extracting(ResultadoLinhaLoteDTO::status)
                 .containsExactly(StatusLinhaLote.VALIDA, StatusLinhaLote.INVALIDA, StatusLinhaLote.INVALIDA);
         assertThat(resultados.get(0).responsaveisExistentes()).containsEntry(CPF_RESPONSAVEL_EXISTENTE, "Paula Existente");
-        assertThat(resultados.get(1).erros()).containsExactly("CPF ja cadastrado para o assistido Caio Existente");
-        assertThat(resultados.get(2).erros()).containsExactly("Ja existe assistido com mesmo nome e data de nascimento");
+        assertThat(resultados.get(1).erros()).containsExactly("CPF ja cadastrado para o atendido Caio Existente");
+        assertThat(resultados.get(2).erros()).containsExactly("Ja existe atendido com mesmo nome e data de nascimento");
         assertThat(assistidoRepository.count()).isEqualTo(assistidosAntes);
     }
 
