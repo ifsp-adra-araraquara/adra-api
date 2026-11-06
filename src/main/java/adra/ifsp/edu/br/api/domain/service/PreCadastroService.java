@@ -1,6 +1,7 @@
 package adra.ifsp.edu.br.api.domain.service;
 
 import adra.ifsp.edu.br.api.config.CacheConfig;
+import adra.ifsp.edu.br.api.domain.service.ArquivoService.AnexoNovo;
 import adra.ifsp.edu.br.api.domain.dto.arquivo.ArquivoResponseDTO;
 import adra.ifsp.edu.br.api.domain.dto.arquivo.UrlArquivoDTO;
 import adra.ifsp.edu.br.api.domain.dto.assistido.AssistidoRequestDTO;
@@ -32,9 +33,11 @@ import adra.ifsp.edu.br.api.exception.ArquivoInvalidoException;
 import adra.ifsp.edu.br.api.exception.AssistidoJaCadastradoException;
 import adra.ifsp.edu.br.api.exception.EntidadeNaoEncontradaException;
 import adra.ifsp.edu.br.api.exception.RegraNegocioException;
+import adra.ifsp.edu.br.api.infra.TurnstileClient;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
@@ -65,7 +68,8 @@ public class PreCadastroService {
 
     /** Mesmo IP não pode enviar outro pré-cadastro antes desse intervalo — mitiga spam/flood simples. */
     private static final Duration JANELA_LIMITE = Duration.ofMinutes(2);
-    private static final int LIMITE_DIARIO_POR_IP = 10;
+    private static final int LIMITE_DIARIO_POR_IP = 20;
+    private static final int LIMITE_DIARIO_GLOBAL = 180;
     /** Frente e verso. */
     private static final int MAXIMO_DOCUMENTOS = 2;
 
@@ -78,6 +82,7 @@ public class PreCadastroService {
     private final ArquivoService arquivoService;
     private final ArquivoRepository arquivoRepository;
     private final ResponsavelRepository responsavelRepository;
+    private final TurnstileClient turnstile;
 
     private final Map<String, EnviosDoIp> enviosPorIp = new ConcurrentHashMap<>();
 
@@ -86,33 +91,47 @@ public class PreCadastroService {
 
     /** Devolve o id (protocolo para a família); null quando o honeypot pegou um robô. */
     @CacheEvict(cacheNames = CacheConfig.PAINEL, allEntries = true)
-    public Long registrarPublico(PreCadastroRequestDTO dto, AnexosPreCadastro anexos, String ip) {
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public Long registrarPublico(PreCadastroRequestDTO dto, AnexosPreCadastro anexos, String captcha, String ip) {
         // Honeypot: campo invisível pro humano: se veio preenchido, é robô — finge sucesso.
         if (dto.site() != null && !dto.site().isBlank()) {
             return null;
         }
         validarCondicionais(dto.dados());
         validarAnexos(anexos);
+        if (!turnstile.tokenValido(captcha)) {
+            throw new RegraNegocioException("Não foi possível confirmar que você não é um robô. Tente de novo.");
+        }
         registrarEnvio(ip, Instant.now());
+        validarLimiteGlobal();
 
-        PreCadastro registro = PreCadastro.builder()
-                .nomeCompleto(dto.nomeCompleto().trim())
-                .dataNascimento(dto.dataNascimento())
-                .cpf(dto.cpf())
-                .sexo(dto.sexo())
-                .email(StringUtils.hasText(dto.email()) ? dto.email().trim() : null)
-                .responsavelNome(nomeDoResponsavel(dto.dados()))
-                .responsavelTelefone(telefoneDoResponsavel(dto.dados()))
-                .dados(dto.dados())
-                .ipOrigem(ip)
-                .build();
-        repository.save(registro);
-        salvarAnexos(registro.getPreCadastroId(), anexos);
+        return arquivoService.enviarEGravar(EntidadeArquivo.PRE_CADASTRO, anexosNovos(anexos), enviados -> {
+            PreCadastro registro = PreCadastro.builder()
+                    .nomeCompleto(dto.nomeCompleto().trim())
+                    .dataNascimento(dto.dataNascimento())
+                    .cpf(dto.cpf())
+                    .sexo(dto.sexo())
+                    .email(StringUtils.hasText(dto.email()) ? dto.email().trim() : null)
+                    .responsavelNome(nomeDoResponsavel(dto.dados()))
+                    .responsavelTelefone(telefoneDoResponsavel(dto.dados()))
+                    .dados(dto.dados())
+                    .ipOrigem(ip)
+                    .build();
+            repository.save(registro);
+            enviados.forEach(enviado -> arquivoService.registrarDoLinkPublico(registro.getPreCadastroId(), enviado));
 
-        auditoriaService.registrar(ModuloSistema.PRE_CADASTRO, "pre_cadastro", registro.getPreCadastroId(),
-                AcaoSistema.CRIAR, null, Map.of("nomeCompleto", registro.getNomeCompleto()),
-                "Pré-cadastro recebido pelo link público");
-        return registro.getPreCadastroId();
+            auditoriaService.registrar(ModuloSistema.PRE_CADASTRO, "pre_cadastro", registro.getPreCadastroId(),
+                    AcaoSistema.CRIAR, null, Map.of("nomeCompleto", registro.getNomeCompleto()),
+                    "Pré-cadastro recebido pelo link público");
+            return registro.getPreCadastroId();
+        });
+    }
+
+    private void validarLimiteGlobal() {
+        OffsetDateTime inicioDoDia = LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toOffsetDateTime();
+        if (repository.countByCriadoEmGreaterThanEqual(inicioDoDia) >= LIMITE_DIARIO_GLOBAL) {
+            throw new RegraNegocioException("Limite de inscrições por hoje atingido. Tente amanhã ou procure a ADRA.");
+        }
     }
 
     private void validarAnexos(AnexosPreCadastro anexos) {
@@ -121,16 +140,18 @@ public class PreCadastroService {
         }
     }
 
-    private void salvarAnexos(Long preCadastroId, AnexosPreCadastro anexos) {
+    private List<AnexoNovo> anexosNovos(AnexosPreCadastro anexos) {
+        List<AnexoNovo> novos = new ArrayList<>();
         if (anexos.foto() != null) {
-            arquivoService.salvarDoLinkPublico(preCadastroId, CategoriaArquivo.FOTO_PERFIL, anexos.foto());
+            novos.add(new AnexoNovo(CategoriaArquivo.FOTO_PERFIL, anexos.foto()));
         }
         for (MultipartFile documento : anexos.documentosCrianca()) {
-            arquivoService.salvarDoLinkPublico(preCadastroId, CategoriaArquivo.DOCUMENTO_IDENTIDADE, documento);
+            novos.add(new AnexoNovo(CategoriaArquivo.DOCUMENTO_IDENTIDADE, documento));
         }
         for (MultipartFile documento : anexos.documentosResponsavel()) {
-            arquivoService.salvarDoLinkPublico(preCadastroId, CategoriaArquivo.DOCUMENTO_RESPONSAVEL, documento);
+            novos.add(new AnexoNovo(CategoriaArquivo.DOCUMENTO_RESPONSAVEL, documento));
         }
+        return novos;
     }
 
     /** O que a família deixou de enviar (tudo é opcional no link; a equipe pede na entrevista). */
@@ -173,7 +194,7 @@ public class PreCadastroService {
         }
     }
 
-    /** 1 envio a cada 2 minutos e no máximo 10 por dia, por IP (em memória: a API roda numa instância só). */
+    /** 1 envio a cada 2 minutos e no máximo 20 por dia, por IP (em memória: a API roda numa instância só). */
     void registrarEnvio(String ip, Instant agora) {
         if (ip == null) {
             return;
@@ -244,7 +265,7 @@ public class PreCadastroService {
         return PreCadastroResponseDTO.de(registro, assistidoExistenteId, arquivos, faltando);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public UrlArquivoDTO gerarUrlDoArquivo(Long preCadastroId, Long arquivoId) {
         return arquivoService.gerarUrlDePreCadastro(preCadastroId, arquivoId);
     }

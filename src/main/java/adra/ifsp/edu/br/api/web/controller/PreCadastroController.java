@@ -34,17 +34,19 @@ public class PreCadastroController {
 
     private final PreCadastroService service;
 
-    /** Multipart: "dados" (JSON) + foto e documentos opcionais. */
+    /** Multipart: "dados" (JSON) + comprovante de endereço + foto e documentos opcionais. */
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<Map<String, Long>> registrarPublico(
             @Valid @RequestPart("dados") PreCadastroRequestDTO dto,
             @RequestPart(value = "foto", required = false) MultipartFile foto,
             @RequestPart(value = "documentosCrianca", required = false) List<MultipartFile> documentosCrianca,
             @RequestPart(value = "documentosResponsavel", required = false) List<MultipartFile> documentosResponsavel,
+            @RequestPart(value = "comprovanteEndereco", required = false) MultipartFile comprovanteEndereco,
+            @RequestParam(value = "captcha", required = false) String captcha,
             HttpServletRequest request
     ) {
-        AnexosPreCadastro anexos = new AnexosPreCadastro(foto, documentosCrianca, documentosResponsavel);
-        Long protocolo = service.registrarPublico(dto, anexos, ipDoCliente(request));
+        AnexosPreCadastro anexos = new AnexosPreCadastro(foto, documentosCrianca, documentosResponsavel, comprovanteEndereco);
+        Long protocolo = service.registrarPublico(dto, anexos, captcha, ipDoCliente(request));
         return ResponseEntity.status(HttpStatus.CREATED).body(Collections.singletonMap("preCadastroId", protocolo));
     }
 

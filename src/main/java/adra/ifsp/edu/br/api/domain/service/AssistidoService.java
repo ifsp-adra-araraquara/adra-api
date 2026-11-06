@@ -1,6 +1,7 @@
 package adra.ifsp.edu.br.api.domain.service;
 
 import adra.ifsp.edu.br.api.config.CacheConfig;
+import adra.ifsp.edu.br.api.domain.service.ArquivoService.AnexoNovo;
 import adra.ifsp.edu.br.api.domain.dto.PaginaDTO;
 import adra.ifsp.edu.br.api.domain.dto.assistido.AssistidoContagemDTO;
 import adra.ifsp.edu.br.api.domain.dto.assistido.AssistidoRequestDTO;
@@ -37,12 +38,15 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -69,7 +73,7 @@ public class AssistidoService {
     private final VinculoTurmaService vinculoTurmaService;
     private final TurmaAlunosRepository turmaAlunosRepository;
 
-    AssistidoResponseDTO cadastrar(AssistidoRequestDTO dto) {
+    private void validarNovoCadastro(AssistidoRequestDTO dto) {
         validarDadosComplementares(dto);
         // Regra de corte so na entrada: familia ja atendida nao e' barrada ao editar.
         elegibilidadeService.validarRendaFamiliar(dto.rendaFamiliar());
@@ -79,6 +83,10 @@ public class AssistidoService {
         if (dto.responsaveis() == null || dto.responsaveis().isEmpty()) {
             throw new RegraNegocioException("Pelo menos um responsavel deve ser informado");
         }
+    }
+
+    AssistidoResponseDTO cadastrar(AssistidoRequestDTO dto) {
+        validarNovoCadastro(dto);
 
         // CA-A02.3: Validar turma ativa
         Turma turma = null;
@@ -539,8 +547,9 @@ public class AssistidoService {
 
     private static final int MAXIMO_DOCUMENTOS_IDENTIDADE = 1;
 
-    /** Cadastro + RG/CPF (obrigatório) + foto de perfil (opcional), tudo na mesma transação. */
+    /** Cadastro + RG/CPF (obrigatório) + foto de perfil (opcional): grava tudo ou apaga o que foi enviado. */
     @CacheEvict(cacheNames = {CacheConfig.ESTRUTURA, CacheConfig.PAINEL}, allEntries = true)
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public AssistidoResponseDTO cadastrarComArquivos(AssistidoRequestDTO dto, MultipartFile foto,
                                                      List<MultipartFile> documentos) {
         List<MultipartFile> docs = documentos == null ? List.of()
@@ -553,14 +562,18 @@ public class AssistidoService {
             throw new ArquivoInvalidoException("Envie apenas um arquivo do RG ou CPF.");
         }
 
-        AssistidoResponseDTO criado = cadastrar(dto);
-        Long id = criado.assistidoId();
+        validarNovoCadastro(dto);
+
+        List<AnexoNovo> anexos = new ArrayList<>();
         if (foto != null && !foto.isEmpty()) {
-            arquivoService.salvar(EntidadeArquivo.ASSISTIDO, id, CategoriaArquivo.FOTO_PERFIL, foto);
+            anexos.add(new AnexoNovo(CategoriaArquivo.FOTO_PERFIL, foto));
         }
-        for (MultipartFile documento : docs) {
-            arquivoService.salvar(EntidadeArquivo.ASSISTIDO, id, CategoriaArquivo.DOCUMENTO_IDENTIDADE, documento);
-        }
-        return criado;
+        docs.forEach(documento -> anexos.add(new AnexoNovo(CategoriaArquivo.DOCUMENTO_IDENTIDADE, documento)));
+
+        return arquivoService.enviarEGravar(EntidadeArquivo.ASSISTIDO, anexos, enviados -> {
+            AssistidoResponseDTO criado = cadastrar(dto);
+            enviados.forEach(enviado -> arquivoService.registrar(EntidadeArquivo.ASSISTIDO, criado.assistidoId(), enviado));
+            return criado;
+        });
     }
 }
