@@ -135,6 +135,9 @@ public class PreCadastroService {
     }
 
     private void validarAnexos(AnexosPreCadastro anexos) {
+        if (anexos.comprovanteEndereco() == null) {
+            throw new ArquivoInvalidoException("Envie o comprovante de endereço.");
+        }
         if (anexos.documentosCrianca().size() > MAXIMO_DOCUMENTOS || anexos.documentosResponsavel().size() > MAXIMO_DOCUMENTOS) {
             throw new ArquivoInvalidoException("Envie no máximo 2 arquivos por documento (frente e verso).");
         }
@@ -142,6 +145,7 @@ public class PreCadastroService {
 
     private List<AnexoNovo> anexosNovos(AnexosPreCadastro anexos) {
         List<AnexoNovo> novos = new ArrayList<>();
+        novos.add(new AnexoNovo(CategoriaArquivo.DECLARACAO_RESIDENCIA, anexos.comprovanteEndereco()));
         if (anexos.foto() != null) {
             novos.add(new AnexoNovo(CategoriaArquivo.FOTO_PERFIL, anexos.foto()));
         }
@@ -154,11 +158,12 @@ public class PreCadastroService {
         return novos;
     }
 
-    /** O que a família deixou de enviar (tudo é opcional no link; a equipe pede na entrevista). */
+    /** O que a família deixou de enviar (a equipe pede na entrevista). */
     static List<String> anexosFaltando(Collection<CategoriaArquivo> enviados) {
         List<String> faltando = new ArrayList<>();
-        if (!enviados.contains(CategoriaArquivo.FOTO_PERFIL)) faltando.add("Foto da criança");
-        if (!enviados.contains(CategoriaArquivo.DOCUMENTO_IDENTIDADE)) faltando.add("Documento da criança");
+        if (!enviados.contains(CategoriaArquivo.FOTO_PERFIL)) faltando.add("Foto do atendido");
+        if (!enviados.contains(CategoriaArquivo.DOCUMENTO_IDENTIDADE)) faltando.add("Documento do atendido");
+        if (!enviados.contains(CategoriaArquivo.DECLARACAO_RESIDENCIA)) faltando.add("Comprovante de endereço");
         if (!enviados.contains(CategoriaArquivo.DOCUMENTO_RESPONSAVEL)) faltando.add("Documento do responsável");
         return faltando;
     }
@@ -300,12 +305,14 @@ public class PreCadastroService {
         return PreCadastroResponseDTO.de(registro, null, List.of(), List.of());
     }
 
-    /** Foto e documento da criança vão para o atendido; o documento do responsável, para o responsável principal. */
+    /** Foto, documento e comprovante vão para o atendido; o documento do responsável, para o responsável principal. */
     private void transferirAnexos(Long preCadastroId, Long assistidoId, AssistidoRequestDTO dto) {
         arquivoService.transferir(EntidadeArquivo.PRE_CADASTRO, preCadastroId, CategoriaArquivo.FOTO_PERFIL,
                 EntidadeArquivo.ASSISTIDO, assistidoId, CategoriaArquivo.FOTO_PERFIL);
         arquivoService.transferir(EntidadeArquivo.PRE_CADASTRO, preCadastroId, CategoriaArquivo.DOCUMENTO_IDENTIDADE,
                 EntidadeArquivo.ASSISTIDO, assistidoId, CategoriaArquivo.DOCUMENTO_IDENTIDADE);
+        arquivoService.transferir(EntidadeArquivo.PRE_CADASTRO, preCadastroId, CategoriaArquivo.DECLARACAO_RESIDENCIA,
+                EntidadeArquivo.ASSISTIDO, assistidoId, CategoriaArquivo.DECLARACAO_RESIDENCIA);
         dto.responsaveis().stream()
                 .filter(VinculoFamiliarComResponsavelRequestDTO::responsavelPrincipal)
                 .findFirst()

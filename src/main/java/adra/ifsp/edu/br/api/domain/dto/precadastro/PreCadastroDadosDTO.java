@@ -69,7 +69,11 @@ public record PreCadastroDadosDTO(
             Boolean aceiteLgpd,
 
             @NotNull(message = "Responda o termo de cessão de imagem.")
-            Boolean autorizaUsoImagem
+            Boolean autorizaUsoImagem,
+
+            @NotNull(message = "Responda sobre a regra de frequência.")
+            @AssertTrue(message = "Sem confirmar a regra de frequência não é possível enviar a inscrição.")
+            Boolean cienteFrequencia
     ) {
     }
 
@@ -159,6 +163,7 @@ public record PreCadastroDadosDTO(
             @Size(max = 120)
             String outro,
 
+            @NotBlank(message = "Informe o NIS.")
             @Pattern(regexp = "^$|\\d{11}", message = "NIS deve ter 11 dígitos.")
             String nis
     ) {

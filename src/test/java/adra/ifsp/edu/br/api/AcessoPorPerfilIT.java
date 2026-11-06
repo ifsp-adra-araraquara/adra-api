@@ -9,11 +9,15 @@ import static org.junit.jupiter.params.provider.Arguments.arguments;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.request;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.time.DayOfWeek;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -40,11 +44,21 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import com.jayway.jsonpath.JsonPath;
 
 import adra.ifsp.edu.br.api.domain.enums.NomeNivelPermissao;
+import adra.ifsp.edu.br.api.domain.enums.ProvedorArmazenamento;
+import adra.ifsp.edu.br.api.domain.enums.Turno;
+import adra.ifsp.edu.br.api.domain.model.Oficina;
+import adra.ifsp.edu.br.api.domain.model.OficinaTurma;
+import adra.ifsp.edu.br.api.domain.model.Turma;
 import adra.ifsp.edu.br.api.domain.model.Usuario;
 import adra.ifsp.edu.br.api.domain.repository.NivelPermissaoRepository;
+import adra.ifsp.edu.br.api.domain.repository.OficinaRepository;
+import adra.ifsp.edu.br.api.domain.repository.OficinaTurmaRepository;
+import adra.ifsp.edu.br.api.domain.repository.TurmaRepository;
 import adra.ifsp.edu.br.api.domain.repository.UsuarioRepository;
 import adra.ifsp.edu.br.api.domain.service.TokenService;
 import adra.ifsp.edu.br.api.infra.SupabaseAdminClient;
+import adra.ifsp.edu.br.api.infra.TurnstileClient;
+import adra.ifsp.edu.br.api.infra.armazenamento.ArmazenamentoArquivos;
 
 @Import(TestcontainersConfiguration.class)
 @SpringBootTest
@@ -63,15 +77,36 @@ class AcessoPorPerfilIT {
     @Autowired
     private NivelPermissaoRepository nivelPermissaoRepository;
 
+    @Autowired
+    private OficinaRepository oficinaRepository;
+
+    @Autowired
+    private TurmaRepository turmaRepository;
+
+    @Autowired
+    private OficinaTurmaRepository oficinaTurmaRepository;
+
+    @Autowired
+    private TokenService tokenService;
+
     @MockitoBean
     private SupabaseAdminClient supabaseAdminClient;
+
+    @MockitoBean
+    private TurnstileClient turnstile;
+
+    @MockitoBean
+    private ArmazenamentoArquivos storage;
 
     @MockitoBean
     private JavaMailSender mailSender;
 
     static Stream<Arguments> matriz() {
         return Stream.of(
-                arguments(HttpMethod.GET, "/api/assistidos", Set.of(COORDENADOR, ASSISTENTE_SOCIAL, EDUCADOR_SOCIAL, OFICINEIRO)),
+                arguments(HttpMethod.GET, "/api/assistidos", Set.of(COORDENADOR, ASSISTENTE_SOCIAL, EDUCADOR_SOCIAL)),
+                arguments(HttpMethod.GET, "/api/assistidos/contagem", Set.of(COORDENADOR, ASSISTENTE_SOCIAL, EDUCADOR_SOCIAL)),
+                arguments(HttpMethod.GET, "/api/arquivos/fotos-perfil?entidadeTipo=ASSISTIDO&entidadeIds=" + INEXISTENTE, Set.of(COORDENADOR, ASSISTENTE_SOCIAL, EDUCADOR_SOCIAL)),
+                arguments(HttpMethod.GET, "/api/arquivos/fotos-perfil?entidadeTipo=PRE_CADASTRO&entidadeIds=" + INEXISTENTE, Set.of()),
                 arguments(HttpMethod.GET, "/api/assistidos/" + INEXISTENTE, Set.of(COORDENADOR, ASSISTENTE_SOCIAL, EDUCADOR_SOCIAL)),
                 arguments(HttpMethod.GET, "/api/assistidos/elegibilidade", Set.of(COORDENADOR, ASSISTENTE_SOCIAL)),
                 arguments(HttpMethod.GET, "/api/responsaveis", Set.of(COORDENADOR, ASSISTENTE_SOCIAL, EDUCADOR_SOCIAL)),
@@ -126,21 +161,65 @@ class AcessoPorPerfilIT {
     /** Sem login e contra o schema das migrations (enum de auditoria incluso). Dados inventados. */
     @Test
     void linkPublicoDePreCadastroGravaSemLogin() throws Exception {
+        when(turnstile.tokenValido("token-valido")).thenReturn(true);
+        when(storage.provedor()).thenReturn(ProvedorArmazenamento.SUPABASE);
         String corpo = """
                 {"nomeCompleto": "Crianca Teste", "dataNascimento": "2016-04-12", "cpf": "56532228281", "sexo": "FEMININO", "site": "",
-                 "dados": {"termos": {"aceiteLgpd": true, "autorizaUsoImagem": false},
+                 "dados": {"termos": {"aceiteLgpd": true, "autorizaUsoImagem": false, "cienteFrequencia": true},
                    "mae": {"nomeCompleto": "Mae Teste", "dataNascimento": "1990-01-20", "cpf": "96234168493",
                            "escolaridade": "MEDIO_COMPLETO", "estadoCivil": "SOLTEIRO", "renda": 1500, "telefone": "16991234567"},
                    "enderecoFamilia": {"logradouro": "Rua das Flores"},
-                   "transferencia": {"recebe": false},
+                   "transferencia": {"recebe": false, "nis": "12345678901"},
                    "saude": {"possuiProblema": false, "contatoEmergenciaNome": "Tia Teste", "contatoEmergenciaTelefone": "16998765432"},
                    "autorizacoes": {"eventosPasseios": true, "irEmboraSozinho": true}}}
                 """;
 
         mvc.perform(multipart("/api/pre-cadastro")
                         .file(new MockMultipartFile("dados", "", MediaType.APPLICATION_JSON_VALUE, corpo.getBytes()))
+                        .file(new MockMultipartFile("comprovanteEndereco", "comprovante.pdf", MediaType.APPLICATION_PDF_VALUE, pdfMinimo()))
+                        .param("captcha", "token-valido")
                         .header("X-Forwarded-For", "acesso-" + UUID.randomUUID()))
                 .andExpect(status().isCreated());
+    }
+
+    @Test
+    void oficineiroListaSoOsGruposDeleESemBuscarPorCpf() throws Exception {
+        Usuario oficineiro = criarUsuario(OFICINEIRO, false);
+        Long grupoDele = grupoDaOficinaDe(oficineiro);
+        Long outroGrupo = grupoDaOficinaDe(criarUsuario(OFICINEIRO, false));
+        RequestPostProcessor comoOficineiro = jwt()
+                .jwt(token -> token.subject(oficineiro.getUsuarioId().toString()).claim(TokenService.CLAIM_PERFIL, OFICINEIRO.name()))
+                .authorities(new SimpleGrantedAuthority("ROLE_OFICINEIRO"));
+
+        for (String url : List.of("/api/assistidos", "/api/assistidos/contagem")) {
+            mvc.perform(get(url).param("turmaId", grupoDele.toString()).with(comoOficineiro)).andExpect(status().isOk());
+            int buscaPorNome = mvc.perform(get(url).param("turmaId", grupoDele.toString()).param("busca", "Ana").with(comoOficineiro))
+                    .andReturn().getResponse().getStatus();
+            assertThat(buscaPorNome).isNotEqualTo(403);
+            mvc.perform(get(url).param("turmaId", grupoDele.toString()).param("busca", "123.4").with(comoOficineiro)).andExpect(status().isForbidden());
+            mvc.perform(get(url).param("turmaId", outroGrupo.toString()).with(comoOficineiro)).andExpect(status().isForbidden());
+            mvc.perform(get(url).with(comoOficineiro)).andExpect(status().isForbidden());
+        }
+    }
+
+    @Test
+    void tamanhoDaListagemDeAssistidosTemLimite() throws Exception {
+        mvc.perform(get("/api/assistidos").param("tamanho", "10000").with(comPerfil(COORDENADOR)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tamanho").value(500));
+    }
+
+    @Test
+    void tokenDeUsuarioDesativadoEhRecusado() throws Exception {
+        Usuario usuario = criarUsuario(COORDENADOR, false);
+        String autorizacao = "Bearer " + tokenService.gerarToken(usuario);
+
+        mvc.perform(get("/api/avisos").header("Authorization", autorizacao)).andExpect(status().isOk());
+
+        usuario.setAtivo(false);
+        usuarioRepository.save(usuario);
+
+        mvc.perform(get("/api/avisos").header("Authorization", autorizacao)).andExpect(status().isUnauthorized());
     }
 
     @Test
@@ -196,6 +275,10 @@ class AcessoPorPerfilIT {
                 .andExpect(status().isNoContent());
     }
 
+    private static byte[] pdfMinimo() {
+        return "%PDF-1.4\n%%EOF".getBytes();
+    }
+
     private Usuario criarUsuario(NomeNivelPermissao perfil, boolean administrador) {
         return usuarioRepository.save(Usuario.builder()
                 .nivelPermissao(nivelPermissaoRepository.findByNome(perfil).orElseThrow())
@@ -204,6 +287,26 @@ class AcessoPorPerfilIT {
                 .authUid(UUID.randomUUID())
                 .administrador(administrador)
                 .build());
+    }
+
+    private Long grupoDaOficinaDe(Usuario oficineiro) {
+        Oficina oficina = new Oficina();
+        oficina.setNomeOficina("Oficina " + UUID.randomUUID());
+        oficina.setOficineiroResponsavel(oficineiro);
+        oficinaRepository.save(oficina);
+
+        Turma grupo = new Turma();
+        grupo.setNomeTurma("Grupo " + UUID.randomUUID());
+        grupo.setTurno(Turno.MANHA);
+        grupo.setCapacidade(20);
+        grupo.setDiasDaSemana(new ArrayList<>(List.of(DayOfWeek.MONDAY)));
+        turmaRepository.save(grupo);
+
+        OficinaTurma vinculo = new OficinaTurma();
+        vinculo.setOficina(oficina);
+        vinculo.setTurma(grupo);
+        oficinaTurmaRepository.save(vinculo);
+        return grupo.getTurmaId();
     }
 
     private List<String> modulosNoLogin(Usuario usuario) throws Exception {
