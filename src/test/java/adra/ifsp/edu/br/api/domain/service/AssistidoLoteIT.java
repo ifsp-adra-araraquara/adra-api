@@ -230,6 +230,6 @@ class AssistidoLoteIT {
 
     private VinculoFamiliarComResponsavelRequestDTO responsavel(String nome, String cpf) {
         return new VinculoFamiliarComResponsavelRequestDTO(nome, null, cpf, null, null, null, null,
-                null, null, null, null, "Mae", true, false, false);
+                null, null, null, null, "Mae", true, false, false, null);
     }
 }
