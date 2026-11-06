@@ -30,6 +30,9 @@ public interface ArquivoRepository extends JpaRepository<Arquivo, Long> {
     /** Anexos de vários donos de uma vez (lista de pré-cadastros). */
     List<Arquivo> findByEntidadeTipoAndEntidadeIdInAndExcluidoEmIsNull(EntidadeArquivo entidadeTipo, Collection<Long> entidadeIds);
 
+    List<Arquivo> findByEntidadeTipoAndEntidadeIdInAndCategoriaAndExcluidoEmIsNull(
+            EntidadeArquivo entidadeTipo, Collection<Long> entidadeIds, CategoriaArquivo categoria);
+
     /**
      * Troca o dono dos arquivos ativos (pré-cadastro aprovado). O dono é imutável na
      * entidade (updatable = false), por isso o update explícito.

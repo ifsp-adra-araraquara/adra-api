@@ -24,6 +24,7 @@ import adra.ifsp.edu.br.api.domain.repository.ChamadaRepository;
 import adra.ifsp.edu.br.api.domain.repository.MotivoDisciplinarRepository;
 import adra.ifsp.edu.br.api.domain.repository.NivelPermissaoRepository;
 import adra.ifsp.edu.br.api.domain.repository.OficinaRepository;
+import adra.ifsp.edu.br.api.domain.repository.OficinaResumoRepository;
 import adra.ifsp.edu.br.api.domain.repository.OficinaTurmaRepository;
 import adra.ifsp.edu.br.api.domain.repository.PresencaRepository;
 import adra.ifsp.edu.br.api.domain.repository.TurmaAlunosRepository;
@@ -88,6 +89,7 @@ class PainelServiceIT {
     @Autowired private PresencaRepository presencaRepository;
     @Autowired private DisciplinarService disciplinarService;
     @Autowired private PainelService painelService;
+    @Autowired private OficinaResumoRepository oficinaResumoRepository;
     @Autowired private PainelController painelController;
     @Autowired private EntityManager entityManager;
     @Autowired private DataSource dataSource;
@@ -164,6 +166,46 @@ class PainelServiceIT {
         assertThat(painel.tendencia()).hasSize(PainelService.MESES_TENDENCIA);
         assertThat(painel.tendencia().getLast()).extracting(PainelMensalDTO.FrequenciaMes::percentual).isEqualTo(67);
         assertThat(painel.frequencia().percentualMesAnterior()).isNull();
+    }
+
+    @Test
+    @DisplayName("Saída e retorno ao grupo no mesmo dia não contam o atendido duas vezes no mês")
+    void saidaERetornoNoMesmoDiaNoMes() {
+        vinculoEncerrado(ana, MES.atDay(5), MES.atEndOfMonth());
+        falta(chamada(MES.atDay(5)), ana, StatusPresenca.FALTA);
+
+        PainelMensalDTO painel = mensal();
+
+        assertThat(painel.frequencia().percentual()).isEqualTo(50);
+        assertThat(painel.frequencia().faltas()).isEqualTo(1);
+        assertThat(painel.turmas()).singleElement()
+                .extracting(PainelMensalDTO.Turma::alunos)
+                .isEqualTo(2L);
+    }
+
+    @Test
+    @DisplayName("Saída e retorno ao grupo no mesmo dia não contam o atendido duas vezes no card da oficina")
+    void saidaERetornoNoMesmoDiaNoCardDaOficina() {
+        vinculoEncerrado(ana, MES.atEndOfMonth(), MES.atEndOfMonth());
+        entityManager.flush();
+
+        assertThat(oficinaResumoRepository.turmasAtivas(MES.atEndOfMonth()))
+                .filteredOn(grupo -> grupo.turmaId().equals(turma.getTurmaId()))
+                .singleElement()
+                .extracting(OficinaResumoRepository.TurmaDaOficina::alunos)
+                .isEqualTo(2L);
+    }
+
+    @Test
+    @DisplayName("Saída e retorno ao grupo no mesmo dia não inflam as faltas seguidas")
+    void saidaERetornoNoMesmoDiaNasFaltasSeguidas() {
+        LocalDate ontem = HOJE.minusDays(1);
+        vinculoEncerrado(ana, ontem, ontem);
+        falta(chamada(HOJE.minusDays(2)), ana, StatusPresenca.FALTA);
+        falta(chamada(ontem), ana, StatusPresenca.FALTA);
+        entityManager.flush();
+
+        assertThat(painelService.hoje().faltasSeguidas().itens()).isEmpty();
     }
 
     @Test
@@ -292,6 +334,16 @@ class PainelServiceIT {
         vinculo.setStatus(saida == null ? StatusGeral.ATIVO : StatusGeral.INATIVO);
         turmaAlunosRepository.save(vinculo);
         return assistido;
+    }
+
+    private void vinculoEncerrado(Assistido assistido, LocalDate entrada, LocalDate saida) {
+        TurmaAlunos vinculo = new TurmaAlunos();
+        vinculo.setTurma(turma);
+        vinculo.setAssistido(assistido);
+        vinculo.setDataEntrada(entrada);
+        vinculo.setDataSaida(saida);
+        vinculo.setStatus(StatusGeral.INATIVO);
+        turmaAlunosRepository.save(vinculo);
     }
 
     private Chamada chamada(LocalDate data) {

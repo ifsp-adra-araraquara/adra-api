@@ -51,7 +51,7 @@ public record PreCadastroDadosDTO(
         @Valid
         Transferencia transferencia,
 
-        @NotNull(message = "Responda sobre a saúde da criança.")
+        @NotNull(message = "Responda sobre a saúde do atendido.")
         @Valid
         Saude saude,
 
@@ -69,7 +69,11 @@ public record PreCadastroDadosDTO(
             Boolean aceiteLgpd,
 
             @NotNull(message = "Responda o termo de cessão de imagem.")
-            Boolean autorizaUsoImagem
+            Boolean autorizaUsoImagem,
+
+            @NotNull(message = "Responda sobre a regra de frequência.")
+            @AssertTrue(message = "Sem confirmar a regra de frequência não é possível enviar a inscrição.")
+            Boolean cienteFrequencia
     ) {
     }
 
@@ -159,13 +163,14 @@ public record PreCadastroDadosDTO(
             @Size(max = 120)
             String outro,
 
+            @NotBlank(message = "Informe o NIS.")
             @Pattern(regexp = "^$|\\d{11}", message = "NIS deve ter 11 dígitos.")
             String nis
     ) {
     }
 
     public record Saude(
-            @NotNull(message = "Responda se a criança tem algum problema de saúde.")
+            @NotNull(message = "Responda se o atendido tem algum problema de saúde.")
             Boolean possuiProblema,
 
             @Size(max = 1000)
@@ -185,7 +190,7 @@ public record PreCadastroDadosDTO(
             @NotNull(message = "Responda se autoriza eventos, passeios e viagens.")
             Boolean eventosPasseios,
 
-            @NotNull(message = "Responda se a criança pode ir embora sozinha.")
+            @NotNull(message = "Responda se o atendido pode ir embora sozinho.")
             Boolean irEmboraSozinho,
 
             @Size(max = 500)

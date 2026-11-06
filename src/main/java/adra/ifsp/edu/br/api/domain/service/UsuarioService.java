@@ -40,6 +40,12 @@ public class UsuarioService {
     private final UsuarioMapper usuarioMapper;
     private final AuditoriaService auditoriaService;
 
+    @Cacheable(CacheConfig.USUARIOS_ATIVOS)
+    @Transactional(readOnly = true)
+    public boolean estaAtivo(Long usuarioId) {
+        return usuarioRepository.existsByUsuarioIdAndAtivoTrue(usuarioId);
+    }
+
     @Transactional(readOnly = true)
     public void validarNovoCadastro(UsuarioRequestDTO dto) {
         if (usuarioRepository.existsByEmailIgnoreCase(dto.email())) {
@@ -150,7 +156,7 @@ public class UsuarioService {
     }
 
     /** Ativa/inativa - nunca ha' delete fisico (ver comentario na entidade Usuario). */
-    @CacheEvict(cacheNames = CacheConfig.REFERENCIAS, allEntries = true)
+    @CacheEvict(cacheNames = {CacheConfig.REFERENCIAS, CacheConfig.USUARIOS_ATIVOS}, allEntries = true)
     public UsuarioResponseDTO alterarStatus(Long id, UsuarioStatusRequestDTO dto) {
         Usuario usuario = buscarEntidadePorId(id);
         boolean statusAnterior = usuario.isAtivo();

@@ -331,6 +331,7 @@ public class ChamadaService {
     private List<Assistido> atendidosNoDia(Turma turma, LocalDate data) {
         return turmaAlunosRepository.findElegiveisParaChamada(turma, data).stream()
                 .map(TurmaAlunos::getAssistido)
+                .distinct()
                 .sorted(Comparator.comparing(Assistido::getNomeCompleto, String.CASE_INSENSITIVE_ORDER))
                 .toList();
     }

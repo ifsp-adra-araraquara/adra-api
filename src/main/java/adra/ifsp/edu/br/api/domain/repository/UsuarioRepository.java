@@ -18,4 +18,6 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long>, JpaSpec
     Optional<Usuario> findByEmailIgnoreCase(String email);
 
     Optional<Usuario> findByAuthUid(UUID authUid);
+
+    boolean existsByUsuarioIdAndAtivoTrue(Long usuarioId);
 }

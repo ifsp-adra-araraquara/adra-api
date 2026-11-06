@@ -25,7 +25,9 @@ import adra.ifsp.edu.br.api.domain.repository.PreCadastroRepository;
 import adra.ifsp.edu.br.api.domain.repository.ResponsavelRepository;
 import adra.ifsp.edu.br.api.exception.RegraNegocioException;
 import adra.ifsp.edu.br.api.infra.armazenamento.ArmazenamentoArquivos;
+import adra.ifsp.edu.br.api.infra.TurnstileClient;
 import com.jayway.jsonpath.JsonPath;
+import com.zaxxer.hikari.HikariDataSource;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -39,16 +41,20 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import tools.jackson.databind.json.JsonMapper;
 
 import javax.imageio.ImageIO;
+import javax.sql.DataSource;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.net.URI;
+import java.sql.SQLException;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -62,6 +68,11 @@ import static adra.ifsp.edu.br.api.domain.enums.NomeNivelPermissao.OFICINEIRO;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
@@ -84,6 +95,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 })
 class PreCadastroIT {
 
+    private static final String TOKEN_VALIDO = "token-valido";
     private static final String CPF_CRIANCA = "56532228281";
     private static final String CPF_MAE = "96234168493";
     private static final String CPF_CRIANCA_REPROVADA = "98334040814";
@@ -100,11 +112,13 @@ class PreCadastroIT {
     @Autowired private AssistidoService assistidoService;
     @Autowired private AssistidoRepository assistidoRepository;
     @Autowired private ResponsavelRepository responsavelRepository;
-    @Autowired private PreCadastroRepository preCadastroRepository;
+    @MockitoSpyBean private PreCadastroRepository preCadastroRepository;
     @Autowired private JdbcTemplate jdbcTemplate;
+    @Autowired private DataSource dataSource;
 
     @MockitoBean private ArmazenamentoArquivos storage;
     @MockitoBean private UsuarioAutenticadoService usuarioAutenticadoService;
+    @MockitoBean private TurnstileClient turnstile;
 
     @BeforeEach
     void definirDefaultsDoBanco() {
@@ -115,6 +129,15 @@ class PreCadastroIT {
         jdbcTemplate.execute("alter table adra.assistido_responsavel alter column criado_em set default now()");
         jdbcTemplate.execute("alter table adra.log_auditoria alter column data_hora set default now()");
         when(storage.provedor()).thenReturn(ProvedorArmazenamento.SUPABASE);
+        when(turnstile.tokenValido(TOKEN_VALIDO)).thenReturn(true);
+        doAnswer(chamada -> {
+            assertThat(conexoesEmUso()).isZero();
+            return null;
+        }).when(storage).salvar(any(), any(), any());
+        when(storage.urlTemporaria(any(), any())).thenAnswer(chamada -> {
+            assertThat(conexoesEmUso()).isZero();
+            return URI.create("https://storage.test/arquivo");
+        });
     }
 
     @Test
@@ -199,7 +222,7 @@ class PreCadastroIT {
     @DisplayName("Envio sem aceite da LGPD e bloqueado")
     void envioSemLgpdBloqueado() throws Exception {
         PreCadastroDadosDTO base = dados(CPF_MAE);
-        PreCadastroDadosDTO semAceite = new PreCadastroDadosDTO(new Termos(false, true), base.crianca(), base.mae(),
+        PreCadastroDadosDTO semAceite = new PreCadastroDadosDTO(new Termos(false, true, true), base.crianca(), base.mae(),
                 base.pai(), base.responsavelLegal(), base.enderecoFamilia(), base.transferencia(), base.saude(),
                 base.autorizacoes());
 
@@ -234,7 +257,62 @@ class PreCadastroIT {
     }
 
     @Test
-    @DisplayName("Mesmo IP: um envio a cada 2 minutos e no maximo 10 por dia")
+    @DisplayName("NIS, regra de frequencia e comprovante de endereco sao obrigatorios no envio publico")
+    void camposObrigatoriosDoEnvioPublico() throws Exception {
+        PreCadastroDadosDTO base = dados(CPF_MAE);
+        long antes = preCadastroRepository.count();
+
+        mvc.perform(multipart("/api/pre-cadastro")
+                        .file(partDados(requisicao(CPF_CRIANCA, comTransferencia(base, new Transferencia(false, Set.of(), null, null)))))
+                        .file(imagem("comprovanteEndereco")).param("captcha", TOKEN_VALIDO).header("X-Forwarded-For", ipNovo()))
+                .andExpect(status().isBadRequest());
+        PreCadastroDadosDTO semCiencia = new PreCadastroDadosDTO(new Termos(true, false, false), base.crianca(), base.mae(),
+                base.pai(), base.responsavelLegal(), base.enderecoFamilia(), base.transferencia(), base.saude(), base.autorizacoes());
+        mvc.perform(multipart("/api/pre-cadastro")
+                        .file(partDados(requisicao(CPF_CRIANCA, semCiencia)))
+                        .file(imagem("comprovanteEndereco")).param("captcha", TOKEN_VALIDO).header("X-Forwarded-For", ipNovo()))
+                .andExpect(status().isBadRequest());
+        mvc.perform(multipart("/api/pre-cadastro")
+                        .file(partDados(requisicao(CPF_CRIANCA, base)))
+                        .param("captcha", TOKEN_VALIDO).header("X-Forwarded-For", ipNovo()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.mensagem").value("Envie o comprovante de endereço."));
+
+        assertThat(preCadastroRepository.count()).isEqualTo(antes);
+        verify(storage, never()).salvar(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("Captcha recusado nao grava nem envia arquivos")
+    void captchaRecusado() throws Exception {
+        long antes = preCadastroRepository.count();
+
+        mvc.perform(multipart("/api/pre-cadastro").file(partDados(requisicao(CPF_CRIANCA, dados(CPF_MAE))))
+                        .file(imagem("comprovanteEndereco"))
+                        .param("captcha", "token-falso")
+                        .header("X-Forwarded-For", ipNovo()))
+                .andExpect(status().isConflict());
+
+        assertThat(preCadastroRepository.count()).isEqualTo(antes);
+        verify(storage, never()).salvar(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("Limite global do dia bloqueia o envio antes de enviar arquivos")
+    void limiteGlobalDoDia() throws Exception {
+        doReturn(180L).when(preCadastroRepository).countByCriadoEmGreaterThanEqual(any());
+
+        mvc.perform(multipart("/api/pre-cadastro").file(partDados(requisicao(CPF_CRIANCA, dados(CPF_MAE))))
+                        .file(imagem("comprovanteEndereco"))
+                        .param("captcha", TOKEN_VALIDO)
+                        .header("X-Forwarded-For", ipNovo()))
+                .andExpect(status().isConflict());
+
+        verify(storage, never()).salvar(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("Mesmo IP: um envio a cada 2 minutos e no maximo 20 por dia")
     void limiteDeEnviosPorIp() {
         String ip = ipNovo();
         Instant inicio = Instant.parse("2026-11-03T11:00:00Z");
@@ -242,7 +320,7 @@ class PreCadastroIT {
         preCadastroService.registrarEnvio(ip, inicio);
         assertThatThrownBy(() -> preCadastroService.registrarEnvio(ip, inicio.plus(Duration.ofMinutes(1))))
                 .isInstanceOf(RegraNegocioException.class);
-        for (int i = 1; i < 10; i++) {
+        for (int i = 1; i < 20; i++) {
             preCadastroService.registrarEnvio(ip, inicio.plus(Duration.ofMinutes(3L * i)));
         }
         assertThatThrownBy(() -> preCadastroService.registrarEnvio(ip, inicio.plus(Duration.ofMinutes(60))))
@@ -262,11 +340,13 @@ class PreCadastroIT {
         mvc.perform(get("/api/pre-cadastro").with(comPerfil(ASSISTENTE_SOCIAL)))
                 .andExpect(jsonPath("$[?(@.preCadastroId == " + id + ")].anexosFaltando.length()").value(0));
         String detalhe = mvc.perform(get("/api/pre-cadastro/" + id).with(comPerfil(ASSISTENTE_SOCIAL)))
-                .andExpect(jsonPath("$.arquivos.length()").value(3))
+                .andExpect(jsonPath("$.arquivos.length()").value(4))
                 .andReturn().getResponse().getContentAsString();
         int arquivoId = JsonPath.read(detalhe, "$.arquivos[0].arquivoId");
         mvc.perform(get("/api/arquivos/" + arquivoId + "/url").with(comPerfil(ASSISTENTE_SOCIAL)))
                 .andExpect(status().isForbidden());
+        mvc.perform(get("/api/pre-cadastro/" + id + "/arquivos/" + arquivoId + "/url").with(comPerfil(ASSISTENTE_SOCIAL)))
+                .andExpect(status().isOk());
 
         String rascunho = mvc.perform(get("/api/pre-cadastro/" + id + "/rascunho-assistido").with(comPerfil(ASSISTENTE_SOCIAL)))
                 .andReturn().getResponse().getContentAsString();
@@ -278,7 +358,7 @@ class PreCadastroIT {
         Long maeId = responsavelRepository.findByCpf(CPF_MAE_COM_ANEXOS).orElseThrow().getResponsavelId();
         assertThat(jdbcTemplate.queryForList(
                 "select categoria from adra.arquivo where entidade_tipo = 'ASSISTIDO' and entidade_id = ? order by categoria",
-                String.class, assistidoId)).containsExactly("DOCUMENTO_IDENTIDADE", "FOTO_PERFIL");
+                String.class, assistidoId)).containsExactly("DECLARACAO_RESIDENCIA", "DOCUMENTO_IDENTIDADE", "FOTO_PERFIL");
         assertThat(jdbcTemplate.queryForList(
                 "select categoria from adra.arquivo where entidade_tipo = 'RESPONSAVEL' and entidade_id = ?",
                 String.class, maeId)).containsExactly("DOCUMENTO_IDENTIDADE");
@@ -301,7 +381,7 @@ class PreCadastroIT {
     }
 
     private Long enviarPublico(PreCadastroRequestDTO requisicao, MockMultipartFile... anexos) throws Exception {
-        var envio = multipart("/api/pre-cadastro").file(partDados(requisicao));
+        var envio = multipart("/api/pre-cadastro").file(partDados(requisicao)).file(imagem("comprovanteEndereco")).param("captcha", TOKEN_VALIDO);
         for (MockMultipartFile anexo : anexos) {
             envio.file(anexo);
         }
@@ -313,6 +393,10 @@ class PreCadastroIT {
 
     private MockMultipartFile partDados(PreCadastroRequestDTO requisicao) {
         return new MockMultipartFile("dados", "", MediaType.APPLICATION_JSON_VALUE, jsonMapper.writeValueAsBytes(requisicao));
+    }
+
+    private int conexoesEmUso() throws SQLException {
+        return dataSource.unwrap(HikariDataSource.class).getHikariPoolMXBean().getActiveConnections();
     }
 
     private static MockMultipartFile imagem(String parte) throws IOException {
@@ -333,7 +417,7 @@ class PreCadastroIT {
     private static PreCadastroDadosDTO dados(String cpfMae) {
         EnderecoDTO endereco = new EnderecoDTO("Rua das Flores", "100", "Centro", null);
         return new PreCadastroDadosDTO(
-                new Termos(true, false),
+                new Termos(true, false, true),
                 new PreCadastroDadosDTO.Crianca(null),
                 new Mae("Mae Teste", LocalDate.of(1990, 1, 20), cpfMae, Escolaridade.MEDIO_COMPLETO,
                         EstadoCivil.SOLTEIRO, null, "Cozinheira", new BigDecimal("1500.00"), "16991234567"),

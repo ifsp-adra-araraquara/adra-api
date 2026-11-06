@@ -101,7 +101,7 @@ public class FrequenciaService {
             }
         }
         historico.sort(Comparator.comparing(FrequenciaDiaDTO::data).reversed());
-        return historico;
+        return historico.stream().distinct().toList();
     }
 
     /** Uma coluna por dia de chamada do grupo no mês; dia com chamada lançada fora da grade também entra. */

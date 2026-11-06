@@ -262,12 +262,12 @@ public class TurmaService {
         Turma turma = buscarEntidadePorId(turmaId);
 
         if (!turma.getAtivo()) {
-            throw new RegraNegocioException("Não é possível vincular assistidos a uma turma inativa.");
+            throw new RegraNegocioException("Não é possível vincular atendidos a um grupo inativo.");
         }
 
         List<Assistido> assistidos = assistidoRepository.findAllById(dto.assistidoIds());
         if (assistidos.size() != dto.assistidoIds().size()) {
-            throw new EntidadeNaoEncontradaException("Um ou mais assistidos informados não foram encontrados.");
+            throw new EntidadeNaoEncontradaException("Um ou mais atendidos informados não foram encontrados.");
         }
 
         for (Assistido assistido : assistidos) {
@@ -301,6 +301,6 @@ public class TurmaService {
 
     Turma buscarEntidadePorId(Long id) {
         return turmaRepository.findById(id)
-                .orElseThrow(() -> new EntidadeNaoEncontradaException("Turma nao encontrada: id " + id));
+                .orElseThrow(() -> new EntidadeNaoEncontradaException("Grupo nao encontrado: id " + id));
     }
 }

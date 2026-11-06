@@ -2,6 +2,7 @@ package adra.ifsp.edu.br.api.web.controller;
 
 import java.net.URI;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -58,6 +59,14 @@ public class ArquivoController {
                                                            @RequestParam Long entidadeId,
                                                            @RequestParam(required = false) CategoriaArquivo categoria) {
         return ResponseEntity.ok(arquivoService.listar(entidadeTipo, entidadeId, categoria));
+    }
+
+    @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL', 'EDUCADOR_SOCIAL') "
+            + "and #entidadeTipo != T(adra.ifsp.edu.br.api.domain.enums.EntidadeArquivo).PRE_CADASTRO")
+    @GetMapping("/fotos-perfil")
+    public ResponseEntity<Map<Long, UrlArquivoDTO>> urlsDasFotosDePerfil(@RequestParam EntidadeArquivo entidadeTipo,
+                                                                         @RequestParam List<Long> entidadeIds) {
+        return ResponseEntity.ok(arquivoService.urlsDasFotosDePerfil(entidadeTipo, entidadeIds));
     }
 
     @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL', 'EDUCADOR_SOCIAL') "

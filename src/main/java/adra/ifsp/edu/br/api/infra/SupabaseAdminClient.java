@@ -1,10 +1,13 @@
 package adra.ifsp.edu.br.api.infra;
 
+import java.net.http.HttpClient;
+import java.time.Duration;
 import java.util.Map;
 import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
@@ -17,7 +20,12 @@ public class SupabaseAdminClient {
 
     public SupabaseAdminClient(@Value("${adra.supabase.url}") String url,
                                @Value("${adra.supabase.service-key}") String serviceKey) {
+        JdkClientHttpRequestFactory fabrica = new JdkClientHttpRequestFactory(
+                HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build());
+        fabrica.setReadTimeout(Duration.ofSeconds(30));
+
         this.rest = RestClient.builder()
+                .requestFactory(fabrica)
                 .baseUrl(url + "/auth/v1")
                 .defaultHeader("apikey", serviceKey)
                 .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + serviceKey)

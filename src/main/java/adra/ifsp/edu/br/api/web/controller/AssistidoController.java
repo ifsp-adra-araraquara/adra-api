@@ -57,7 +57,8 @@ public class AssistidoController {
         return ResponseEntity.ok(assistidoLoteService.validar(itens));
     }
 
-    @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL', 'EDUCADOR_SOCIAL', 'OFICINEIRO')")
+    @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL', 'EDUCADOR_SOCIAL') "
+            + "or (hasRole('OFICINEIRO') and @acessoTurma.oficineiroPodeListarAssistidos(#turmaId, #busca))")
     @GetMapping
     public ResponseEntity<PaginaDTO<AssistidoResponseDTO>> listar(
             @RequestParam(required = false) String busca,
@@ -72,7 +73,8 @@ public class AssistidoController {
     }
 
     /** Totais das abas da listagem (Todos / Ativos / Inativos / Em acompanhamento). */
-    @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL', 'EDUCADOR_SOCIAL', 'OFICINEIRO')")
+    @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL', 'EDUCADOR_SOCIAL') "
+            + "or (hasRole('OFICINEIRO') and @acessoTurma.oficineiroPodeListarAssistidos(#turmaId, #busca))")
     @GetMapping("/contagem")
     public ResponseEntity<AssistidoContagemDTO> contar(
             @RequestParam(required = false) String busca,

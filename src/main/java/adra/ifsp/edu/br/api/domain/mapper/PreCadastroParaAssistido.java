@@ -58,7 +58,7 @@ public class PreCadastroParaAssistido {
                 dados.termos().autorizaUsoImagem(),
                 dados.autorizacoes().eventosPasseios(),
                 dados.autorizacoes().irEmboraSozinho(),
-                null,
+                dados.termos().cienteFrequencia(),
                 responsaveis(dados, enderecoFamilia),
                 null);
     }
