@@ -1,9 +1,6 @@
 package adra.ifsp.edu.br.api.domain.service;
 
 import adra.ifsp.edu.br.api.domain.enums.StatusGeral;
-import adra.ifsp.edu.br.api.domain.enums.StatusPresenca;
-
-import java.util.List;
 
 /**
  * Indicadores de frequência de um assistido, calculados a partir do status de
@@ -34,30 +31,16 @@ public record IndicadorFrequencia(
 
     public static final IndicadorFrequencia SEM_AULAS = new IndicadorFrequencia(null, 0, 0, false);
 
-    /**
-     * @param statusMaisRecentePrimeiro status de cada aula realizada, da mais recente para a mais antiga
-     * @param statusAssistido           só assistido ATIVO pode estar "em acompanhamento"
-     */
-    public static IndicadorFrequencia de(List<StatusPresenca> statusMaisRecentePrimeiro, StatusGeral statusAssistido) {
-        int total = statusMaisRecentePrimeiro.size();
+    public static IndicadorFrequencia de(int total, int presentes, int faltasConsecutivas, StatusGeral statusAssistido) {
         if (total == 0) {
             return SEM_AULAS;
         }
 
-        long presentes = statusMaisRecentePrimeiro.stream().filter(s -> s == StatusPresenca.PRESENTE).count();
         int percentual = (int) Math.round(presentes * 100.0 / total);
 
-        int consecutivas = 0;
-        for (StatusPresenca status : statusMaisRecentePrimeiro) {
-            if (status != StatusPresenca.FALTA) {
-                break;
-            }
-            consecutivas++;
-        }
-
         boolean emAcompanhamento = statusAssistido == StatusGeral.ATIVO
-                && (percentual < FREQUENCIA_MINIMA || consecutivas >= LIMIAR_FALTAS_CONSECUTIVAS);
+                && (percentual < FREQUENCIA_MINIMA || faltasConsecutivas >= LIMIAR_FALTAS_CONSECUTIVAS);
 
-        return new IndicadorFrequencia(percentual, total, consecutivas, emAcompanhamento);
+        return new IndicadorFrequencia(percentual, total, faltasConsecutivas, emAcompanhamento);
     }
 }
