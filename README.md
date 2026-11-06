@@ -182,6 +182,122 @@ então esse comando não abre shell nenhum. Ele só troca a versão e sobe.
 `compose.yaml`, `Caddyfile`, um `.env` preenchido e o `scripts/deploy.sh` deste
 repositório copiado para `~/adra/deploy.sh`, com permissão de execução.
 
+## Backup
+
+O backup do Supabase não inclui os arquivos do Storage, e o plano Free nem tem
+backup automático. Por isso guardamos uma cópia completa fora do Supabase.
+
+### Como funciona
+
+Toda quinta às 02:17 BRT, o cron do droplet roda o `scripts/backup.sh`:
+
+1. Gera o dump do banco e baixa o bucket.
+2. Junta tudo em um zip com senha (AES-256).
+3. Envia o zip para a pasta `adra-backups`, no Google Drive da conta Google da
+   ADRA.
+4. Apaga as cópias além das 12 mais recentes.
+5. Avisa o healthchecks.io que terminou.
+
+O zip contém:
+
+- `db.dump`: schemas `adra`, `auth` e `storage`. Sem `auth`, ninguém faz login
+  depois de restaurar.
+- `storage/`: o bucket `adra-arquivos` inteiro. Os arquivos não entram no dump.
+- `app.log`: logs da API dos últimos 7 dias, no máximo desde o último deploy.
+
+Se uma etapa falhar, o script para, remove os arquivos temporários e mantém as
+cópias antigas. Sem o aviso, o healthchecks.io manda um e-mail em até 8 dias.
+
+O backup não passa pelo CI/CD. O deploy não entrega nem altera o script, as
+credenciais ou o cron.
+
+A senha do zip fica no `.env` do droplet e com o responsável da ADRA. Sem ela, os
+zips não abrem. Para abrir, use o 7-Zip.
+
+### Runbook
+
+Os comandos rodam no droplet, salvo indicação.
+
+| Situação | O que fazer |
+| --- | --- |
+| Rodar agora | `~/adra/backup.sh` |
+| Ver a última execução | `journalctl -t adra-backup -n 50` |
+| Listar as cópias | `rclone lsl gdrive:adra-backups` |
+| Alerta do healthchecks.io | Veja a última execução, corrija a causa e rode agora |
+| Erro de autenticação no Drive | Na sua máquina, rode `rclone config reconnect gdrive:` e copie o `rclone.conf` de novo |
+| Erro de senha no banco ou 403 no S3 | Confira `SUPABASE_PASSWORD` e as chaves S3 no `~/adra/.env` |
+| Drive sem espaço | Confira com `rclone about gdrive:`, libere espaço ou reduza `COPIES_TO_KEEP` no script |
+| Mudou `scripts/backup.sh` | Faça o merge e copie o script de novo com `scp` |
+| Trocou a senha do zip | Atualize o `~/adra/.env`; as cópias antigas continuam com a senha antiga |
+| Perda de dados | Siga a [restauração](#restauração) |
+
+### Instalação
+
+1. No Google Cloud, com a conta Google da ADRA: crie um projeto, ative a Google
+   Drive API, configure a tela de consentimento como External com o escopo
+   `drive.file`, crie um OAuth client do tipo Desktop e publique o app. Em
+   "Testing", a autorização expira em 7 dias.
+2. Na sua máquina, faça login com a conta quando o navegador abrir:
+
+   ```bash
+   rclone config create gdrive drive client_id=ID client_secret=SEGREDO scope=drive.file
+   rclone mkdir gdrive:adra-backups
+   ```
+
+3. No painel do Supabase de produção, gere uma chave em Storage > S3. Ela dá
+   acesso total aos buckets, então fica só no servidor.
+4. No healthchecks.io, crie um check com período de 7 dias e tolerância de 1 dia.
+5. Prepare o droplet. A chave de CI não serve aqui, porque ela só executa o deploy.
+
+   ```bash
+   # No droplet
+   curl https://rclone.org/install.sh | sudo bash
+   sudo apt install p7zip-full
+   timedatectl   # precisa estar em UTC
+   df -h         # precisa caber cerca de 2x o bucket, mais o dump
+   mkdir -p ~/.config/rclone
+
+   # Na sua máquina
+   scp scripts/backup.sh adra@IP_DO_DROPLET:~/adra/backup.sh
+   scp ~/.config/rclone/rclone.conf adra@IP_DO_DROPLET:~/.config/rclone/rclone.conf
+
+   # No droplet
+   chmod 700 ~/adra/backup.sh
+   chmod 600 ~/.config/rclone/rclone.conf
+   ```
+
+6. Adicione ao `~/adra/.env` as variáveis de backup do `.env.example`. Use aspas
+   simples em valores com espaço ou caracteres especiais.
+7. Rode `~/adra/backup.sh`, baixe o zip do Drive e abra com a senha.
+8. Agende com `crontab -e`:
+
+   ```cron
+   17 5 * * 4 /home/adra/adra/backup.sh 2>&1 | logger -t adra-backup
+   ```
+
+Para testar contra outro ambiente, defina `BACKUP_DB_URL`, `BACKUP_S3_ENDPOINT`,
+`BACKUP_S3_REGION` e `BACKUP_REMOTE` no `.env` de teste.
+
+### Restauração
+
+Em um projeto novo do Supabase, com a conexão do Session pooler em `DB_URL`:
+
+```bash
+7z x adra-backup-AAAA-MM-DD.zip
+
+psql "$DB_URL" -c 'CREATE SCHEMA adra'
+pg_restore --no-owner --no-privileges --schema=adra -d "$DB_URL" db.dump
+pg_restore --data-only --schema=auth --table=users -d "$DB_URL" db.dump
+pg_restore --data-only --schema=auth --table=identities -d "$DB_URL" db.dump
+pg_restore --data-only --schema=storage --table=buckets -d "$DB_URL" db.dump
+
+rclone config create supabase s3 provider=Other access_key_id=ID secret_access_key=SEGREDO \
+    endpoint=https://REF.storage.supabase.co/storage/v1/s3 region=REGIAO force_path_style=true
+rclone copy storage supabase:adra-arquivos
+```
+
+Depois, aponte o `application-prod.properties` e o `.env` para o projeto novo.
+
 ## Testes
 
 `make test` roda `./gradlew test`. Os testes sobem o próprio Postgres via
