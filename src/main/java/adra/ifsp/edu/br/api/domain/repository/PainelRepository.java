@@ -53,7 +53,7 @@ public class PainelRepository {
     /** Atendido esperado numa chamada lançada (CTE reaproveitada pelas consultas de frequência). */
     private static final String ESPERADOS = """
             esperados AS (
-                SELECT c.chamada_id, c.turma_id, c.data_chamada, ta.assistido_id
+                SELECT DISTINCT c.chamada_id, c.turma_id, c.data_chamada, ta.assistido_id
                   FROM adra.chamada c
                   JOIN adra.turma t ON t.turma_id = c.turma_id
                   JOIN adra.turma_aluno ta
@@ -118,7 +118,7 @@ public class PainelRepository {
                                   FROM adra.oficina_turma ot
                                   JOIN adra.oficina o ON o.oficina_id = ot.oficina_id
                                  WHERE ot.turma_id = t.turma_id AND ot.ativo) AS nome_oficina,
-                               (SELECT COUNT(*)
+                               (SELECT COUNT(DISTINCT ta.assistido_id)
                                   FROM adra.turma_aluno ta
                                   JOIN adra.assistido s ON s.assistido_id = ta.assistido_id
                                  WHERE ta.turma_id = t.turma_id
@@ -250,10 +250,10 @@ public class PainelRepository {
     public List<FaltasSeguidas> faltasSeguidas(LocalDate desde, LocalDate hoje, int limiar) {
         return jdbc.sql("""
                         WITH chamadas_do_atendido AS (
-                            SELECT ta.assistido_id, ch.data_chamada,
+                            SELECT DISTINCT ta.assistido_id, ch.chamada_id, ch.data_chamada,
                                    COALESCE(p.status_presenca::text, 'PRESENTE') AS status,
-                                   ROW_NUMBER() OVER (PARTITION BY ta.assistido_id
-                                                      ORDER BY ch.data_chamada DESC) AS ordem
+                                   DENSE_RANK() OVER (PARTITION BY ta.assistido_id
+                                                      ORDER BY ch.data_chamada DESC, ch.chamada_id DESC) AS ordem
                               FROM adra.turma_aluno ta
                               JOIN adra.assistido s ON s.assistido_id = ta.assistido_id AND s.status = 'ATIVO'
                               JOIN adra.chamada ch

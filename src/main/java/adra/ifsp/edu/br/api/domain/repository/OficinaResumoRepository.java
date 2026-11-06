@@ -37,7 +37,7 @@ public class OficinaResumoRepository {
                                            ELSE '7' END, ',')
                                   FROM adra.turma_dia_semana d
                                  WHERE d.turma_id = t.turma_id) AS dias,
-                               (SELECT COUNT(*)
+                               (SELECT COUNT(DISTINCT ta.assistido_id)
                                   FROM adra.turma_aluno ta
                                   JOIN adra.assistido s ON s.assistido_id = ta.assistido_id
                                  WHERE ta.turma_id = t.turma_id

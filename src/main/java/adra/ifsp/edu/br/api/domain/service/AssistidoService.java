@@ -52,6 +52,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.BinaryOperator;
 import java.util.stream.Collectors;
 
 @Service
@@ -210,8 +211,8 @@ public class AssistidoService {
         Map<Long, TurmaAlunos> periodoNaTurma = new java.util.HashMap<>();
         if (turmaId != null && !assistidos.isEmpty()) {
             for (TurmaAlunos v : turmaAlunosRepository.findByTurma_TurmaIdAndAssistidoIn(turmaId, assistidos)) {
-                periodoNaTurma.merge(v.getAssistido().getAssistidoId(), v,
-                        (a, b) -> a.getDataEntrada().isAfter(b.getDataEntrada()) ? a : b);
+                periodoNaTurma.merge(v.getAssistido().getAssistidoId(), v, BinaryOperator.maxBy(
+                        Comparator.comparing(TurmaAlunos::getDataEntrada).thenComparing(TurmaAlunos::getTurmaAlunoId)));
             }
         }
 

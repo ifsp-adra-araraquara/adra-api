@@ -3,6 +3,7 @@ package adra.ifsp.edu.br.api.domain.service;
 import adra.ifsp.edu.br.api.ContainerPostgresAdra;
 import adra.ifsp.edu.br.api.domain.dto.assistido.AssistidoStatusRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.chamada.AtendidoChamadaDTO;
+import adra.ifsp.edu.br.api.domain.dto.presenca.FrequenciaDiaDTO;
 import adra.ifsp.edu.br.api.domain.dto.chamada.ChamadaGrupoDTO;
 import adra.ifsp.edu.br.api.domain.dto.chamada.PresencaChamadaRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.disciplinar.ArquivarRegistroRequestDTO;
@@ -87,6 +88,8 @@ class ChamadaServiceIT {
     @Autowired private ChamadaRepository chamadaRepository;
     @Autowired private PresencaRepository presencaRepository;
     @Autowired private ChamadaService chamadaService;
+    @Autowired private AssistidoIndicadoresService indicadoresService;
+    @Autowired private FrequenciaService frequenciaService;
     @Autowired private AssistidoService assistidoService;
     @Autowired private VinculoTurmaService vinculoTurmaService;
     @Autowired private DataSource dataSource;
@@ -129,6 +132,59 @@ class ChamadaServiceIT {
     }
 
     @Test
+    @DisplayName("Frequência respeita o período no grupo, não conta a chamada duas vezes e a justificada interrompe a sequência")
+    void frequenciaCalculadaNoBanco() {
+        LocalDate maisAntigo = diaSemFeriado(12);
+        LocalDate segundo = diaSemFeriado(9);
+        LocalDate terceiro = diaSemFeriado(6);
+        LocalDate maisRecente = diaSemFeriado(3);
+        LocalDate entrada = maisAntigo.minusDays(1);
+
+        Assistido saiuNoSegundoDia = matricular("Carla Saiu", turma, entrada, segundo);
+        Assistido voltouNoTerceiroDia = matricular("Davi Voltou", turma, entrada, terceiro);
+        Assistido semChamadas = matricular("Eva Nova", turma, HOJE, null);
+
+        PresencaChamadaRequestDTO justificada =
+                new PresencaChamadaRequestDTO(ana.getAssistidoId(), StatusPresenca.FALTA_JUSTIFICADA, MotivoFalta.ATESTADO, null);
+        chamadaService.gravar(turma.getTurmaId(), maisAntigo, List.of(presente(ana)));
+        chamadaService.gravar(turma.getTurmaId(), segundo, List.of(justificada));
+        chamadaService.gravar(turma.getTurmaId(), terceiro, List.of(falta(ana)));
+        ChamadaGrupoDTO ultima = chamadaService.gravar(turma.getTurmaId(), maisRecente, List.of(falta(ana)));
+
+        assertThat(linha(ultima, ana).frequenciaPercentual()).isEqualTo(25);
+
+        voltarAoGrupo(voltouNoTerceiroDia, terceiro);
+
+        var frequencias = indicadoresService.frequencias(List.of(ana, saiuNoSegundoDia, voltouNoTerceiroDia, semChamadas));
+        assertThat(frequencias.get(ana.getAssistidoId()).totalAulas()).isEqualTo(4);
+        assertThat(frequencias.get(ana.getAssistidoId()).faltasConsecutivas()).isEqualTo(2);
+        assertThat(frequencias.get(ana.getAssistidoId()).emAcompanhamento()).isTrue();
+        assertThat(frequencias.get(saiuNoSegundoDia.getAssistidoId()).totalAulas()).isEqualTo(2);
+        assertThat(frequencias.get(voltouNoTerceiroDia.getAssistidoId()).totalAulas()).isEqualTo(4);
+        assertThat(frequencias.get(semChamadas.getAssistidoId())).isEqualTo(IndicadorFrequencia.SEM_AULAS);
+    }
+
+    @Test
+    @DisplayName("Saída e retorno ao grupo no mesmo dia: chamada e ficha não repetem o atendido nem o dia")
+    void saidaERetornoNoMesmoDia() {
+        LocalDate anterior = diaSemFeriado(6);
+        LocalDate dia = diaSemFeriado(3);
+        Assistido davi = matricular("Davi Voltou", turma, anterior.minusDays(1), dia);
+        voltarAoGrupo(davi, dia);
+        chamadaService.gravar(turma.getTurmaId(), anterior, List.of(presente(davi)));
+
+        ChamadaGrupoDTO gravada = chamadaService.gravar(turma.getTurmaId(), dia, List.of(falta(davi)));
+        ChamadaGrupoDTO aberta = chamadaService.buscar(turma.getTurmaId(), dia);
+
+        assertThat(gravada.atendidos()).filteredOn(a -> a.assistidoId().equals(davi.getAssistidoId())).hasSize(1);
+        assertThat(aberta.atendidos()).filteredOn(a -> a.assistidoId().equals(davi.getAssistidoId())).hasSize(1);
+        assertThat(status(aberta, davi)).isEqualTo(StatusPresenca.FALTA);
+        assertThat(frequenciaService.historicoDoAtendido(davi.getAssistidoId()))
+                .extracting(FrequenciaDiaDTO::data)
+                .containsExactly(dia, anterior);
+    }
+
+    @Test
     @DisplayName("CA-FT12.1: gravar de novo o mesmo dia atualiza a chamada, sem duplicar")
     void regravarAtualizaSemDuplicar() {
         LocalDate dia = diaSemFeriado(1);
@@ -137,7 +193,7 @@ class ChamadaServiceIT {
         ChamadaGrupoDTO regravada = chamadaService.gravar(turma.getTurmaId(), dia, List.of(presente(ana), falta(bruno)));
 
         assertThat(chamadaRepository.findByTurmaAndDataChamada(turma, dia)).isPresent();
-        assertThat(chamadaRepository.findByTurmaIn(List.of(turma))).hasSize(1);
+        assertThat(chamadaRepository.findByTurmaAndDataChamadaBetween(turma, dia, dia)).hasSize(1);
         assertThat(status(regravada, ana)).isEqualTo(StatusPresenca.PRESENTE);
         assertThat(status(regravada, bruno)).isEqualTo(StatusPresenca.FALTA);
     }
@@ -396,6 +452,15 @@ class ChamadaServiceIT {
         vinculo.setStatus(saida == null ? StatusGeral.ATIVO : StatusGeral.INATIVO);
         turmaAlunosRepository.save(vinculo);
         return assistido;
+    }
+
+    private void voltarAoGrupo(Assistido assistido, LocalDate data) {
+        TurmaAlunos volta = new TurmaAlunos();
+        volta.setTurma(turma);
+        volta.setAssistido(assistido);
+        volta.setDataEntrada(data);
+        volta.setStatus(StatusGeral.ATIVO);
+        turmaAlunosRepository.save(volta);
     }
 
     private Usuario criarUsuario(NomeNivelPermissao perfil, String email) {
