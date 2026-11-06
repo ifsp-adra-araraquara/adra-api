@@ -2,6 +2,7 @@ package adra.ifsp.edu.br.api.domain.service;
 
 import adra.ifsp.edu.br.api.domain.enums.EntidadeArquivo;
 import adra.ifsp.edu.br.api.domain.repository.ArquivoRepository;
+import adra.ifsp.edu.br.api.domain.repository.AssistidoSpecification;
 import adra.ifsp.edu.br.api.domain.repository.OficinaRepository;
 import adra.ifsp.edu.br.api.domain.repository.OficinaTurmaRepository;
 import adra.ifsp.edu.br.api.domain.repository.SemanarioRepository;
@@ -47,6 +48,11 @@ public class AcessoTurmaService {
         Long usuarioId = usuarioIdAtual();
         return turmaId != null && usuarioId != null
                 && oficinaTurmaRepository.existsByTurma_TurmaIdAndOficina_OficineiroResponsavel_UsuarioIdAndAtivoTrue(turmaId, usuarioId);
+    }
+
+    @Transactional(readOnly = true)
+    public boolean oficineiroPodeListarAssistidos(Long turmaId, String busca) {
+        return !AssistidoSpecification.pareceCpf(busca) && podeAcessarTurma(turmaId);
     }
 
     /** O arquivo é material de um semanário deste oficineiro? */

@@ -54,6 +54,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Transactional
 public class AssistidoService {
+    private static final int TAMANHO_MAXIMO_PAGINA = 500;
+
     private final ArquivoService arquivoService;
     private final AssistidoRepository assistidoRepository;
     private final AssistidoMapper assistidoMapper;
@@ -150,6 +152,7 @@ public class AssistidoService {
     @Transactional(readOnly = true)
     public PaginaDTO<AssistidoResponseDTO> listarPaginado(String busca, Long turmaId, Long oficinaId, StatusGeral status,
                                                           boolean emAcompanhamento, int pagina, int tamanho) {
+        tamanho = Math.min(tamanho, TAMANHO_MAXIMO_PAGINA);
         Sort porNome = Sort.by(Sort.Direction.ASC, "nomeCompleto");
 
         if (emAcompanhamento) {
