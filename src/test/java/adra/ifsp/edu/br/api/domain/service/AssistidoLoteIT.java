@@ -11,7 +11,6 @@ import adra.ifsp.edu.br.api.domain.enums.ProvedorArmazenamento;
 import adra.ifsp.edu.br.api.domain.enums.StatusLinhaLote;
 import adra.ifsp.edu.br.api.domain.repository.AssistidoRepository;
 import adra.ifsp.edu.br.api.domain.repository.ResponsavelRepository;
-import adra.ifsp.edu.br.api.exception.ArquivoInvalidoException;
 import adra.ifsp.edu.br.api.infra.armazenamento.ArmazenamentoArquivos;
 import com.zaxxer.hikari.HikariDataSource;
 import org.junit.jupiter.api.BeforeEach;
@@ -102,7 +101,7 @@ class AssistidoLoteIT {
     }
 
     @Test
-    @DisplayName("Cadastra irmaos com documento e foto opcional, cria uma vez o responsavel comum e recusa sem documento")
+    @DisplayName("Cadastra irmaos com documento e foto opcional, cria uma vez o responsavel comum e aceita sem documento")
     void cadastraComArquivosReaproveitandoResponsavel() throws IOException {
         VinculoFamiliarComResponsavelRequestDTO mae = responsavel("Maria Irmaos", CPF_MAE_IRMAOS);
         Integer arquivosAntes = jdbcTemplate.queryForObject("select count(*) from adra.arquivo", Integer.class);
@@ -115,8 +114,7 @@ class AssistidoLoteIT {
 
         AssistidoRequestDTO semDocumento = assistido("Caio Sem Documento", LocalDate.of(2016, 1, 1),
                 responsavel("Joao Sem Documento", CPF_RESPONSAVEL_SEM_DOCUMENTO));
-        assertThatThrownBy(() -> assistidoService.cadastrarComArquivos(semDocumento, imagem("foto"), List.of()))
-                .isInstanceOf(ArquivoInvalidoException.class);
+        assistidoService.cadastrarComArquivos(semDocumento, null, null);
 
         Long maeId = responsavelRepository.findByCpf(CPF_MAE_IRMAOS).orElseThrow().getResponsavelId();
         Integer vinculosDaMae = jdbcTemplate.queryForObject(
@@ -124,8 +122,8 @@ class AssistidoLoteIT {
         assertThat(vinculosDaMae).isEqualTo(2);
         assertThat(jdbcTemplate.queryForObject("select count(*) from adra.arquivo", Integer.class)).isEqualTo(arquivosAntes + 3);
         verify(storage, times(3)).salvar(any(), any(), eq("image/jpeg"));
-        assertThat(assistidoRepository.count()).isEqualTo(assistidosAntes);
-        assertThat(responsavelRepository.findByCpf(CPF_RESPONSAVEL_SEM_DOCUMENTO)).isEmpty();
+        assertThat(assistidoRepository.count()).isEqualTo(assistidosAntes + 1);
+        assertThat(responsavelRepository.findByCpf(CPF_RESPONSAVEL_SEM_DOCUMENTO)).isPresent();
     }
 
     @Test

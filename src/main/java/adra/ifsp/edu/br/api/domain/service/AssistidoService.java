@@ -548,7 +548,7 @@ public class AssistidoService {
 
     private static final int MAXIMO_DOCUMENTOS_IDENTIDADE = 1;
 
-    /** Cadastro + RG/CPF (obrigatório) + foto de perfil (opcional): grava tudo ou apaga o que foi enviado. */
+    /** Cadastro + RG/CPF (opcional) + foto de perfil (opcional): grava tudo ou apaga o que foi enviado. */
     @CacheEvict(cacheNames = {CacheConfig.ESTRUTURA, CacheConfig.PAINEL}, allEntries = true)
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public AssistidoResponseDTO cadastrarComArquivos(AssistidoRequestDTO dto, MultipartFile foto,
@@ -556,9 +556,6 @@ public class AssistidoService {
         List<MultipartFile> docs = documentos == null ? List.of()
                 : documentos.stream().filter(d -> d != null && !d.isEmpty()).toList();
         // valida antes de criar o assistido, pra não gastar insert/upload à toa
-        if (docs.isEmpty()) {
-            throw new ArquivoInvalidoException("Envie a foto do RG ou CPF do atendido.");
-        }
         if (docs.size() > MAXIMO_DOCUMENTOS_IDENTIDADE) {
             throw new ArquivoInvalidoException("Envie apenas um arquivo do RG ou CPF.");
         }
