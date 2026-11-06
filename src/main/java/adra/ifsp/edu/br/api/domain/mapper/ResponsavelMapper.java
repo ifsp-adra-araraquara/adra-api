@@ -13,7 +13,7 @@ public class ResponsavelMapper {
         return Responsavel.builder()
                 .nomeCompleto(dto.nomeCompleto())
                 .dataNascimento(dto.dataNascimento())
-                .cpf(dto.cpf())
+                .cpf(textoOuNulo(dto.cpf()))
                 .telefone(dto.telefone())
                 .email(dto.email())
                 .endereco(EnderecoMapper.paraEntidade(dto.endereco()))
@@ -28,7 +28,7 @@ public class ResponsavelMapper {
     public void atualizarEntidade(Responsavel entidade, ResponsavelRequestDTO dto) {
         entidade.setNomeCompleto(dto.nomeCompleto());
         entidade.setDataNascimento(dto.dataNascimento());
-        entidade.setCpf(dto.cpf());
+        entidade.setCpf(textoOuNulo(dto.cpf()));
         entidade.setTelefone(dto.telefone());
         entidade.setEmail(dto.email());
         entidade.setEndereco(EnderecoMapper.paraEntidade(dto.endereco()));

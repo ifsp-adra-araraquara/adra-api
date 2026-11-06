@@ -25,7 +25,6 @@ public record ResponsavelRequestDTO(
         @Past(message = "Data de nascimento deve estar no passado")
         LocalDate dataNascimento,
 
-        @NotBlank(message = "CPF e' obrigatorio")
         @ValidCpf(message = "CPF invalido")
         String cpf,
 

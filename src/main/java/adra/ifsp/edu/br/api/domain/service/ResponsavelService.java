@@ -14,6 +14,7 @@ import adra.ifsp.edu.br.api.exception.EntidadeNaoEncontradaException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.util.List;
 import java.util.Map;
@@ -30,9 +31,7 @@ public class ResponsavelService {
     private final AuditoriaService auditoriaService;
 
     public ResponsavelResponseDTO cadastrar(ResponsavelRequestDTO dto) {
-        responsavelRepository.findByCpf(dto.cpf()).ifPresent(existente -> {
-            throw new CpfDuplicadoException(responsavelMapper.paraDTO(existente));
-        });
+        verificarCpfDisponivel(dto.cpf(), null);
 
         Responsavel responsavel = responsavelMapper.paraNovaEntidade(dto);
         responsavel = responsavelRepository.save(responsavel);
@@ -97,11 +96,7 @@ public class ResponsavelService {
     public ResponsavelResponseDTO atualizar(Long id, ResponsavelRequestDTO dto) {
         Responsavel responsavel = buscarEntidadePorId(id);
 
-        responsavelRepository.findByCpf(dto.cpf())
-                .filter(outro -> !outro.getResponsavelId().equals(id))
-                .ifPresent(outro -> {
-                    throw new CpfDuplicadoException(responsavelMapper.paraDTO(outro));
-                });
+        verificarCpfDisponivel(dto.cpf(), id);
 
         Map<String, Object> valorAnterior = Map.of(
                 "nomeCompleto", responsavel.getNomeCompleto(),
@@ -122,6 +117,17 @@ public class ResponsavelService {
         );
 
         return responsavelMapper.paraDTO(responsavel);
+    }
+
+    private void verificarCpfDisponivel(String cpf, Long idEmEdicao) {
+        if (!StringUtils.hasText(cpf)) {
+            return;
+        }
+        responsavelRepository.findByCpf(cpf)
+                .filter(outro -> !outro.getResponsavelId().equals(idEmEdicao))
+                .ifPresent(outro -> {
+                    throw new CpfDuplicadoException(responsavelMapper.paraDTO(outro));
+                });
     }
 
     Responsavel buscarEntidadePorId(Long id) {

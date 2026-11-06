@@ -22,7 +22,6 @@ public record VinculoFamiliarComResponsavelRequestDTO(
 
         LocalDate dataNascimento,
 
-        @NotBlank(message = "CPF e' obrigatorio")
         @ValidCpf(message = "CPF invalido")
         String cpf,
 
@@ -54,7 +53,9 @@ public record VinculoFamiliarComResponsavelRequestDTO(
 
         boolean contatoEmergencia,
 
-        boolean autorizadoRetirada
+        boolean autorizadoRetirada,
+
+        Long responsavelId
 
 ) {
 
