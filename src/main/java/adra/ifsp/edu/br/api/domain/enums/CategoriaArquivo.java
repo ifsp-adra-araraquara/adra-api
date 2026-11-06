@@ -27,7 +27,14 @@ public enum CategoriaArquivo {
             1600,              // legível sem pesar
             false),     // pode ter mais de um (frente e verso)
 
-    MATERIAL_AULA(
+    /** Pré-cadastro: documento do responsável, separado do da criança (vira DOCUMENTO_IDENTIDADE do responsável na aprovação). */
+    DOCUMENTO_RESPONSAVEL(
+            Set.of("image/webp", "image/jpeg", "image/png", "application/pdf"),
+            2 * 1024 * 1024,
+            1600,
+            false),
+
+    MATERIAL_SEMANARIO(
             Set.of("application/pdf"),
             2*1024*1024,
         1600, false

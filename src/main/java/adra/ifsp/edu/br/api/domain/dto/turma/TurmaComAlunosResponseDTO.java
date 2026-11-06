@@ -1,6 +1,7 @@
 package adra.ifsp.edu.br.api.domain.dto.turma;
 
 import adra.ifsp.edu.br.api.domain.enums.Turno;
+import adra.ifsp.edu.br.api.domain.model.OficinaTurma;
 import adra.ifsp.edu.br.api.domain.model.Turma;
 
 /**
@@ -19,12 +20,14 @@ public record TurmaComAlunosResponseDTO(
         Integer capacidade
 ) {
 
-    public static TurmaComAlunosResponseDTO fromEntity(Turma turma, long quantidadeAlunos) {
+    /** Uma linha por grupo atendido numa oficina do oficineiro. */
+    public static TurmaComAlunosResponseDTO fromVinculo(OficinaTurma vinculo, long quantidadeAlunos) {
+        Turma turma = vinculo.getTurma();
         return new TurmaComAlunosResponseDTO(
                 turma.getTurmaId(),
                 turma.getNomeTurma(),
-                turma.getOficina() != null ? turma.getOficina().getOficinaId() : null,
-                turma.getOficina() != null ? turma.getOficina().getNomeOficina() : null,
+                vinculo.getOficina().getOficinaId(),
+                vinculo.getOficina().getNomeOficina(),
                 turma.getTurno(),
                 (int) quantidadeAlunos,
                 turma.getCapacidade()

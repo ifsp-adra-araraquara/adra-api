@@ -76,7 +76,7 @@ class RedefinicaoSenhaIT {
 
     @Test
     void enviaPorEmailOMesmoLinkQueDevolveAoAdministrador() throws Exception {
-        mvc.perform(post("/api/usuarios/{id}/redefinicao-senha", usuario.getUsuarioId()).with(comPerfil(NomeNivelPermissao.ADMINISTRADOR)))
+        mvc.perform(post("/api/usuarios/{id}/redefinicao-senha", usuario.getUsuarioId()).with(comoAdministrador()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.link").value(LINK))
                 .andExpect(jsonPath("$.emailEnviado").value(true));
@@ -90,7 +90,7 @@ class RedefinicaoSenhaIT {
     void devolveOLinkMesmoQuandoOEmailFalha() throws Exception {
         doThrow(new MailSendException("SMTP fora do ar")).when(mailSender).send(any(MimeMessage.class));
 
-        mvc.perform(post("/api/usuarios/{id}/redefinicao-senha", usuario.getUsuarioId()).with(comPerfil(NomeNivelPermissao.ADMINISTRADOR)))
+        mvc.perform(post("/api/usuarios/{id}/redefinicao-senha", usuario.getUsuarioId()).with(comoAdministrador()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.link").value(LINK))
                 .andExpect(jsonPath("$.emailEnviado").value(false));
@@ -100,6 +100,14 @@ class RedefinicaoSenhaIT {
     void recusaQuemNaoEAdministrador() throws Exception {
         mvc.perform(post("/api/usuarios/{id}/redefinicao-senha", usuario.getUsuarioId()).with(comPerfil(NomeNivelPermissao.COORDENADOR)))
                 .andExpect(status().isForbidden());
+    }
+
+    private RequestPostProcessor comoAdministrador() {
+        return jwt()
+                .jwt(token -> token
+                        .claim(TokenService.CLAIM_PERFIL, NomeNivelPermissao.COORDENADOR.name())
+                        .claim(TokenService.CLAIM_ADMINISTRADOR, true))
+                .authorities(new SimpleGrantedAuthority("ROLE_COORDENADOR"), new SimpleGrantedAuthority("ADMINISTRADOR"));
     }
 
     private RequestPostProcessor comPerfil(NomeNivelPermissao perfil) {

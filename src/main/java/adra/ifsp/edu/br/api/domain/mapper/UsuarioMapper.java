@@ -22,6 +22,7 @@ public class UsuarioMapper {
                 .cargoFuncao(dto.cargoFuncao())
                 .telefone(dto.telefone())
                 .ativo(true)
+                .administrador(dto.administrador())
                 .build();
     }
 
@@ -31,6 +32,7 @@ public class UsuarioMapper {
         entidade.setEmail(dto.email());
         entidade.setCargoFuncao(dto.cargoFuncao());
         entidade.setTelefone(dto.telefone());
+        entidade.setAdministrador(dto.administrador());
     }
 
     public UsuarioResponseDTO paraDTO(Usuario entidade) {
@@ -46,6 +48,7 @@ public class UsuarioMapper {
                 entidade.getCargoFuncao(),
                 entidade.getTelefone(),
                 entidade.isAtivo(),
+                entidade.isAdministrador(),
                 entidade.getUltimoLogin(),
                 entidade.getCriadoEm(),
                 entidade.getAtualizadoEm(),

@@ -1,5 +1,7 @@
 package adra.ifsp.edu.br.api.domain.service;
 
+import adra.ifsp.edu.br.api.config.CacheConfig;
+import adra.ifsp.edu.br.api.domain.service.ArquivoService.AnexoNovo;
 import adra.ifsp.edu.br.api.domain.dto.PaginaDTO;
 import adra.ifsp.edu.br.api.domain.dto.assistido.AssistidoContagemDTO;
 import adra.ifsp.edu.br.api.domain.dto.assistido.AssistidoRequestDTO;
@@ -29,29 +31,36 @@ import adra.ifsp.edu.br.api.exception.AcessoNegadoException;
 import adra.ifsp.edu.br.api.exception.EntidadeNaoEncontradaException;
 import adra.ifsp.edu.br.api.exception.RegraNegocioException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.BinaryOperator;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 @Transactional
 public class AssistidoService {
+    private static final int TAMANHO_MAXIMO_PAGINA = 500;
+
     private final ArquivoService arquivoService;
     private final AssistidoRepository assistidoRepository;
     private final AssistidoMapper assistidoMapper;
@@ -65,7 +74,7 @@ public class AssistidoService {
     private final VinculoTurmaService vinculoTurmaService;
     private final TurmaAlunosRepository turmaAlunosRepository;
 
-    AssistidoResponseDTO cadastrar(AssistidoRequestDTO dto) {
+    private void validarNovoCadastro(AssistidoRequestDTO dto) {
         validarDadosComplementares(dto);
         // Regra de corte so na entrada: familia ja atendida nao e' barrada ao editar.
         elegibilidadeService.validarRendaFamiliar(dto.rendaFamiliar());
@@ -75,14 +84,18 @@ public class AssistidoService {
         if (dto.responsaveis() == null || dto.responsaveis().isEmpty()) {
             throw new RegraNegocioException("Pelo menos um responsavel deve ser informado");
         }
+    }
+
+    AssistidoResponseDTO cadastrar(AssistidoRequestDTO dto) {
+        validarNovoCadastro(dto);
 
         // CA-A02.3: Validar turma ativa
         Turma turma = null;
         if (dto.turmaId() != null) {
             turma = turmaRepository.findById(dto.turmaId())
-                    .orElseThrow(() -> new EntidadeNaoEncontradaException("Turma nao encontrada: id " + dto.turmaId()));
+                    .orElseThrow(() -> new EntidadeNaoEncontradaException("Grupo nao encontrado: id " + dto.turmaId()));
             if (!turma.getAtivo()) {
-                throw new RegraNegocioException("A turma informada nao esta ativa");
+                throw new RegraNegocioException("O grupo informado nao esta ativo");
             }
         }
 
@@ -129,7 +142,7 @@ public class AssistidoService {
     public AssistidoResponseDTO buscarPorCpf(String cpf) {
         return assistidoRepository.findByCpf(cpf)
                 .map(assistidoMapper::paraDTO)
-                .orElseThrow(() -> new EntidadeNaoEncontradaException("Assistido nao encontrado para o CPF informado"));
+                .orElseThrow(() -> new EntidadeNaoEncontradaException("Atendido nao encontrado para o CPF informado"));
     }
 
     @Transactional(readOnly = true)
@@ -148,6 +161,7 @@ public class AssistidoService {
     @Transactional(readOnly = true)
     public PaginaDTO<AssistidoResponseDTO> listarPaginado(String busca, Long turmaId, Long oficinaId, StatusGeral status,
                                                           boolean emAcompanhamento, int pagina, int tamanho) {
+        tamanho = Math.min(tamanho, TAMANHO_MAXIMO_PAGINA);
         Sort porNome = Sort.by(Sort.Direction.ASC, "nomeCompleto");
 
         if (emAcompanhamento) {
@@ -197,8 +211,8 @@ public class AssistidoService {
         Map<Long, TurmaAlunos> periodoNaTurma = new java.util.HashMap<>();
         if (turmaId != null && !assistidos.isEmpty()) {
             for (TurmaAlunos v : turmaAlunosRepository.findByTurma_TurmaIdAndAssistidoIn(turmaId, assistidos)) {
-                periodoNaTurma.merge(v.getAssistido().getAssistidoId(), v,
-                        (a, b) -> a.getDataEntrada().isAfter(b.getDataEntrada()) ? a : b);
+                periodoNaTurma.merge(v.getAssistido().getAssistidoId(), v, BinaryOperator.maxBy(
+                        Comparator.comparing(TurmaAlunos::getDataEntrada).thenComparing(TurmaAlunos::getTurmaAlunoId)));
             }
         }
 
@@ -235,6 +249,7 @@ public class AssistidoService {
      * a classe e' @Transactional, entao qualquer excecao aqui reverte as
      * tres partes juntas (CA-A04.4).
      */
+    @CacheEvict(cacheNames = {CacheConfig.ESTRUTURA, CacheConfig.PAINEL}, allEntries = true)
     public AssistidoResponseDTO atualizar(Long id, AssistidoRequestDTO dto) {
         Assistido assistido = buscarEntidadePorId(id);
 
@@ -285,9 +300,9 @@ public class AssistidoService {
         Turma novaTurma = null;
         if (novaTurmaId != null) {
             novaTurma = turmaRepository.findById(novaTurmaId)
-                    .orElseThrow(() -> new EntidadeNaoEncontradaException("Turma nao encontrada: id " + novaTurmaId));
+                    .orElseThrow(() -> new EntidadeNaoEncontradaException("Grupo nao encontrado: id " + novaTurmaId));
             if (!Boolean.TRUE.equals(novaTurma.getAtivo())) {
-                throw new RegraNegocioException("A turma informada nao esta ativa");
+                throw new RegraNegocioException("O grupo informado nao esta ativo");
             }
             turmaHistoricoRepository.save(AssistidoTurmaHistorico.builder()
                     .assistido(assistido)
@@ -327,10 +342,10 @@ public class AssistidoService {
                 .toList();
 
         if (idsParaManter.size() + novos.size() == 0) {
-            throw new RegraNegocioException("O assistido deve manter pelo menos um responsavel vinculado");
+            throw new RegraNegocioException("O atendido deve manter pelo menos um responsavel vinculado");
         }
 
-        if (!paraRemover.isEmpty() && !usuarioAtualTemPapel("ROLE_ADMINISTRADOR")) {
+        if (!paraRemover.isEmpty() && !usuarioAtualTemPapel("ADMINISTRADOR")) {
             throw new AcessoNegadoException("Somente o administrador pode remover um responsavel vinculado");
         }
 
@@ -388,6 +403,7 @@ public class AssistidoService {
     }
 
     /** Muda o status (ex.: encerrar vinculo com a instituicao) - fluxo separado da edicao cadastral. */
+    @CacheEvict(cacheNames = {CacheConfig.ESTRUTURA, CacheConfig.PAINEL}, allEntries = true)
     public AssistidoResponseDTO alterarStatus(Long id, AssistidoStatusRequestDTO dto) {
         Assistido assistido = buscarEntidadePorId(id);
 
@@ -424,7 +440,7 @@ public class AssistidoService {
 
     Assistido buscarEntidadePorId(Long id) {
         return assistidoRepository.findById(id)
-                .orElseThrow(() -> new EntidadeNaoEncontradaException("Assistido nao encontrado: id " + id));
+                .orElseThrow(() -> new EntidadeNaoEncontradaException("Atendido nao encontrado: id " + id));
     }
 
     /** CPF repetido bloqueia; mesmo nome + nascimento so passa se os dois tiverem CPFs diferentes. */
@@ -434,7 +450,7 @@ public class AssistidoService {
             Optional<Assistido> mesmoCpf = assistidoRepository.findByCpf(dto.cpf())
                     .filter(a -> !a.getAssistidoId().equals(idEmEdicao));
             if (mesmoCpf.isPresent()) {
-                return Optional.of("CPF ja cadastrado para o assistido " + mesmoCpf.get().getNomeCompleto());
+                return Optional.of("CPF ja cadastrado para o atendido " + mesmoCpf.get().getNomeCompleto());
             }
         }
 
@@ -444,7 +460,7 @@ public class AssistidoService {
                 .filter(a -> !a.getAssistidoId().equals(idEmEdicao))
                 .anyMatch(a -> !cpfsDiferentes(a.getCpf(), dto.cpf()));
         if (mesmaPessoa) {
-            return Optional.of("Ja existe assistido com mesmo nome e data de nascimento");
+            return Optional.of("Ja existe atendido com mesmo nome e data de nascimento");
         }
         return Optional.empty();
     }
@@ -514,10 +530,10 @@ public class AssistidoService {
      */
     private void validarDadosComplementares(AssistidoRequestDTO dto) {
         if (Boolean.TRUE.equals(dto.possuiProblemaSaude()) && !StringUtils.hasText(dto.problemaSaude())) {
-            throw new RegraNegocioException("Informe qual e' o problema de saude do assistido");
+            throw new RegraNegocioException("Informe qual e' o problema de saude do atendido");
         }
         if (Boolean.TRUE.equals(dto.pcd()) && !StringUtils.hasText(dto.deficiencia())) {
-            throw new RegraNegocioException("Informe qual e' a deficiencia do assistido");
+            throw new RegraNegocioException("Informe qual e' a deficiencia do atendido");
         }
         if (Boolean.TRUE.equals(dto.recebeProgramaTransferencia())) {
             Set<ProgramaTransferencia> programas = dto.programasTransferencia();
@@ -532,27 +548,33 @@ public class AssistidoService {
 
     private static final int MAXIMO_DOCUMENTOS_IDENTIDADE = 1;
 
-    /** Cadastro + RG/CPF (obrigatório) + foto de perfil (opcional), tudo na mesma transação. */
+    /** Cadastro + RG/CPF (obrigatório) + foto de perfil (opcional): grava tudo ou apaga o que foi enviado. */
+    @CacheEvict(cacheNames = {CacheConfig.ESTRUTURA, CacheConfig.PAINEL}, allEntries = true)
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public AssistidoResponseDTO cadastrarComArquivos(AssistidoRequestDTO dto, MultipartFile foto,
                                                      List<MultipartFile> documentos) {
         List<MultipartFile> docs = documentos == null ? List.of()
                 : documentos.stream().filter(d -> d != null && !d.isEmpty()).toList();
         // valida antes de criar o assistido, pra não gastar insert/upload à toa
         if (docs.isEmpty()) {
-            throw new ArquivoInvalidoException("Envie a foto do RG ou CPF do assistido.");
+            throw new ArquivoInvalidoException("Envie a foto do RG ou CPF do atendido.");
         }
         if (docs.size() > MAXIMO_DOCUMENTOS_IDENTIDADE) {
             throw new ArquivoInvalidoException("Envie apenas um arquivo do RG ou CPF.");
         }
 
-        AssistidoResponseDTO criado = cadastrar(dto);
-        Long id = criado.assistidoId();
+        validarNovoCadastro(dto);
+
+        List<AnexoNovo> anexos = new ArrayList<>();
         if (foto != null && !foto.isEmpty()) {
-            arquivoService.salvar(EntidadeArquivo.ASSISTIDO, id, CategoriaArquivo.FOTO_PERFIL, foto);
+            anexos.add(new AnexoNovo(CategoriaArquivo.FOTO_PERFIL, foto));
         }
-        for (MultipartFile documento : docs) {
-            arquivoService.salvar(EntidadeArquivo.ASSISTIDO, id, CategoriaArquivo.DOCUMENTO_IDENTIDADE, documento);
-        }
-        return criado;
+        docs.forEach(documento -> anexos.add(new AnexoNovo(CategoriaArquivo.DOCUMENTO_IDENTIDADE, documento)));
+
+        return arquivoService.enviarEGravar(EntidadeArquivo.ASSISTIDO, anexos, enviados -> {
+            AssistidoResponseDTO criado = cadastrar(dto);
+            enviados.forEach(enviado -> arquivoService.registrar(EntidadeArquivo.ASSISTIDO, criado.assistidoId(), enviado));
+            return criado;
+        });
     }
 }

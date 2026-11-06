@@ -1,23 +1,28 @@
 package adra.ifsp.edu.br.api.domain.service;
 
 import java.io.IOException;
+import java.net.URI;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
-import adra.ifsp.edu.br.api.domain.dto.arquivo.AulaArquivoDTO;
-import adra.ifsp.edu.br.api.domain.model.Aula;
-import adra.ifsp.edu.br.api.domain.model.Turma;
+import adra.ifsp.edu.br.api.config.CacheConfig;
 import adra.ifsp.edu.br.api.domain.repository.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -29,6 +34,8 @@ import adra.ifsp.edu.br.api.domain.enums.EntidadeArquivo;
 import adra.ifsp.edu.br.api.domain.enums.ModuloSistema;
 import adra.ifsp.edu.br.api.domain.enums.ProvedorArmazenamento;
 import adra.ifsp.edu.br.api.domain.model.Arquivo;
+import adra.ifsp.edu.br.api.domain.model.Usuario;
+import adra.ifsp.edu.br.api.exception.AcessoNegadoException;
 import adra.ifsp.edu.br.api.exception.ArquivoInvalidoException;
 import adra.ifsp.edu.br.api.exception.EntidadeNaoEncontradaException;
 import adra.ifsp.edu.br.api.infra.armazenamento.ArmazenamentoArquivos;
@@ -40,18 +47,27 @@ import lombok.RequiredArgsConstructor;
 public class ArquivoService {
 
     private static final Logger log = LoggerFactory.getLogger(ArquivoService.class);
+    private static final int MAXIMO_FOTOS_POR_LOTE = 100;
+
+    public record AnexoNovo(CategoriaArquivo categoria, MultipartFile arquivo) {
+    }
+
+    public record ArquivoEnviado(CategoriaArquivo categoria, ProvedorArmazenamento provedor, String chave,
+                                 String nomeOriginal, String mimeType, long tamanhoBytes, String hashSha256) {
+    }
 
     private final ArquivoRepository arquivoRepository;
     private final AssistidoRepository assistidoRepository;
     private final UsuarioRepository usuarioRepository;
     private final ResponsavelRepository responsavelRepository;
-    private final AulaRepository aulaRepository;
-    private final TurmaRepository turmaRepository;
+    private final SemanarioRepository semanarioRepository;
+    private final PreCadastroRepository preCadastroRepository;
     private final AcessoTurmaService acessoTurma;
     private final ProcessadorArquivo processador;
     private final List<ArmazenamentoArquivos> armazenamentos;
     private final UsuarioAutenticadoService usuarioAutenticadoService;
     private final AuditoriaService auditoriaService;
+    private final TransactionTemplate transacao;
 
     /** Onde os arquivos NOVOS vão. Os antigos são lidos pelo provedor gravado em cada linha. */
     @Value("${adra.arquivos.provedor}")
@@ -60,25 +76,65 @@ public class ArquivoService {
     @Value("${adra.arquivos.url-validade:5m}")
     private Duration validadeUrl;
 
-    /**
-     * Valida, comprime, envia ao storage e grava os metadados. Roda dentro da
-     * transação de quem chamou (ex.: cadastro do assistido): se ela falhar
-     * depois do upload, o binário é apagado do storage.
-     */
+    @CacheEvict(cacheNames = {CacheConfig.FOTOS_PERFIL, CacheConfig.URLS_ARQUIVO}, allEntries = true)
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public ArquivoResponseDTO salvar(EntidadeArquivo entidadeTipo, Long entidadeId,
                                      CategoriaArquivo categoria, MultipartFile arquivo) {
+        validarDono(entidadeTipo, entidadeId);
+        return enviarEGravar(entidadeTipo, List.of(new AnexoNovo(categoria, arquivo)),
+                enviados -> registrar(entidadeTipo, entidadeId, enviados.getFirst()));
+    }
+
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public <T> T enviarEGravar(EntidadeArquivo entidadeTipo, List<AnexoNovo> anexos,
+                               Function<List<ArquivoEnviado>, T> gravacao) {
+        List<ArquivoEnviado> enviados = new ArrayList<>();
+        try {
+            for (AnexoNovo anexo : anexos) {
+                enviados.add(enviarAoStorage(entidadeTipo, anexo));
+            }
+            return transacao.execute(status -> gravacao.apply(enviados));
+        } catch (RuntimeException e) {
+            enviados.forEach(this::apagarDoStorage);
+            throw e;
+        }
+    }
+
+    @CacheEvict(cacheNames = {CacheConfig.FOTOS_PERFIL, CacheConfig.URLS_ARQUIVO}, allEntries = true)
+    public ArquivoResponseDTO registrar(EntidadeArquivo entidadeTipo, Long entidadeId, ArquivoEnviado enviado) {
+        return gravarMetadados(entidadeTipo, entidadeId, enviado, usuarioAutenticadoService.getUsuarioAtual());
+    }
+
+    /** Link público do pré-cadastro: sem login, então sem "enviado por". */
+    @CacheEvict(cacheNames = {CacheConfig.FOTOS_PERFIL, CacheConfig.URLS_ARQUIVO}, allEntries = true)
+    public ArquivoResponseDTO registrarDoLinkPublico(Long preCadastroId, ArquivoEnviado enviado) {
+        return gravarMetadados(EntidadeArquivo.PRE_CADASTRO, preCadastroId, enviado, null);
+    }
+
+    private ArquivoEnviado enviarAoStorage(EntidadeArquivo entidadeTipo, AnexoNovo anexo) {
+        MultipartFile arquivo = anexo.arquivo();
         if (arquivo == null || arquivo.isEmpty()) {
             throw new ArquivoInvalidoException("Envie um arquivo.");
         }
-        validarDono(entidadeTipo, entidadeId);
 
-        ProcessadorArquivo.ArquivoProcessado processado = processador.processar(lerBytes(arquivo), categoria);
-        String hash = sha256(processado.conteudo());
+        ProcessadorArquivo.ArquivoProcessado processado = processador.processar(lerBytes(arquivo), anexo.categoria());
+        String chave = montarChave(entidadeTipo, anexo.categoria(), processado.extensao());
+        ArmazenamentoArquivos storage = armazenamento(provedorAtivo);
+        storage.salvar(chave, processado.conteudo(), processado.mimeType());
+
+        return new ArquivoEnviado(anexo.categoria(), storage.provedor(), chave, nomeSeguro(arquivo.getOriginalFilename()),
+                processado.mimeType(), processado.conteudo().length, sha256(processado.conteudo()));
+    }
+
+    private ArquivoResponseDTO gravarMetadados(EntidadeArquivo entidadeTipo, Long entidadeId, ArquivoEnviado enviado,
+                                               Usuario enviadoPor) {
+        CategoriaArquivo categoria = enviado.categoria();
 
         var identico = arquivoRepository
                 .findFirstByEntidadeTipoAndEntidadeIdAndCategoriaAndHashSha256AndExcluidoEmIsNull(
-                        entidadeTipo, entidadeId, categoria, hash);
+                        entidadeTipo, entidadeId, categoria, enviado.hashSha256());
         if (identico.isPresent()) {
+            aposCommit(() -> apagarDoStorage(enviado));
             return ArquivoResponseDTO.de(identico.get());
         }
 
@@ -86,22 +142,17 @@ public class ArquivoService {
             substituirAnteriores(entidadeTipo, entidadeId, categoria);
         }
 
-        String chave = montarChave(entidadeTipo, entidadeId, categoria, processado.extensao());
-        ArmazenamentoArquivos storage = armazenamento(provedorAtivo);
-        storage.salvar(chave, processado.conteudo(), processado.mimeType());
-        aposRollback(() -> removerDoStorageSemFalhar(storage, chave));
-
         Arquivo salvo = arquivoRepository.save(Arquivo.builder()
                 .entidadeTipo(entidadeTipo)
                 .entidadeId(entidadeId)
                 .categoria(categoria)
-                .provedor(storage.provedor())
-                .chave(chave)
-                .nomeOriginal(nomeSeguro(arquivo.getOriginalFilename()))
-                .mimeType(processado.mimeType())
-                .tamanhoBytes((long) processado.conteudo().length)
-                .hashSha256(hash)
-                .enviadoPor(usuarioAutenticadoService.getUsuarioAtual())
+                .provedor(enviado.provedor())
+                .chave(enviado.chave())
+                .nomeOriginal(enviado.nomeOriginal())
+                .mimeType(enviado.mimeType())
+                .tamanhoBytes(enviado.tamanhoBytes())
+                .hashSha256(enviado.hashSha256())
+                .enviadoPor(enviadoPor)
                 .build());
 
         auditoriaService.registrar(ModuloSistema.DOCUMENTOS, "arquivo", salvo.getArquivoId(),
@@ -113,6 +164,8 @@ public class ArquivoService {
         return ArquivoResponseDTO.de(salvo);
     }
 
+    @Cacheable(cacheNames = CacheConfig.FOTOS_PERFIL,
+            condition = "#categoria == T(adra.ifsp.edu.br.api.domain.enums.CategoriaArquivo).FOTO_PERFIL")
     @Transactional(readOnly = true)
     public List<ArquivoResponseDTO> listar(EntidadeArquivo entidadeTipo, Long entidadeId, CategoriaArquivo categoria) {
         List<Arquivo> arquivos = categoria == null
@@ -120,14 +173,14 @@ public class ArquivoService {
                 entidadeTipo, entidadeId)
                 : arquivoRepository.findByEntidadeTipoAndEntidadeIdAndCategoriaAndExcluidoEmIsNullOrderByCriadoEmDesc(
                 entidadeTipo, entidadeId, categoria);
-        if (entidadeTipo == EntidadeArquivo.AULA) {
+        if (entidadeTipo == EntidadeArquivo.SEMANARIO) {
             arquivos = somenteVisiveisAoUsuario(arquivos);
         }
         return arquivos.stream().map(ArquivoResponseDTO::de).toList();
     }
 
     /**
-     * Material de aula: o Oficineiro só enxerga o que ELE enviou;
+     * Material do semanário: o Oficineiro só enxerga o que ELE enviou;
      * Coordenação/Sociopedagógico/Admin enxergam tudo (com o nome de quem enviou).
      */
     private List<Arquivo> somenteVisiveisAoUsuario(List<Arquivo> arquivos) {
@@ -138,44 +191,67 @@ public class ArquivoService {
                 .toList();
     }
 
-    /**
-     * Aulas da turma que têm material, cada uma com seus arquivos (mais recentes primeiro).
-     * Aula sem material não entra. Uma consulta de arquivos por aula — ok pro volume atual;
-     * se pesar, trocar por uma busca com EntidadeIdIn e agrupar por entidadeId.
-     */
-    @Transactional(readOnly = true)
-    public List<AulaArquivoDTO> listarArquivosPorAula(Long turmaId) {
-        List<AulaArquivoDTO> aulasArquivos = new ArrayList<>();
-
-        Turma turma = turmaRepository.findById(turmaId)
-                .orElseThrow(() -> new EntidadeNaoEncontradaException("Turma nao encontrada: id " + turmaId));
-
-        List<Aula> aulas = aulaRepository.findByTurmaOrderByDataAulaDescHorarioInicioDesc(turma);
-
-        for (Aula aula : aulas) {
-            List<Arquivo> arquivos = arquivoRepository
-                    .findByEntidadeTipoAndEntidadeIdAndCategoriaAndExcluidoEmIsNullOrderByCriadoEmDesc(
-                            EntidadeArquivo.AULA, aula.getAulaId(), CategoriaArquivo.MATERIAL_AULA);
-            arquivos = somenteVisiveisAoUsuario(arquivos);
-
-            if (!arquivos.isEmpty()) {
-                aulasArquivos.add(AulaArquivoDTO.de(aula, arquivos));
-            }
-        }
-        return aulasArquivos;
-    }
-
-
-
-
-    @Transactional(readOnly = true)
+    @Cacheable(CacheConfig.URLS_ARQUIVO)
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public UrlArquivoDTO gerarUrl(Long arquivoId) {
         Arquivo arquivo = buscarAtivo(arquivoId);
+        // Arquivo do pré-cadastro só pela tela de pré-cadastros (Coordenação e Assistente Social).
+        if (arquivo.getEntidadeTipo() == EntidadeArquivo.PRE_CADASTRO) {
+            throw new AcessoNegadoException("Arquivo de pré-cadastro: abra pela tela de pré-cadastros.");
+        }
+        return urlTemporaria(arquivo);
+    }
+
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public UrlArquivoDTO gerarUrlDePreCadastro(Long preCadastroId, Long arquivoId) {
+        Arquivo arquivo = buscarAtivo(arquivoId);
+        if (arquivo.getEntidadeTipo() != EntidadeArquivo.PRE_CADASTRO || !arquivo.getEntidadeId().equals(preCadastroId)) {
+            throw new EntidadeNaoEncontradaException("Arquivo nao encontrado neste pré-cadastro: id " + arquivoId);
+        }
+        return urlTemporaria(arquivo);
+    }
+
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public Map<Long, UrlArquivoDTO> urlsDasFotosDePerfil(EntidadeArquivo entidadeTipo, List<Long> entidadeIds) {
+        if (entidadeIds.size() > MAXIMO_FOTOS_POR_LOTE) {
+            throw new ArquivoInvalidoException("Peça no máximo " + MAXIMO_FOTOS_POR_LOTE + " fotos por vez.");
+        }
+
+        List<Arquivo> fotos = arquivoRepository.findByEntidadeTipoAndEntidadeIdInAndCategoriaAndExcluidoEmIsNull(
+                entidadeTipo, entidadeIds, CategoriaArquivo.FOTO_PERFIL);
+        Instant expiraEm = Instant.now().plus(validadeUrl);
+
+        Map<Long, UrlArquivoDTO> urls = new HashMap<>();
+        fotos.stream().collect(Collectors.groupingBy(Arquivo::getProvedor)).forEach((provedor, fotosDoProvedor) -> {
+            Map<String, URI> assinadas = armazenamento(provedor).urlsTemporarias(
+                    fotosDoProvedor.stream().map(Arquivo::getChave).toList(), validadeUrl);
+            for (Arquivo foto : fotosDoProvedor) {
+                URI assinada = assinadas.get(foto.getChave());
+                if (assinada != null) {
+                    urls.put(foto.getEntidadeId(), new UrlArquivoDTO(assinada.toString(), expiraEm));
+                }
+            }
+        });
+        return urls;
+    }
+
+    /**
+     * Passa os arquivos de um dono para outro (pré-cadastro aprovado → assistido/responsável).
+     * O binário fica onde está no storage; só a linha muda de dono.
+     */
+    @CacheEvict(cacheNames = {CacheConfig.FOTOS_PERFIL, CacheConfig.URLS_ARQUIVO}, allEntries = true)
+    public void transferir(EntidadeArquivo deTipo, Long deId, CategoriaArquivo deCategoria,
+                           EntidadeArquivo paraTipo, Long paraId, CategoriaArquivo paraCategoria) {
+        arquivoRepository.transferirDono(deTipo, deId, deCategoria, paraTipo, paraId, paraCategoria);
+    }
+
+    private UrlArquivoDTO urlTemporaria(Arquivo arquivo) {
         var url = armazenamento(arquivo.getProvedor()).urlTemporaria(arquivo.getChave(), validadeUrl);
         return new UrlArquivoDTO(url.toString(), Instant.now().plus(validadeUrl));
     }
 
     /** Some da listagem na hora; o binário só sai do storage depois do commit. */
+    @CacheEvict(cacheNames = {CacheConfig.FOTOS_PERFIL, CacheConfig.URLS_ARQUIVO}, allEntries = true)
     public void remover(Long arquivoId) {
         Arquivo arquivo = buscarAtivo(arquivoId);
         arquivo.marcarComoExcluido();
@@ -223,12 +299,16 @@ public class ArquivoService {
             if (!responsavelRepository.existsById(entidadeId)) {
                 throw new EntidadeNaoEncontradaException(entidadeTipo + " nao encontrado: id " + entidadeId);
             }
-        } else if(entidadeTipo==EntidadeArquivo.AULA){
-            if (!aulaRepository.existsById(entidadeId)) {
+        } else if(entidadeTipo==EntidadeArquivo.SEMANARIO){
+            if (!semanarioRepository.existsById(entidadeId)) {
+                throw new EntidadeNaoEncontradaException(entidadeTipo + " nao encontrado: id " + entidadeId);
+            }
+        } else if(entidadeTipo==EntidadeArquivo.PRE_CADASTRO){
+            if (!preCadastroRepository.existsById(entidadeId)) {
                 throw new EntidadeNaoEncontradaException(entidadeTipo + " nao encontrado: id " + entidadeId);
             }
         } else {
-            throw new ArquivoInvalidoException("Arquivos so podem ser enviados para assistidos, responsaveis, usuarios e aulas.");
+            throw new ArquivoInvalidoException("Arquivos so podem ser enviados para atendidos, responsaveis, usuarios e semanarios.");
         }
     }
 
@@ -244,9 +324,9 @@ public class ArquivoService {
                 .orElseThrow(() -> new IllegalStateException("Nenhum adaptador de storage para " + provedor));
     }
 
-    /** Sem nome de pessoa no caminho (LGPD): assistido/123/foto_perfil/<uuid>.webp */
-    private static String montarChave(EntidadeArquivo tipo, Long id, CategoriaArquivo categoria, String extensao) {
-        return tipo.name().toLowerCase() + "/" + id + "/" + categoria.name().toLowerCase()
+    /** Sem nome de pessoa no caminho (LGPD): assistido/foto_perfil/<uuid>.webp */
+    private static String montarChave(EntidadeArquivo tipo, CategoriaArquivo categoria, String extensao) {
+        return tipo.name().toLowerCase() + "/" + categoria.name().toLowerCase()
                 + "/" + UUID.randomUUID() + "." + extensao;
     }
 
@@ -272,13 +352,19 @@ public class ArquivoService {
         }
     }
 
+    private void apagarDoStorage(ArquivoEnviado enviado) {
+        removerDoStorageSemFalhar(armazenamento(enviado.provedor()), enviado.chave());
+    }
+
     private static void removerDoStorageSemFalhar(ArmazenamentoArquivos storage, String chave) {
-        try {
-            storage.remover(chave);
-        } catch (RuntimeException e) {
-            // Fica órfão no bucket, mas não derruba a requisição. Dá pra varrer depois.
-            log.warn("Nao foi possivel remover {} do storage {}", chave, storage.provedor(), e);
-        }
+        Thread.startVirtualThread(() -> {
+            try {
+                storage.remover(chave);
+            } catch (RuntimeException e) {
+                // Fica órfão no bucket, mas não derruba a requisição. Dá pra varrer depois.
+                log.warn("Nao foi possivel remover {} do storage {}", chave, storage.provedor(), e);
+            }
+        });
     }
 
     private static void aposCommit(Runnable acao) {
@@ -286,15 +372,6 @@ public class ArquivoService {
             @Override
             public void afterCommit() {
                 acao.run();
-            }
-        });
-    }
-
-    private static void aposRollback(Runnable acao) {
-        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-            @Override
-            public void afterCompletion(int status) {
-                if (status == STATUS_ROLLED_BACK) acao.run();
             }
         });
     }

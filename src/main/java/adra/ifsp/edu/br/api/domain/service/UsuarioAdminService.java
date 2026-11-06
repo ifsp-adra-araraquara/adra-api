@@ -13,9 +13,7 @@ import adra.ifsp.edu.br.api.domain.dto.usuario.RedefinicaoSenhaResponseDTO;
 import adra.ifsp.edu.br.api.domain.dto.usuario.UsuarioRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.usuario.UsuarioResponseDTO;
 import adra.ifsp.edu.br.api.domain.dto.usuario.UsuarioStatusRequestDTO;
-import adra.ifsp.edu.br.api.domain.enums.NomeNivelPermissao;
 import adra.ifsp.edu.br.api.domain.model.Usuario;
-import adra.ifsp.edu.br.api.exception.AcessoNegadoException;
 import adra.ifsp.edu.br.api.exception.RegraNegocioException;
 import adra.ifsp.edu.br.api.infra.EmailService;
 import adra.ifsp.edu.br.api.infra.SupabaseAdminClient;
@@ -36,7 +34,6 @@ public class UsuarioAdminService {
     private final EmailService emailService;
 
     public UsuarioResponseDTO cadastrar(UsuarioRequestDTO dto) {
-        exigirAdministrador();
         usuarioService.validarNovoCadastro(dto);
 
         UUID authUid = supabaseAdminClient.convidar(dto.email());
@@ -58,7 +55,6 @@ public class UsuarioAdminService {
     }
 
     public void reenviarConvite(Long id) {
-        exigirAdministrador();
         Usuario usuario = buscarComIdentidade(id);
 
         try {
@@ -73,7 +69,6 @@ public class UsuarioAdminService {
 
     /** O link volta mesmo se o e-mail falhar: o admin pode repassa-lo por outro canal. */
     public RedefinicaoSenhaResponseDTO redefinirSenha(Long id) {
-        exigirAdministrador();
         Usuario usuario = buscarComIdentidade(id);
 
         String tokenHash = supabaseAdminClient.gerarTokenRedefinicao(usuario.getEmail());
@@ -100,7 +95,6 @@ public class UsuarioAdminService {
     }
 
     public UsuarioResponseDTO alterarStatus(Long id, UsuarioStatusRequestDTO dto) {
-        exigirAdministrador();
         validarNaoInativarProprioUsuario(id, dto.ativo());
 
         Usuario usuario = usuarioService.buscarEntidadePorId(id);
@@ -147,16 +141,6 @@ public class UsuarioAdminService {
         } catch (RuntimeException falhaAoDesfazer) {
             // Engolir para nao mascarar o erro original.
             log.error("Falha ao remover a identidade {} apos erro no cadastro", authUid, falhaAoDesfazer);
-        }
-    }
-
-    private void exigirAdministrador() {
-        // Temporario: vira @PreAuthorize com a US-08.
-        Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        String perfil = principal instanceof Jwt jwt ? jwt.getClaimAsString(TokenService.CLAIM_PERFIL) : null;
-
-        if (!NomeNivelPermissao.ADMINISTRADOR.name().equals(perfil)) {
-            throw new AcessoNegadoException("Apenas o Administrador pode gerenciar usuarios.");
         }
     }
 }

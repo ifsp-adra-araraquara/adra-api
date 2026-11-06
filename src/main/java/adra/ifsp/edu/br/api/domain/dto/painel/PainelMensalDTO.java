@@ -9,7 +9,7 @@ import java.util.List;
  *
  * @param mes        yyyy-MM
  * @param tendencia  frequência dos 6 meses até `mes`, do mais antigo ao mais recente
- * @param turmas     turmas ativas, da menor para a maior frequência (sem aula realizada por último)
+ * @param turmas     grupos ativos, da menor para a maior frequência (sem chamada lançada por último)
  */
 public record PainelMensalDTO(
         String mes,
@@ -29,13 +29,13 @@ public record PainelMensalDTO(
     }
 
     /**
-     * Presença sobre aluno-aula esperado (mesma regra da chamada: só P conta
-     * como presença; FJ é ausência). `null` quando não houve aula realizada.
+     * Presença sobre atendido esperado nas chamadas (só P conta como
+     * presença; FJ é ausência). `null` quando não houve chamada lançada.
      */
     public record Frequencia(
             Integer percentual,
             Integer percentualMesAnterior,
-            long aulasRealizadas,
+            long chamadasLancadas,
             long chamadasPendentes,
             long faltas,
             long faltasJustificadas
@@ -61,7 +61,7 @@ public record PainelMensalDTO(
         }
     }
 
-    public record FrequenciaMes(String mes, Integer percentual, long aulas) {
+    public record FrequenciaMes(String mes, Integer percentual, long chamadas) {
     }
 
     public record Turma(
@@ -70,7 +70,7 @@ public record PainelMensalDTO(
             String nomeOficina,
             long alunos,
             Integer capacidade,
-            long aulasRealizadas,
+            long chamadasLancadas,
             long chamadasPendentes,
             Integer frequencia
     ) {

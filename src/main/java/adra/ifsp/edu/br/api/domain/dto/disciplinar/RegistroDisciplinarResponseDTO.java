@@ -3,6 +3,7 @@ package adra.ifsp.edu.br.api.domain.dto.disciplinar;
 import adra.ifsp.edu.br.api.domain.enums.ConsequenciaDisciplinar;
 import adra.ifsp.edu.br.api.domain.enums.NivelDisciplinar;
 import adra.ifsp.edu.br.api.domain.enums.OrigemRegistroDisciplinar;
+import adra.ifsp.edu.br.api.domain.enums.Sexo;
 import adra.ifsp.edu.br.api.domain.enums.StatusDocumentoDisciplinar;
 import adra.ifsp.edu.br.api.domain.model.RegistroDisciplinar;
 
@@ -14,6 +15,8 @@ public record RegistroDisciplinarResponseDTO(
         Long registroId,
         Long assistidoId,
         String nomeAssistido,
+        /** Para o pronome do documento ("o atendido" / "a atendida"); pode ser null. */
+        Sexo sexoAssistido,
         Long motivoId,
         /** Nome do motivo, ou o texto da progressão ("Gerada pela 3ª ocorrência"). */
         String motivo,
@@ -23,7 +26,7 @@ public record RegistroDisciplinarResponseDTO(
         Integer sequencia,
         LocalDate dataRegistro,
         String descricao,
-        Long aulaId,
+        Long turmaId,
         LocalDate suspensaoInicio,
         LocalDate suspensaoFim,
         StatusDocumentoDisciplinar documentoStatus,
@@ -48,6 +51,7 @@ public record RegistroDisciplinarResponseDTO(
                 r.getRegistroId(),
                 r.getAssistido().getAssistidoId(),
                 r.getAssistido().getNomeCompleto(),
+                r.getAssistido().getSexo(),
                 motivo != null ? motivo.getMotivoId() : null,
                 motivo != null ? motivo.getNome() : textoProgressao(r),
                 r.getNivel(),
@@ -56,7 +60,7 @@ public record RegistroDisciplinarResponseDTO(
                 r.getSequencia(),
                 r.getDataRegistro(),
                 r.getDescricao(),
-                r.getAula() != null ? r.getAula().getAulaId() : null,
+                r.getTurma() != null ? r.getTurma().getTurmaId() : null,
                 r.getSuspensaoInicio(),
                 r.getSuspensaoFim(),
                 r.getDocumentoStatus(),

@@ -1,8 +1,8 @@
 package adra.ifsp.edu.br.api.domain.enums;
 
 /**
- * US-71: situação da chamada de uma aula no painel do coordenador.
- * Não é coluna no banco — é derivada da existência de linhas em presenca.
+ * Situação da chamada de um grupo num dia. Não é coluna no banco: é derivada
+ * da existência da linha em `chamada`.
  */
 public enum StatusChamada {
     LANCADA,

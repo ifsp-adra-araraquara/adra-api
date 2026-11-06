@@ -1,17 +1,11 @@
 package adra.ifsp.edu.br.api.domain.service;
 
-import adra.ifsp.edu.br.api.domain.enums.StatusAula;
-import adra.ifsp.edu.br.api.domain.enums.StatusPresenca;
+import adra.ifsp.edu.br.api.domain.dto.presenca.AutorizadoRetiradaDTO;
 import adra.ifsp.edu.br.api.domain.model.Assistido;
 import adra.ifsp.edu.br.api.domain.model.AssistidoResponsavel;
-import adra.ifsp.edu.br.api.domain.model.Aula;
-import adra.ifsp.edu.br.api.domain.model.Presenca;
-import adra.ifsp.edu.br.api.domain.model.Turma;
-import adra.ifsp.edu.br.api.domain.model.TurmaAlunos;
 import adra.ifsp.edu.br.api.domain.repository.AssistidoResponsavelRepository;
-import adra.ifsp.edu.br.api.domain.repository.AulaRepository;
 import adra.ifsp.edu.br.api.domain.repository.PresencaRepository;
-import adra.ifsp.edu.br.api.domain.repository.TurmaAlunosRepository;
+import adra.ifsp.edu.br.api.domain.repository.PresencaRepository.FrequenciaDoAssistido;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,25 +14,21 @@ import java.time.LocalDate;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
  * Dados derivados das linhas da listagem de assistidos — responsável principal
- * e indicadores de frequência — calculados em lote (4 queries por página, não
- * 1 por aluno). Frequência com a mesma reconstituição de
- * {@link PresencaService#buscarFrequenciaAssistido}, pra lista e ficha nunca
- * divergirem.
+ * e indicadores de frequência — calculados em lote. Frequência com a mesma
+ * reconstituição de {@link FrequenciaService#historicoDoAtendido}, pra lista e
+ * ficha nunca divergirem.
  */
 @Service
 @RequiredArgsConstructor
 public class AssistidoIndicadoresService {
 
-    private final TurmaAlunosRepository turmaAlunosRepository;
-    private final AulaRepository aulaRepository;
     private final PresencaRepository presencaRepository;
     private final AssistidoResponsavelRepository assistidoResponsavelRepository;
 
@@ -48,50 +38,17 @@ public class AssistidoIndicadoresService {
             return Map.of();
         }
 
-        List<TurmaAlunos> vinculos = turmaAlunosRepository.findByAssistidoIn(assistidos);
-        Set<Turma> turmas = vinculos.stream().map(TurmaAlunos::getTurma).collect(Collectors.toSet());
-        List<Aula> aulas = turmas.isEmpty()
-                ? List.of()
-                : aulaRepository.findByTurmaInAndStatusAula(turmas, StatusAula.REALIZADA);
-
-        Map<Long, List<Aula>> aulasPorTurma = aulas.stream()
-                .collect(Collectors.groupingBy(a -> a.getTurma().getTurmaId()));
-
-        Map<Long, Map<Long, StatusPresenca>> faltasPorAssistido = new HashMap<>();
-        if (!aulas.isEmpty()) {
-            for (Presenca falta : presencaRepository.findByAulaInAndAssistidoIn(aulas, assistidos)) {
-                faltasPorAssistido
-                        .computeIfAbsent(falta.getAssistido().getAssistidoId(), k -> new HashMap<>())
-                        .put(falta.getAula().getAulaId(), falta.getStatusPresenca());
-            }
-        }
-
-        Map<Long, List<TurmaAlunos>> vinculosPorAssistido = vinculos.stream()
-                .collect(Collectors.groupingBy(v -> v.getAssistido().getAssistidoId()));
+        List<Long> ids = assistidos.stream().map(Assistido::getAssistidoId).toList();
+        Map<Long, FrequenciaDoAssistido> frequencias = presencaRepository.frequencias(ids, LocalDate.now()).stream()
+                .collect(Collectors.toMap(FrequenciaDoAssistido::getAssistidoId, Function.identity()));
 
         Map<Long, IndicadorFrequencia> resultado = new HashMap<>();
         for (Assistido assistido : assistidos) {
-            Long id = assistido.getAssistidoId();
-            Map<Long, StatusPresenca> faltas = faltasPorAssistido.getOrDefault(id, Map.of());
-
-            // aulaId -> aula, sem repetir caso dois vínculos cubram a mesma aula
-            Map<Long, Aula> aulasDoAssistido = new LinkedHashMap<>();
-            for (TurmaAlunos vinculo : vinculosPorAssistido.getOrDefault(id, List.of())) {
-                LocalDate fim = vinculo.getDataSaida() != null ? vinculo.getDataSaida() : LocalDate.now();
-                for (Aula aula : aulasPorTurma.getOrDefault(vinculo.getTurma().getTurmaId(), List.of())) {
-                    LocalDate data = aula.getDataAula();
-                    if (!data.isBefore(vinculo.getDataEntrada()) && !data.isAfter(fim)) {
-                        aulasDoAssistido.putIfAbsent(aula.getAulaId(), aula);
-                    }
-                }
-            }
-
-            List<StatusPresenca> statusMaisRecentePrimeiro = aulasDoAssistido.values().stream()
-                    .sorted(Comparator.comparing(Aula::getDataAula).thenComparing(Aula::getAulaId).reversed())
-                    .map(aula -> faltas.getOrDefault(aula.getAulaId(), StatusPresenca.PRESENTE))
-                    .toList();
-
-            resultado.put(id, IndicadorFrequencia.de(statusMaisRecentePrimeiro, assistido.getStatus()));
+            FrequenciaDoAssistido frequencia = frequencias.get(assistido.getAssistidoId());
+            resultado.put(assistido.getAssistidoId(), frequencia == null
+                    ? IndicadorFrequencia.SEM_AULAS
+                    : IndicadorFrequencia.de(frequencia.getTotal(), frequencia.getPresentes(),
+                            frequencia.getFaltasConsecutivas(), assistido.getStatus()));
         }
         return resultado;
     }
@@ -113,5 +70,25 @@ public class AssistidoIndicadoresService {
                         ar -> ar.getAssistido().getAssistidoId(),
                         Collectors.collectingAndThen(Collectors.toList(),
                                 lista -> lista.stream().min(prioridade).orElseThrow())));
+    }
+
+    /** Quem pode buscar cada assistido (responsáveis "autorizado a retirar"), principal primeiro. */
+    @Transactional(readOnly = true)
+    public Map<Long, List<AutorizadoRetiradaDTO>> autorizadosRetirada(Collection<Assistido> assistidos) {
+        if (assistidos.isEmpty()) {
+            return Map.of();
+        }
+        List<Long> ids = assistidos.stream().map(Assistido::getAssistidoId).toList();
+
+        return assistidoResponsavelRepository.findComResponsavelByAssistidoIds(ids).stream()
+                .filter(AssistidoResponsavel::isAutorizadoRetirada)
+                .sorted(Comparator.comparing(AssistidoResponsavel::isResponsavelPrincipal).reversed()
+                        .thenComparing(v -> v.getResponsavel().getNomeCompleto()))
+                .collect(Collectors.groupingBy(
+                        v -> v.getAssistido().getAssistidoId(),
+                        Collectors.mapping(v -> new AutorizadoRetiradaDTO(
+                                v.getResponsavel().getNomeCompleto(),
+                                v.getParentesco(),
+                                v.getResponsavel().getTelefone()), Collectors.toList())));
     }
 }

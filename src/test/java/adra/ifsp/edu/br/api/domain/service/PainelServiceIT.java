@@ -4,27 +4,29 @@ import adra.ifsp.edu.br.api.ContainerPostgresAdra;
 import adra.ifsp.edu.br.api.domain.dto.disciplinar.RegistroDisciplinarRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.painel.PainelHojeDTO;
 import adra.ifsp.edu.br.api.domain.dto.painel.PainelMensalDTO;
-import adra.ifsp.edu.br.api.domain.dto.presenca.PresencaRequestDTO;
-import adra.ifsp.edu.br.api.domain.enums.MotivoFalta;
 import adra.ifsp.edu.br.api.domain.enums.NivelDisciplinar;
 import adra.ifsp.edu.br.api.domain.enums.NomeNivelPermissao;
-import adra.ifsp.edu.br.api.domain.enums.StatusAula;
 import adra.ifsp.edu.br.api.domain.enums.StatusGeral;
 import adra.ifsp.edu.br.api.domain.enums.StatusPresenca;
 import adra.ifsp.edu.br.api.domain.enums.Turno;
 import adra.ifsp.edu.br.api.domain.model.Assistido;
-import adra.ifsp.edu.br.api.domain.model.Aula;
+import adra.ifsp.edu.br.api.domain.model.Chamada;
 import adra.ifsp.edu.br.api.domain.model.MotivoDisciplinar;
 import adra.ifsp.edu.br.api.domain.model.NivelPermissao;
 import adra.ifsp.edu.br.api.domain.model.Oficina;
+import adra.ifsp.edu.br.api.domain.model.OficinaTurma;
+import adra.ifsp.edu.br.api.domain.model.Presenca;
 import adra.ifsp.edu.br.api.domain.model.Turma;
 import adra.ifsp.edu.br.api.domain.model.TurmaAlunos;
 import adra.ifsp.edu.br.api.domain.model.Usuario;
 import adra.ifsp.edu.br.api.domain.repository.AssistidoRepository;
-import adra.ifsp.edu.br.api.domain.repository.AulaRepository;
+import adra.ifsp.edu.br.api.domain.repository.ChamadaRepository;
 import adra.ifsp.edu.br.api.domain.repository.MotivoDisciplinarRepository;
 import adra.ifsp.edu.br.api.domain.repository.NivelPermissaoRepository;
 import adra.ifsp.edu.br.api.domain.repository.OficinaRepository;
+import adra.ifsp.edu.br.api.domain.repository.OficinaResumoRepository;
+import adra.ifsp.edu.br.api.domain.repository.OficinaTurmaRepository;
+import adra.ifsp.edu.br.api.domain.repository.PresencaRepository;
 import adra.ifsp.edu.br.api.domain.repository.TurmaAlunosRepository;
 import adra.ifsp.edu.br.api.domain.repository.TurmaRepository;
 import adra.ifsp.edu.br.api.domain.repository.UsuarioRepository;
@@ -50,6 +52,7 @@ import java.sql.SQLException;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.YearMonth;
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -78,23 +81,26 @@ class PainelServiceIT {
     @Autowired private UsuarioRepository usuarioRepository;
     @Autowired private AssistidoRepository assistidoRepository;
     @Autowired private OficinaRepository oficinaRepository;
+    @Autowired private OficinaTurmaRepository oficinaTurmaRepository;
     @Autowired private TurmaRepository turmaRepository;
     @Autowired private TurmaAlunosRepository turmaAlunosRepository;
-    @Autowired private AulaRepository aulaRepository;
+    @Autowired private ChamadaRepository chamadaRepository;
     @Autowired private MotivoDisciplinarRepository motivoRepository;
-    @Autowired private PresencaService presencaService;
+    @Autowired private PresencaRepository presencaRepository;
     @Autowired private DisciplinarService disciplinarService;
     @Autowired private PainelService painelService;
+    @Autowired private OficinaResumoRepository oficinaResumoRepository;
     @Autowired private PainelController painelController;
     @Autowired private EntityManager entityManager;
     @Autowired private DataSource dataSource;
 
     private static final LocalDate HOJE = LocalDate.now();
-    /** Mês fechado, para as datas das aulas não dependerem do dia em que o teste roda. */
+    /** Mês fechado, para as datas das chamadas não dependerem do dia em que o teste roda. */
     private static final YearMonth MES = YearMonth.from(HOJE).minusMonths(1);
 
     private Usuario coordenador;
-    private Usuario sociopedagogico;
+    private Usuario educadorSocial;
+    private Oficina futebol;
     private Turma turma;
     private Assistido ana;
     private Assistido bruno;
@@ -110,21 +116,22 @@ class PainelServiceIT {
         }
 
         coordenador = criarUsuario(NomeNivelPermissao.COORDENADOR, "coord-ft05@teste.local");
-        sociopedagogico = criarUsuario(NomeNivelPermissao.SOCIOPEDAGOGICO, "socio-ft05@teste.local");
+        educadorSocial = criarUsuario(NomeNivelPermissao.EDUCADOR_SOCIAL, "socio-ft05@teste.local");
         autenticarComo(coordenador);
 
-        Oficina oficina = new Oficina();
-        oficina.setNomeOficina("Futebol");
-        oficina.setOficineiroResponsavel(coordenador);
-        oficina = oficinaRepository.save(oficina);
+        futebol = new Oficina();
+        futebol.setNomeOficina("Futebol");
+        futebol.setOficineiroResponsavel(coordenador);
+        futebol = oficinaRepository.save(futebol);
 
         turma = new Turma();
-        turma.setOficina(oficina);
-        turma.setOficineiroResponsavel(coordenador);
         turma.setNomeTurma("Turma A - Futebol");
         turma.setTurno(Turno.MANHA);
         turma.setCapacidade(20);
+        turma.setDiasDaSemana(new ArrayList<>(List.of(MES.atDay(5).getDayOfWeek())));
         turma = turmaRepository.save(turma);
+        oficinaTurmaRepository.save(new OficinaTurma(futebol, turma));
+        fundarGrupoEm(MES.atDay(1).minusMonths(3));
 
         LocalDate entrada = MES.atDay(1).minusMonths(3);
         ana = matricular("Ana Painel", LocalDate.of(2015, 3, 3), entrada, null);
@@ -136,39 +143,83 @@ class PainelServiceIT {
     @Test
     @DisplayName("Frequência do mês: presença esparsa, FJ como ausência e desligado fora")
     void frequenciaDoMes() {
-        Aula a1 = aula(MES.atDay(5), StatusAula.REALIZADA);
-        aula(MES.atDay(12), StatusAula.REALIZADA);
-        Aula a3 = aula(MES.atDay(19), StatusAula.REALIZADA);
-        aula(MES.atDay(26), StatusAula.REALIZADA);
-        aula(MES.atDay(27), StatusAula.PLANEJADA); // chamada esquecida
-        falta(a1, ana, StatusPresenca.FALTA);
-        falta(a3, bruno, StatusPresenca.FALTA_JUSTIFICADA);
+        Chamada c1 = chamada(MES.atDay(5));
+        chamada(MES.atDay(12));
+        Chamada c3 = chamada(MES.atDay(19));
+        // dia 26, mesmo dia da semana, fica sem chamada: pendente
+        falta(c1, ana, StatusPresenca.FALTA);
+        falta(c3, bruno, StatusPresenca.FALTA_JUSTIFICADA);
 
         PainelMensalDTO painel = mensal();
 
-        // 4 aulas × 2 alunos = 8 esperados; 2 ausências -> 75%
-        assertThat(painel.frequencia().percentual()).isEqualTo(75);
-        assertThat(painel.frequencia().aulasRealizadas()).isEqualTo(4);
-        assertThat(painel.frequencia().chamadasPendentes()).isEqualTo(1);
+        // 3 chamadas × 2 atendidos = 6 esperados; 2 ausências -> 67%
+        assertThat(painel.frequencia().percentual()).isEqualTo(67);
+        assertThat(painel.frequencia().chamadasLancadas()).isEqualTo(3);
+        assertThat(painel.frequencia().chamadasPendentes()).isEqualTo(FeriadosNacionais.ehFeriado(MES.atDay(26)) ? 0 : 1);
         assertThat(painel.frequencia().faltas()).isEqualTo(1);
         assertThat(painel.frequencia().faltasJustificadas()).isEqualTo(1);
         assertThat(painel.turmas()).singleElement()
                 .extracting(PainelMensalDTO.Turma::frequencia, PainelMensalDTO.Turma::alunos, PainelMensalDTO.Turma::nomeOficina)
-                .containsExactly(75, 2L, "Futebol");
+                .containsExactly(67, 2L, "Futebol");
         assertThat(painel.ocupacao().percentual()).isEqualTo(10);
         assertThat(painel.assistidos().ativos()).isEqualTo(2);
         assertThat(painel.tendencia()).hasSize(PainelService.MESES_TENDENCIA);
-        assertThat(painel.tendencia().getLast()).extracting(PainelMensalDTO.FrequenciaMes::percentual).isEqualTo(75);
+        assertThat(painel.tendencia().getLast()).extracting(PainelMensalDTO.FrequenciaMes::percentual).isEqualTo(67);
         assertThat(painel.frequencia().percentualMesAnterior()).isNull();
+    }
+
+    @Test
+    @DisplayName("Saída e retorno ao grupo no mesmo dia não contam o atendido duas vezes no mês")
+    void saidaERetornoNoMesmoDiaNoMes() {
+        vinculoEncerrado(ana, MES.atDay(5), MES.atEndOfMonth());
+        falta(chamada(MES.atDay(5)), ana, StatusPresenca.FALTA);
+
+        PainelMensalDTO painel = mensal();
+
+        assertThat(painel.frequencia().percentual()).isEqualTo(50);
+        assertThat(painel.frequencia().faltas()).isEqualTo(1);
+        assertThat(painel.turmas()).singleElement()
+                .extracting(PainelMensalDTO.Turma::alunos)
+                .isEqualTo(2L);
+    }
+
+    @Test
+    @DisplayName("Saída e retorno ao grupo no mesmo dia não contam o atendido duas vezes no card da oficina")
+    void saidaERetornoNoMesmoDiaNoCardDaOficina() {
+        vinculoEncerrado(ana, MES.atEndOfMonth(), MES.atEndOfMonth());
+        entityManager.flush();
+
+        assertThat(oficinaResumoRepository.turmasAtivas(MES.atEndOfMonth()))
+                .filteredOn(grupo -> grupo.turmaId().equals(turma.getTurmaId()))
+                .singleElement()
+                .extracting(OficinaResumoRepository.TurmaDaOficina::alunos)
+                .isEqualTo(2L);
+    }
+
+    @Test
+    @DisplayName("Saída e retorno ao grupo no mesmo dia não inflam as faltas seguidas")
+    void saidaERetornoNoMesmoDiaNasFaltasSeguidas() {
+        LocalDate ontem = HOJE.minusDays(1);
+        vinculoEncerrado(ana, ontem, ontem);
+        falta(chamada(HOJE.minusDays(2)), ana, StatusPresenca.FALTA);
+        falta(chamada(ontem), ana, StatusPresenca.FALTA);
+        entityManager.flush();
+
+        assertThat(painelService.hoje().faltasSeguidas().itens()).isEmpty();
     }
 
     @Test
     @DisplayName("Hoje: 3 faltas seguidas, chamada atrasada, um passo da advertência e aniversariante")
     void blocoDeHoje() {
-        Aula d3 = aula(HOJE.minusDays(3), StatusAula.REALIZADA);
-        Aula d2 = aula(HOJE.minusDays(2), StatusAula.REALIZADA);
-        Aula d1 = aula(HOJE.minusDays(1), StatusAula.REALIZADA);
-        Aula pendente = aula(HOJE.minusDays(5), StatusAula.PLANEJADA);
+        // Só o dia da semana de 5 dias atrás é de chamada, e o grupo existe desde a véspera dele.
+        LocalDate esquecida = HOJE.minusDays(5);
+        turma.setDiasDaSemana(new ArrayList<>(List.of(esquecida.getDayOfWeek())));
+        turma = turmaRepository.save(turma);
+        fundarGrupoEm(esquecida.minusDays(1));
+        // Chamadas lançadas pelo Coordenador fora da grade nos últimos 3 dias.
+        Chamada d3 = chamada(HOJE.minusDays(3));
+        Chamada d2 = chamada(HOJE.minusDays(2));
+        Chamada d1 = chamada(HOJE.minusDays(1));
         falta(d3, ana, StatusPresenca.FALTA);
         falta(d2, ana, StatusPresenca.FALTA);
         falta(d1, ana, StatusPresenca.FALTA);
@@ -189,9 +240,13 @@ class PainelServiceIT {
         assertThat(hoje.faltasSeguidas().itens())
                 .extracting(PainelHojeDTO.AlunoFaltas::assistidoId, PainelHojeDTO.AlunoFaltas::faltas)
                 .containsExactly(tuple(ana.getAssistidoId(), 3L));
-        assertThat(hoje.chamadasPendentes().total()).isEqualTo(1);
-        assertThat(hoje.chamadasPendentes().itens()).extracting(PainelHojeDTO.ChamadaPendente::aulaId)
-                .containsExactly(pendente.getAulaId());
+        if (FeriadosNacionais.ehFeriado(esquecida)) {
+            assertThat(hoje.chamadasPendentes().total()).isZero();
+        } else {
+            assertThat(hoje.chamadasPendentes().itens())
+                    .extracting(PainelHojeDTO.ChamadaPendente::turmaId, PainelHojeDTO.ChamadaPendente::data)
+                    .containsExactly(tuple(turma.getTurmaId(), esquecida));
+        }
         assertThat(hoje.umPassoDaProgressao().itens())
                 .extracting(PainelHojeDTO.UmPasso::assistidoId, PainelHojeDTO.UmPasso::nivel)
                 .containsExactly(tuple(ana.getAssistidoId(), "OCORRENCIA"));
@@ -224,10 +279,10 @@ class PainelServiceIT {
         teatro.setNomeOficina("Teatro");
         teatro.setOficineiroResponsavel(coordenador);
         teatro = oficinaRepository.save(teatro);
-        aula(MES.atDay(5), StatusAula.REALIZADA);
+        chamada(MES.atDay(5));
 
         entityManager.flush();
-        PainelMensalDTO futebol = painelService.mensal(MES, turma.getOficina().getOficinaId());
+        PainelMensalDTO futebol = painelService.mensal(MES, this.futebol.getOficinaId());
         PainelMensalDTO soTeatro = painelService.mensal(MES, teatro.getOficinaId());
 
         assertThat(futebol.turmas()).hasSize(1);
@@ -240,7 +295,7 @@ class PainelServiceIT {
     @Test
     @DisplayName("Atividade recente traz chamada lançada e assistido cadastrado, sem texto livre")
     void atividadeRecente() {
-        aula(HOJE.minusDays(1), StatusAula.REALIZADA);
+        chamada(HOJE.minusDays(1));
         entityManager.flush();
 
         assertThat(painelService.hoje().atividades())
@@ -252,7 +307,7 @@ class PainelServiceIT {
     @Test
     @DisplayName("Só o Coordenador acessa o painel")
     void somenteCoordenador() {
-        autenticarComo(sociopedagogico);
+        autenticarComo(educadorSocial);
         assertThatThrownBy(() -> painelController.hoje()).isInstanceOf(AuthorizationDeniedException.class);
         assertThatThrownBy(() -> painelController.mensal(MES, null)).isInstanceOf(AuthorizationDeniedException.class);
     }
@@ -281,17 +336,43 @@ class PainelServiceIT {
         return assistido;
     }
 
-    private Aula aula(LocalDate data, StatusAula status) {
-        Aula aula = new Aula();
-        aula.setTurma(turma);
-        aula.setDataAula(data);
-        aula.setStatusAula(status);
-        return aulaRepository.save(aula);
+    private void vinculoEncerrado(Assistido assistido, LocalDate entrada, LocalDate saida) {
+        TurmaAlunos vinculo = new TurmaAlunos();
+        vinculo.setTurma(turma);
+        vinculo.setAssistido(assistido);
+        vinculo.setDataEntrada(entrada);
+        vinculo.setDataSaida(saida);
+        vinculo.setStatus(StatusGeral.INATIVO);
+        turmaAlunosRepository.save(vinculo);
     }
 
-    private void falta(Aula aula, Assistido assistido, StatusPresenca status) {
-        presencaService.registrarPresenca(new PresencaRequestDTO(aula.getAulaId(), assistido.getAssistidoId(), status,
-                status == StatusPresenca.FALTA_JUSTIFICADA ? MotivoFalta.SAUDE : null, null));
+    private Chamada chamada(LocalDate data) {
+        Chamada chamada = new Chamada();
+        chamada.setTurma(turma);
+        chamada.setDataChamada(data);
+        chamada.setCriadoPor(coordenador);
+        chamada.setAtualizadoPor(coordenador);
+        return chamadaRepository.save(chamada);
+    }
+
+    private void falta(Chamada chamada, Assistido assistido, StatusPresenca status) {
+        Presenca presenca = new Presenca();
+        presenca.setChamada(chamada);
+        presenca.setAssistido(assistido);
+        presenca.setStatusPresenca(status);
+        presenca.setCriadoPor(coordenador);
+        presenca.setAtualizadoPor(coordenador);
+        presencaRepository.save(presenca);
+    }
+
+    /** O grupo só cobra chamada a partir da criação, e o @PrePersist grava "agora": volta a data pelo banco. */
+    private void fundarGrupoEm(LocalDate data) {
+        entityManager.flush();
+        entityManager.createNativeQuery("update adra.turma set criado_em = :data where turma_id = :id")
+                .setParameter("data", data.atStartOfDay())
+                .setParameter("id", turma.getTurmaId())
+                .executeUpdate();
+        entityManager.refresh(turma);
     }
 
     private Usuario criarUsuario(NomeNivelPermissao perfil, String email) {

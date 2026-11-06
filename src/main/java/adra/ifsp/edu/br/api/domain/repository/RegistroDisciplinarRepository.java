@@ -17,6 +17,7 @@ import org.springframework.data.repository.query.Param;
 import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 
 public interface RegistroDisciplinarRepository extends JpaRepository<RegistroDisciplinar, Long>,
         JpaSpecificationExecutor<RegistroDisciplinar> {
@@ -44,8 +45,27 @@ public interface RegistroDisciplinarRepository extends JpaRepository<RegistroDis
 
     long countByArquivadoFalseAndDocumentoStatus(StatusDocumentoDisciplinar documentoStatus);
 
+    /** FT-18: registros com algo a resolver na data — consequência aberta, documento a assinar ou suspensão vigente. */
+    @EntityGraph(attributePaths = {"assistido", "turma"})
+    @Query("""
+            SELECT r FROM RegistroDisciplinar r
+            WHERE r.arquivado = false
+              AND ((r.consequencia IS NOT NULL AND r.consequenciaResolvidaEm IS NULL)
+                   OR r.documentoStatus = adra.ifsp.edu.br.api.domain.enums.StatusDocumentoDisciplinar.PENDENTE_ASSINATURA
+                   OR (r.nivel = adra.ifsp.edu.br.api.domain.enums.NivelDisciplinar.SUSPENSAO
+                       AND r.suspensaoInicio <= :data AND r.suspensaoFim >= :data))
+            ORDER BY r.dataRegistro DESC, r.registroId DESC
+            """)
+    List<RegistroDisciplinar> findComPendenciaEm(@Param("data") LocalDate data);
+
 
     long countByAssistidoAndNivelAndArquivadoFalse(Assistido assistido, NivelDisciplinar nivel);
+
+    List<RegistroDisciplinar> findByAssistidoAndArquivadoFalse(Assistido assistido);
+
+    /** Recomendação/consequência pendente mais recente do assistido (devolvida ao registrar). */
+    Optional<RegistroDisciplinar> findFirstByAssistidoAndArquivadoFalseAndConsequenciaIsNotNullAndConsequenciaResolvidaEmIsNullOrderByRegistroIdDesc(
+            Assistido assistido);
 
     /** Histórico da ficha, mais recente primeiro, já com motivo e autores (evita N+1). */
     @Query("""
@@ -54,7 +74,7 @@ public interface RegistroDisciplinarRepository extends JpaRepository<RegistroDis
             LEFT JOIN FETCH r.registradoPor
             LEFT JOIN FETCH r.arquivadoPor
             LEFT JOIN FETCH r.consequenciaResolvidaPor
-            LEFT JOIN FETCH r.aula
+            LEFT JOIN FETCH r.turma
             WHERE r.assistido = :assistido
             ORDER BY r.dataRegistro DESC, r.registroId DESC
             """)

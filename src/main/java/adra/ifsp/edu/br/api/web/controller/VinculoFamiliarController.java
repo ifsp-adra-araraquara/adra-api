@@ -21,7 +21,7 @@ public class VinculoFamiliarController {
 
     private final VinculoFamiliarService vinculoFamiliarService;
 
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'COORDENADOR', 'SOCIOPEDAGOGICO')")
+    @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL')")
     @PostMapping
     public ResponseEntity<VinculoFamiliarResponseDTO> vincular(@PathVariable Long assistidoId,
                                                                  @Valid @RequestBody VinculoFamiliarRequestDTO dto) {
@@ -30,7 +30,7 @@ public class VinculoFamiliarController {
         return ResponseEntity.created(local).body(criado);
     }
 
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'COORDENADOR', 'SOCIOPEDAGOGICO')")
+    @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL')")
     @PostMapping("/cadastrar-vincular")
     public ResponseEntity<VinculoFamiliarResponseDTO> cadastrarVincular(
             @PathVariable Long assistidoId,
@@ -41,13 +41,13 @@ public class VinculoFamiliarController {
         return ResponseEntity.created(local).body(criado);
     }
 
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'COORDENADOR', 'SOCIOPEDAGOGICO')")
+    @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL', 'EDUCADOR_SOCIAL')")
     @GetMapping
     public ResponseEntity<List<VinculoFamiliarResponseDTO>> listar(@PathVariable Long assistidoId) {
         return ResponseEntity.ok(vinculoFamiliarService.listarPorAssistido(assistidoId));
     }
 
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'COORDENADOR', 'SOCIOPEDAGOGICO')")
+    @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL')")
     @PutMapping("/{responsavelId}")
     public ResponseEntity<VinculoFamiliarResponseDTO> atualizar(@PathVariable Long assistidoId,
                                                                   @PathVariable Long responsavelId,
@@ -55,7 +55,7 @@ public class VinculoFamiliarController {
         return ResponseEntity.ok(vinculoFamiliarService.atualizar(assistidoId, responsavelId, dto));
     }
 
-    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    @PreAuthorize("hasAuthority('ADMINISTRADOR')")
     @DeleteMapping("/{responsavelId}")
     public ResponseEntity<Void> desvincular(@PathVariable Long assistidoId, @PathVariable Long responsavelId) {
         vinculoFamiliarService.desvincular(assistidoId, responsavelId);

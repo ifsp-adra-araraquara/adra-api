@@ -25,20 +25,20 @@ public record PainelHojeDTO(
     public record Lista<T>(List<T> itens, long total) {
     }
 
-    public record AlunoFaltas(Long assistidoId, String nome, String turma, long faltas, LocalDate ultimaAula) {
+    public record AlunoFaltas(Long assistidoId, String nome, String turma, long faltas, LocalDate ultimaChamada) {
     }
 
-    public record ChamadaPendente(Long aulaId, LocalDate data, String horario, String turma) {
+    public record ChamadaPendente(Long turmaId, LocalDate data, String turma) {
     }
 
-    /** Assistido com 2 registros do nível (de 3): o próximo gera a consequência. */
+    /** Assistido com 2 registros do nível (de 3): o próximo gera a recomendação. */
     public record UmPasso(Long assistidoId, String nome, String nivel, long registros) {
     }
 
     /**
-     * @param tipo         CHAMADA (referenciaId = aula), DISCIPLINAR (= registro) ou ASSISTIDO
-     * @param titulo       turma da chamada ou nome do assistido
-     * @param detalhe      data da aula (dd/MM) ou nível disciplinar
+     * @param tipo         CHAMADA (referenciaId = grupo), DISCIPLINAR (= registro) ou ASSISTIDO
+     * @param titulo       grupo da chamada ou nome do atendido
+     * @param detalhe      data da chamada (yyyy-MM-dd) ou nível disciplinar
      */
     public record Atividade(String tipo, Long referenciaId, Long assistidoId, String titulo, String detalhe,
                             Instant quando) {

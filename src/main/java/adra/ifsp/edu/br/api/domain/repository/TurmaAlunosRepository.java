@@ -20,9 +20,6 @@ public interface TurmaAlunosRepository extends JpaRepository<TurmaAlunos, Long> 
     /** Histórico completo de vínculos do assistido (turmas atuais e passadas) — aba "Turmas" no modal do assistido. */
     List<TurmaAlunos> findByAssistidoOrderByDataEntradaDesc(Assistido assistido);
 
-    /** Todos os vínculos (atuais e passados) de vários assistidos — indicadores da listagem. */
-    List<TurmaAlunos> findByAssistidoIn(Collection<Assistido> assistidos);
-
     /** Quem está vinculado ativamente à turma HOJE — usado no "+ Vincular alunos" da tela de turmas. */
     List<TurmaAlunos> findByTurmaAndStatusAndDataSaidaIsNull(Turma turma, StatusGeral status);
 
@@ -56,7 +53,7 @@ public interface TurmaAlunosRepository extends JpaRepository<TurmaAlunos, Long> 
      * pra isso (turma pequena, filtro em memória é irrelevante em custo).
      */
     default List<TurmaAlunos> findElegiveisParaChamada(Turma turma, LocalDate data) {
-        return findVinculosAtivosNaData(turma, StatusGeral.ATIVO, data).stream()
+        return findVinculosNoPeriodo(turma, data, data).stream()
                 .filter(vinculo -> AssistidoSpecification.elegivelParaChamada(vinculo.getAssistido(), data))
                 .toList();
     }

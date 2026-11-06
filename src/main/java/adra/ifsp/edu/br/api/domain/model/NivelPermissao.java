@@ -12,7 +12,7 @@ import org.hibernate.annotations.JdbcTypeCode;
 import java.time.OffsetDateTime;
 
 /**
- * Tabela de referencia (6 linhas fixas, uma por perfil). Populada pela
+ * Tabela de referencia (linhas fixas, uma por perfil). Populada pela
  * migracao deste card (migracao_cadastrar_usuario.sql) via INSERT ...
  * ON CONFLICT DO NOTHING - nunca criada/editada pela aplicacao.
  */

@@ -1,6 +1,12 @@
 package adra.ifsp.edu.br.api.domain.dto.precadastro;
 
+import adra.ifsp.edu.br.api.domain.enums.Sexo;
+import adra.ifsp.edu.br.api.domain.validation.ValidCpf;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Past;
 import jakarta.validation.constraints.Size;
 
 import java.time.LocalDate;
@@ -15,19 +21,24 @@ public record PreCadastroRequestDTO(
         @Size(max = 180)
         String nomeCompleto,
 
+        @NotNull(message = "Informe a data de nascimento.")
+        @Past(message = "Data de nascimento deve estar no passado.")
         LocalDate dataNascimento,
 
-        @NotBlank(message = "Informe o nome do responsável.")
+        @NotBlank(message = "Informe o CPF do atendido.")
+        @ValidCpf(message = "CPF do atendido inválido.")
+        String cpf,
+
+        @NotNull(message = "Informe o sexo do atendido.")
+        Sexo sexo,
+
+        @Email(message = "E-mail inválido.")
         @Size(max = 180)
-        String responsavelNome,
+        String email,
 
-        @Size(max = 20)
-        String responsavelTelefone,
-
-        @Size(max = 255)
-        String endereco,
-
-        String observacao,
+        @NotNull(message = "Preencha o formulário.")
+        @Valid
+        PreCadastroDadosDTO dados,
 
         String site
 ) {

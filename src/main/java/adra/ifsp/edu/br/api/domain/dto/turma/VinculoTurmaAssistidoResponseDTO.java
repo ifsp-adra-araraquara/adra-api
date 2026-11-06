@@ -15,8 +15,6 @@ import java.time.LocalDate;
 public record VinculoTurmaAssistidoResponseDTO(
         Long turmaId,
         String nomeTurma,
-        // "Projeto" da turma — para o histórico mostrar de qual oficina era.
-        String nomeOficina,
         Turno turno,
         Boolean turmaAtiva,
         LocalDate dataEntrada,
@@ -27,7 +25,6 @@ public record VinculoTurmaAssistidoResponseDTO(
         return new VinculoTurmaAssistidoResponseDTO(
                 vinculo.getTurma().getTurmaId(),
                 vinculo.getTurma().getNomeTurma(),
-                vinculo.getTurma().getOficina() != null ? vinculo.getTurma().getOficina().getNomeOficina() : null,
                 vinculo.getTurma().getTurno(),
                 vinculo.getTurma().getAtivo(),
                 vinculo.getDataEntrada(),

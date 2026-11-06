@@ -2,18 +2,16 @@ package adra.ifsp.edu.br.api.domain.enums;
 
 /**
  * O que uma coluna (dia) da grade mensal representa — ver GradeMensalTurmaDTO.
- * Espelha a planilha que a instituição usava: dias com chamada, dias de
- * passeio/evento (aula cancelada) e feriado/recesso (exceção de calendário).
+ * Espelha a planilha que a instituição usava: dias com chamada e dias sem
+ * atividade (feriado, recesso, passeio).
  */
 public enum TipoColunaGrade {
-    /** Aula REALIZADA — tem chamada lançada. */
-    AULA,
-    /** Aula de hoje ou passada ainda sem chamada (PLANEJADA/REMARCADA). */
+    /** Chamada lançada. */
+    LANCADA,
+    /** Dia de chamada do grupo, hoje ou passado, ainda sem chamada. */
     PENDENTE,
-    /** Aula futura — coluna vazia, só pra grade do mês ficar completa. */
+    /** Dia de chamada futuro — coluna vazia, só pra grade do mês ficar completa. */
     FUTURA,
-    /** Aula CANCELADA (passeio, evento...) — rótulo vem das observações da aula. */
-    CANCELADA,
-    /** Feriado/recesso cadastrado no calendário, sem aula gerada. */
-    SEM_AULA
+    /** Feriado nacional ou dia sem atividade no calendário. */
+    SEM_CHAMADA
 }

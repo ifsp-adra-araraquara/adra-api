@@ -1,10 +1,13 @@
 package adra.ifsp.edu.br.api.domain.service;
 
+import adra.ifsp.edu.br.api.config.CacheConfig;
+import adra.ifsp.edu.br.api.domain.dto.chamada.StatusChamadaDiaDTO;
 import adra.ifsp.edu.br.api.domain.dto.painel.PainelHojeDTO;
 import adra.ifsp.edu.br.api.domain.dto.painel.PainelMensalDTO;
 import adra.ifsp.edu.br.api.domain.repository.PainelRepository;
 import adra.ifsp.edu.br.api.domain.repository.PainelRepository.FrequenciaTurmaMes;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,7 +41,7 @@ public class PainelService {
     static final int LIMITE_LISTA = 6;
     /** Até quantos dias para trás uma chamada esquecida ainda aparece como pendente. */
     static final int DIAS_PENDENCIA = 60;
-    /** Janela de aulas para detectar faltas seguidas. */
+    /** Janela de chamadas para detectar faltas seguidas. */
     static final int DIAS_FALTAS_SEGUIDAS = 45;
     static final int DIAS_ANIVERSARIO = 7;
     static final int LIMITE_ATIVIDADES = 8;
@@ -48,7 +51,9 @@ public class PainelService {
 
     private final PainelRepository repository;
     private final DisciplinarService disciplinarService;
+    private final StatusChamadaService statusChamadaService;
 
+    @Cacheable(CacheConfig.PAINEL)
     @Transactional(readOnly = true)
     public PainelMensalDTO mensal(YearMonth mes, Long oficinaId) {
         LocalDate hoje = LocalDate.now();
@@ -66,7 +71,8 @@ public class PainelService {
         Map<Long, FrequenciaTurmaMes> porTurmaNoMes = porMes.getOrDefault(mes, List.of()).stream()
                 .collect(Collectors.toMap(FrequenciaTurmaMes::turmaId, Function.identity()));
 
-        List<PainelRepository.TurmaResumo> turmasResumo = repository.turmas(inicio, fim, referencia, hoje, oficinaId);
+        List<PainelRepository.TurmaResumo> turmasResumo = repository.turmas(inicio, fim, referencia, oficinaId);
+        Map<Long, Long> pendentesPorTurma = pendentesPorTurma(inicio, fim, hoje);
         PainelRepository.AssistidosResumo assistidos = repository.assistidos(inicio, fim, referencia, anterior.atEndOfMonth(), oficinaId);
         List<PainelRepository.DisciplinaNivel> disciplina = repository.disciplinaPorNivel(anterior.atDay(1), inicio, fim, oficinaId);
         PainelRepository.OficinasResumo oficinas = repository.oficinas(inicio, fim);
@@ -79,7 +85,8 @@ public class PainelService {
                 .map(t -> {
                     FrequenciaTurmaMes f = porTurmaNoMes.get(t.turmaId());
                     return new PainelMensalDTO.Turma(t.turmaId(), t.nomeTurma(), t.nomeOficina(), t.alunos(),
-                            t.capacidade(), t.aulasRealizadas(), t.chamadasPendentes(), f == null ? null : percentual(f));
+                            t.capacidade(), t.chamadasLancadas(), pendentesPorTurma.getOrDefault(t.turmaId(), 0L),
+                            f == null ? null : percentual(f));
                 })
                 .sorted(Comparator.comparing(PainelMensalDTO.Turma::frequencia, Comparator.nullsLast(Comparator.naturalOrder()))
                         .thenComparing(PainelMensalDTO.Turma::nomeTurma, String.CASE_INSENSITIVE_ORDER))
@@ -98,7 +105,7 @@ public class PainelService {
             YearMonth m = mes.minusMonths(i);
             List<FrequenciaTurmaMes> linhas = porMes.getOrDefault(m, List.of());
             tendencia.add(new PainelMensalDTO.FrequenciaMes(m.format(MES), percentual(linhas),
-                    linhas.stream().mapToLong(FrequenciaTurmaMes::aulas).sum()));
+                    linhas.stream().mapToLong(FrequenciaTurmaMes::chamadas).sum()));
         }
 
         return new PainelMensalDTO(
@@ -110,8 +117,8 @@ public class PainelService {
                 new PainelMensalDTO.Frequencia(
                         percentual(doMes),
                         percentual(porMes.getOrDefault(anterior, List.of())),
-                        turmasResumo.stream().mapToLong(PainelRepository.TurmaResumo::aulasRealizadas).sum(),
-                        turmasResumo.stream().mapToLong(PainelRepository.TurmaResumo::chamadasPendentes).sum(),
+                        turmasResumo.stream().mapToLong(PainelRepository.TurmaResumo::chamadasLancadas).sum(),
+                        turmasResumo.stream().mapToLong(t -> pendentesPorTurma.getOrDefault(t.turmaId(), 0L)).sum(),
                         faltas,
                         justificadas),
                 new PainelMensalDTO.Ocupacao(turmasResumo.size(), alunosEmTurmas, vagas,
@@ -128,14 +135,14 @@ public class PainelService {
                         new PainelMensalDTO.FaixaEtaria("Sem data", assistidos.semData())));
     }
 
+    @Cacheable(CacheConfig.PAINEL)
     @Transactional(readOnly = true)
     public PainelHojeDTO hoje() {
         LocalDate hoje = LocalDate.now();
 
         List<PainelRepository.FaltasSeguidas> faltas = repository.faltasSeguidas(
                 hoje.minusDays(DIAS_FALTAS_SEGUIDAS), hoje, IndicadorFrequencia.LIMIAR_FALTAS_CONSECUTIVAS);
-        List<PainelRepository.AulaPendente> pendentes = repository.chamadasPendentes(
-                hoje.minusDays(DIAS_PENDENCIA), hoje, LIMITE_LISTA);
+        List<StatusChamadaDiaDTO> pendentes = statusChamadaService.pendentes(hoje.minusDays(DIAS_PENDENCIA), hoje.minusDays(1));
         List<PainelRepository.UmPasso> umPasso = repository.umPassoDaProgressao();
 
         List<PainelHojeDTO.Aniversariante> aniversariantes = repository.aniversariantes(diasDeAniversario(hoje)).stream()
@@ -151,11 +158,11 @@ public class PainelService {
         return new PainelHojeDTO(
                 hoje,
                 new PainelHojeDTO.Lista<>(faltas.stream().limit(LIMITE_LISTA)
-                        .map(f -> new PainelHojeDTO.AlunoFaltas(f.assistidoId(), f.nome(), f.turma(), f.faltas(), f.ultimaAula()))
+                        .map(f -> new PainelHojeDTO.AlunoFaltas(f.assistidoId(), f.nome(), f.turma(), f.faltas(), f.ultimaChamada()))
                         .toList(), faltas.size()),
-                new PainelHojeDTO.Lista<>(pendentes.stream()
-                        .map(p -> new PainelHojeDTO.ChamadaPendente(p.aulaId(), p.data(), p.horarioInicio(), p.turma()))
-                        .toList(), pendentes.isEmpty() ? 0 : pendentes.getFirst().total()),
+                new PainelHojeDTO.Lista<>(pendentes.stream().limit(LIMITE_LISTA)
+                        .map(p -> new PainelHojeDTO.ChamadaPendente(p.turmaId(), p.data(), p.nomeTurma()))
+                        .toList(), pendentes.size()),
                 disciplinarService.buscarPendencias(),
                 new PainelHojeDTO.Lista<>(umPasso.stream().limit(LIMITE_LISTA)
                         .map(u -> new PainelHojeDTO.UmPasso(u.assistidoId(), u.nome(), u.nivel(), u.registros()))
@@ -167,7 +174,18 @@ public class PainelService {
                         .toList());
     }
 
-    /** % de presença sobre aluno-aula esperado; `null` sem aula realizada. */
+    /** Chamadas pendentes do mês por grupo, contadas até ontem. */
+    private Map<Long, Long> pendentesPorTurma(LocalDate inicio, LocalDate fim, LocalDate hoje) {
+        LocalDate ontem = hoje.minusDays(1);
+        if (inicio.isAfter(ontem)) {
+            return Map.of();
+        }
+        LocalDate ate = fim.isAfter(ontem) ? ontem : fim;
+        return statusChamadaService.pendentes(inicio, ate).stream()
+                .collect(Collectors.groupingBy(StatusChamadaDiaDTO::turmaId, Collectors.counting()));
+    }
+
+    /** % de presença sobre atendido esperado nas chamadas; `null` sem chamada lançada. */
     private static Integer percentual(FrequenciaTurmaMes f) {
         return percentual(List.of(f));
     }

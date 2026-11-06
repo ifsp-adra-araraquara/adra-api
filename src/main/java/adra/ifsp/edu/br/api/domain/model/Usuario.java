@@ -54,6 +54,9 @@ public class Usuario {
     @Builder.Default
     private boolean ativo = true;
 
+    @Column(name = "administrador", nullable = false)
+    private boolean administrador;
+
     @Column(name = "ultimo_login")
     private OffsetDateTime ultimoLogin;
 

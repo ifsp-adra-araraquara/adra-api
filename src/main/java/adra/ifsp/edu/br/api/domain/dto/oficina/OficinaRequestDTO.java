@@ -4,6 +4,8 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
+import java.util.List;
+
 public record OficinaRequestDTO(
 
         @NotBlank(message = "Informe o nome da oficina.")
@@ -14,6 +16,8 @@ public record OficinaRequestDTO(
         Long oficineiroResponsavelId,
 
         @Size(max = 100, message = "O local deve ter no máximo 100 caracteres.")
-        String local
+        String local,
+
+        List<Long> turmaIds
 ) {
 }

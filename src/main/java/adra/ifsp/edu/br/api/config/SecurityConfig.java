@@ -1,5 +1,7 @@
 package adra.ifsp.edu.br.api.config;
 
+import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 
 import javax.crypto.spec.SecretKeySpec;
@@ -14,10 +16,16 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
+import org.springframework.security.oauth2.core.OAuth2Error;
+import org.springframework.security.oauth2.core.OAuth2TokenValidator;
+import org.springframework.security.oauth2.core.OAuth2TokenValidatorResult;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
+import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
@@ -28,6 +36,9 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
+
+import adra.ifsp.edu.br.api.domain.service.TokenService;
+import adra.ifsp.edu.br.api.domain.service.UsuarioService;
 
 /**
  * Duas cadeias de seguranca porque sao dois emissores de token diferentes:
@@ -59,7 +70,8 @@ public class SecurityConfig {
 
     @Bean
     @Order(2)
-    public SecurityFilterChain chainApi(HttpSecurity http, JwtAuthenticationConverter jwtAuthenticationConverter) throws Exception {
+    public SecurityFilterChain chainApi(HttpSecurity http, JwtAuthenticationConverter jwtAuthenticationConverter,
+                                        UsuarioService usuarioService) throws Exception {
         return http
                 .cors(cors -> {})
                 .csrf(csrf -> csrf.disable())
@@ -69,7 +81,7 @@ public class SecurityConfig {
                         .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/pre-cadastro").permitAll()
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt
-                        .decoder(decoderAplicacao())
+                        .decoder(decoderAplicacao(usuarioService))
                         .jwtAuthenticationConverter(jwtAuthenticationConverter))) 
                 .build();
     }
@@ -78,11 +90,15 @@ public class SecurityConfig {
     public JwtAuthenticationConverter jwtAuthenticationConverter() {
         JwtAuthenticationConverter converter = new JwtAuthenticationConverter();
         converter.setJwtGrantedAuthoritiesConverter(jwt -> {
-            String perfil = jwt.getClaimAsString(adra.ifsp.edu.br.api.domain.service.TokenService.CLAIM_PERFIL);
-            if (perfil == null) {
-                return List.<GrantedAuthority>of();
+            List<GrantedAuthority> autoridades = new ArrayList<>();
+            String perfil = jwt.getClaimAsString(TokenService.CLAIM_PERFIL);
+            if (perfil != null) {
+                autoridades.add(new SimpleGrantedAuthority("ROLE_" + perfil));
             }
-            return List.of(new SimpleGrantedAuthority("ROLE_" + perfil));
+            if (Boolean.TRUE.equals(jwt.getClaimAsBoolean(TokenService.CLAIM_ADMINISTRADOR))) {
+                autoridades.add(new SimpleGrantedAuthority("ADMINISTRADOR"));
+            }
+            return autoridades;
         });
         return converter;
     }
@@ -109,6 +125,7 @@ public class SecurityConfig {
         config.setAllowedOrigins(origens);
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
+        config.setMaxAge(Duration.ofHours(1));
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);
@@ -120,10 +137,19 @@ public class SecurityConfig {
         return new NimbusJwtEncoder(new ImmutableSecret<>(chaveSimetrica()));
     }
 
-    private JwtDecoder decoderAplicacao() {
-        return NimbusJwtDecoder.withSecretKey(chaveSimetrica())
+    private JwtDecoder decoderAplicacao(UsuarioService usuarioService) {
+        NimbusJwtDecoder decoder = NimbusJwtDecoder.withSecretKey(chaveSimetrica())
                 .macAlgorithm(ALGORITMO)
                 .build();
+        decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
+                JwtValidators.createDefault(), usuarioAtivo(usuarioService)));
+        return decoder;
+    }
+
+    private OAuth2TokenValidator<Jwt> usuarioAtivo(UsuarioService usuarioService) {
+        return jwt -> usuarioService.estaAtivo(Long.valueOf(jwt.getSubject()))
+                ? OAuth2TokenValidatorResult.success()
+                : OAuth2TokenValidatorResult.failure(new OAuth2Error("invalid_token", "Usuario inativo.", null));
     }
 
     private SecretKeySpec chaveSimetrica() {

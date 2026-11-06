@@ -4,12 +4,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import adra.ifsp.edu.br.api.config.CacheConfig;
 import adra.ifsp.edu.br.api.domain.dto.PaginaDTO;
 import adra.ifsp.edu.br.api.domain.dto.usuario.UsuarioRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.usuario.UsuarioResponseDTO;
@@ -37,13 +40,27 @@ public class UsuarioService {
     private final UsuarioMapper usuarioMapper;
     private final AuditoriaService auditoriaService;
 
+    @Cacheable(CacheConfig.USUARIOS_ATIVOS)
+    @Transactional(readOnly = true)
+    public boolean estaAtivo(Long usuarioId) {
+        return usuarioRepository.existsByUsuarioIdAndAtivoTrue(usuarioId);
+    }
+
     @Transactional(readOnly = true)
     public void validarNovoCadastro(UsuarioRequestDTO dto) {
         if (usuarioRepository.existsByEmailIgnoreCase(dto.email())) {
             throw new RegraNegocioException("Ja existe um usuario cadastrado com este e-mail.");
         }
+        validarAdministrador(dto);
     }
 
+    private void validarAdministrador(UsuarioRequestDTO dto) {
+        if (dto.administrador() && dto.nivelPermissao() != NomeNivelPermissao.COORDENADOR) {
+            throw new RegraNegocioException("Somente o Coordenador pode ser Administrador.");
+        }
+    }
+
+    @CacheEvict(cacheNames = CacheConfig.REFERENCIAS, allEntries = true)
     public UsuarioResponseDTO cadastrar(UsuarioRequestDTO dto, UUID authUid) {
         NivelPermissao nivelPermissao = buscarNivelPermissao(dto.nivelPermissao());
 
@@ -59,7 +76,8 @@ public class UsuarioService {
                 Map.of(
                         "nomeCompleto", usuario.getNomeCompleto(),
                         "email", usuario.getEmail(),
-                        "nivelPermissao", dto.nivelPermissao().name()
+                        "nivelPermissao", dto.nivelPermissao().name(),
+                        "administrador", dto.administrador()
                 ),
                 "Cadastro de usuario (colaborador)"
         );
@@ -88,6 +106,7 @@ public class UsuarioService {
      * Lista enxuta (sem paginação) dos oficineiros ativos, usada pra
      * preencher selects no front (ex.: modal de criar turma).
      */
+    @Cacheable(CacheConfig.REFERENCIAS)
     @Transactional(readOnly = true)
     public List<UsuarioResponseDTO> listarOficineiros() {
         Specification<Usuario> spec = UsuarioSpecification.comFiltros(null, NomeNivelPermissao.OFICINEIRO, true);
@@ -97,19 +116,22 @@ public class UsuarioService {
                 .toList();
     }
 
+    @CacheEvict(cacheNames = CacheConfig.REFERENCIAS, allEntries = true)
     public UsuarioResponseDTO atualizar(Long id, UsuarioRequestDTO dto) {
         Usuario usuario = buscarEntidadePorId(id);
 
         if (usuarioRepository.existsByEmailIgnoreCaseAndUsuarioIdNot(dto.email(), id)) {
             throw new RegraNegocioException("Ja existe outro usuario cadastrado com este e-mail.");
         }
+        validarAdministrador(dto);
 
         NivelPermissao nivelPermissao = buscarNivelPermissao(dto.nivelPermissao());
 
         Map<String, Object> valorAnterior = Map.of(
                 "nomeCompleto", usuario.getNomeCompleto(),
                 "email", usuario.getEmail(),
-                "nivelPermissao", usuario.getNivelPermissao().getNome().name()
+                "nivelPermissao", usuario.getNivelPermissao().getNome().name(),
+                "administrador", usuario.isAdministrador()
         );
 
         usuarioMapper.atualizarEntidade(usuario, dto, nivelPermissao);
@@ -124,7 +146,8 @@ public class UsuarioService {
                 Map.of(
                         "nomeCompleto", usuario.getNomeCompleto(),
                         "email", usuario.getEmail(),
-                        "nivelPermissao", dto.nivelPermissao().name()
+                        "nivelPermissao", dto.nivelPermissao().name(),
+                        "administrador", dto.administrador()
                 ),
                 "Atualizacao de dados cadastrais do usuario"
         );
@@ -133,6 +156,7 @@ public class UsuarioService {
     }
 
     /** Ativa/inativa - nunca ha' delete fisico (ver comentario na entidade Usuario). */
+    @CacheEvict(cacheNames = {CacheConfig.REFERENCIAS, CacheConfig.USUARIOS_ATIVOS}, allEntries = true)
     public UsuarioResponseDTO alterarStatus(Long id, UsuarioStatusRequestDTO dto) {
         Usuario usuario = buscarEntidadePorId(id);
         boolean statusAnterior = usuario.isAtivo();

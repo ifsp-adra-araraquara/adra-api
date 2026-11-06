@@ -3,8 +3,11 @@ package adra.ifsp.edu.br.api.infra.armazenamento;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.time.Duration;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
@@ -80,6 +83,24 @@ public class SupabaseArmazenamento implements ArmazenamentoArquivos {
     }
 
     @Override
+    public Map<String, URI> urlsTemporarias(Collection<String> chaves, Duration validade) {
+        try {
+            AssinaturaEmLote[] assinaturas = rest.post()
+                    .uri("/object/sign/" + bucket)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(Map.of("expiresIn", validade.toSeconds(), "paths", chaves))
+                    .retrieve()
+                    .body(AssinaturaEmLote[].class);
+            return Arrays.stream(assinaturas)
+                    .filter(assinatura -> assinatura.signedURL() != null)
+                    .collect(Collectors.toMap(AssinaturaEmLote::path,
+                            assinatura -> URI.create(storageUrl + assinatura.signedURL())));
+        } catch (RestClientException e) {
+            throw new ArmazenamentoException("Falha ao gerar URLs de arquivos", e);
+        }
+    }
+
+    @Override
     public void remover(String chave) {
         try {
             rest.method(HttpMethod.DELETE)
@@ -94,5 +115,8 @@ public class SupabaseArmazenamento implements ArmazenamentoArquivos {
     }
 
     private record Assinatura(String signedURL) {
+    }
+
+    private record AssinaturaEmLote(String path, String signedURL) {
     }
 }

@@ -55,7 +55,7 @@ public class VinculoTurmaService {
         for (TurmaAlunos vinculoAntigo : ativos) {
             vinculoAntigo.setDataSaida(hoje);
             vinculoAntigo.setStatus(StatusGeral.INATIVO);
-            turmaAlunosRepository.save(vinculoAntigo);
+            turmaAlunosRepository.saveAndFlush(vinculoAntigo);
         }
 
         if (turma != null) {

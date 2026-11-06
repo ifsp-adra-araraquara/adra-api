@@ -22,7 +22,7 @@ import java.time.LocalDateTime;
 @Table(
         name = "presenca",
         schema = "adra",
-        uniqueConstraints = @UniqueConstraint(name = "uq_presenca_aula_assistido", columnNames = {"aula_id", "assistido_id"})
+        uniqueConstraints = @UniqueConstraint(name = "uq_presenca_chamada_assistido", columnNames = {"chamada_id", "assistido_id"})
 )
 public class Presenca {
 
@@ -32,8 +32,8 @@ public class Presenca {
     private Long presencaId;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "aula_id", nullable = false)
-    private Aula aula;
+    @JoinColumn(name = "chamada_id", nullable = false)
+    private Chamada chamada;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "assistido_id", nullable = false)

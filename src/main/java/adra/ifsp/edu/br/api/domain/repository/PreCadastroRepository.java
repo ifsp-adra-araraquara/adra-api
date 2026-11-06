@@ -4,8 +4,13 @@ import adra.ifsp.edu.br.api.domain.enums.StatusPreCadastro;
 import adra.ifsp.edu.br.api.domain.model.PreCadastro;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 
 public interface PreCadastroRepository extends JpaRepository<PreCadastro, Long> {
     List<PreCadastro> findByStatusOrderByCriadoEmDesc(StatusPreCadastro status);
+
+    long countByStatus(StatusPreCadastro status);
+
+    long countByCriadoEmGreaterThanEqual(OffsetDateTime inicio);
 }

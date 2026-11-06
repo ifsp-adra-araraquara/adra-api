@@ -17,4 +17,7 @@ public interface OficinaRepository extends JpaRepository<Oficina, Long>, JpaSpec
 
     List<Oficina> findByOficineiroResponsavelUsuarioId(Long idResponsavel);
 
+    /** Este usuário é o oficineiro da oficina? (ver AcessoTurmaService) */
+    boolean existsByOficinaIdAndOficineiroResponsavelUsuarioId(Long oficinaId, Long usuarioId);
+
 }

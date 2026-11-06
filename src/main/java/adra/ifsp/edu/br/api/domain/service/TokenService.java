@@ -19,6 +19,7 @@ import lombok.RequiredArgsConstructor;
 public class TokenService {
 
     public static final String CLAIM_PERFIL = "perfil";
+    public static final String CLAIM_ADMINISTRADOR = "administrador";
 
     private final JwtEncoder jwtEncoder;
 
@@ -34,6 +35,7 @@ public class TokenService {
                 .issuedAt(agora)
                 .expiresAt(agora.plus(expiracao))
                 .claim(CLAIM_PERFIL, usuario.getNivelPermissao().getNome().name())
+                .claim(CLAIM_ADMINISTRADOR, usuario.isAdministrador())
                 .build();
 
         JwsHeader header = JwsHeader.with(MacAlgorithm.HS256).build();

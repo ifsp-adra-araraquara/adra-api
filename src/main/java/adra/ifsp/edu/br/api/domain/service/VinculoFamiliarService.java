@@ -44,7 +44,7 @@ public class VinculoFamiliarService {
         vinculoRepository.findByIdAssistidoIdAndIdResponsavelId(assistidoId, dto.responsavelId())
                 .ifPresent(v -> {
                     throw new RegraNegocioException(
-                            "Este responsavel ja esta vinculado a este assistido. Use a edicao do vinculo.");
+                            "Este responsavel ja esta vinculado a este atendido. Use a edicao do vinculo.");
                 });
 
         if (dto.responsavelPrincipal()) {
@@ -161,7 +161,7 @@ public class VinculoFamiliarService {
     private AssistidoResponsavel buscarVinculo(Long assistidoId, Long responsavelId) {
         return vinculoRepository.findByIdAssistidoIdAndIdResponsavelId(assistidoId, responsavelId)
                 .orElseThrow(() -> new EntidadeNaoEncontradaException(
-                        "Vinculo nao encontrado entre assistido " + assistidoId + " e responsavel " + responsavelId));
+                        "Vinculo nao encontrado entre atendido " + assistidoId + " e responsavel " + responsavelId));
     }
 
     /**
@@ -176,7 +176,7 @@ public class VinculoFamiliarService {
 
         if (jaExisteOutroPrincipal) {
             throw new RegraNegocioException(
-                    "Ja existe um responsavel principal para este assistido. Remova a marcacao atual antes de definir outro.");
+                    "Ja existe um responsavel principal para este atendido. Remova a marcacao atual antes de definir outro.");
         }
     }
 }
