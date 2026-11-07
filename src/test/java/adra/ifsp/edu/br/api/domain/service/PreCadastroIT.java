@@ -65,6 +65,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import static adra.ifsp.edu.br.api.domain.enums.NomeNivelPermissao.ASSISTENTE_SOCIAL;
+import static adra.ifsp.edu.br.api.domain.enums.NomeNivelPermissao.COORDENADOR;
 import static adra.ifsp.edu.br.api.domain.enums.NomeNivelPermissao.EDUCADOR_SOCIAL;
 import static adra.ifsp.edu.br.api.domain.enums.NomeNivelPermissao.OFICINEIRO;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -114,6 +115,7 @@ class PreCadastroIT {
     private static final String CPF_RESPONSAVEL_LISTA_JA_ATENDIDA = "60936460172";
     private static final String CPF_CRIANCA_MAIS_ANTIGA = "96132020721";
     private static final String CPF_CRIANCA_MAIS_NOVA = "99999539998";
+    private static final String CPF_CRIANCA_VISTA = "31415926590";
 
     @Autowired private MockMvc mvc;
     @Autowired private JsonMapper jsonMapper;
@@ -476,6 +478,27 @@ class PreCadastroIT {
         mvc.perform(colocarNaLista(maisNovo, null).with(comPerfil(ASSISTENTE_SOCIAL))).andExpect(status().isOk());
 
         assertThat(idsDaLista("LISTA_ESPERA")).containsSubsequence(maisAntigo.intValue(), maisNovo.intValue());
+    }
+
+    @Test
+    @DisplayName("Inscricao so fica vista quando a Assistente Social abre")
+    void vistaPelaAssistenteSocial() throws Exception {
+        Long id = enviarPublico(requisicao(CPF_CRIANCA_VISTA, dados(CPF_MAE)));
+
+        mvc.perform(get("/api/pre-cadastro/" + id).with(comPerfil(COORDENADOR))).andExpect(status().isOk());
+        assertThat(vistaNaLista(id)).isFalse();
+
+        when(usuarioAutenticadoService.temPerfil(ASSISTENTE_SOCIAL)).thenReturn(true);
+        mvc.perform(get("/api/pre-cadastro/" + id).with(comPerfil(ASSISTENTE_SOCIAL))).andExpect(status().isOk());
+        assertThat(vistaNaLista(id)).isTrue();
+    }
+
+    private boolean vistaNaLista(Long id) throws Exception {
+        String lista = mvc.perform(get("/api/pre-cadastro").param("status", "PENDENTE").with(comPerfil(COORDENADOR)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        List<Boolean> vista = JsonPath.read(lista, "$[?(@.preCadastroId == " + id + ")].vistoAssistenteSocial");
+        return vista.getFirst();
     }
 
     private MockHttpServletRequestBuilder colocarNaLista(Long id, String observacao) throws Exception {

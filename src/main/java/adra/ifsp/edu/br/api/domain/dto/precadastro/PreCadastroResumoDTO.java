@@ -26,7 +26,8 @@ public record PreCadastroResumoDTO(
         List<String> anexosFaltando,
         BigDecimal rendaFamiliar,
         Boolean possuiProblemaSaude,
-        Set<ProgramaTransferencia> programasTransferencia
+        Set<ProgramaTransferencia> programasTransferencia,
+        boolean vistoAssistenteSocial
 ) {
     public static PreCadastroResumoDTO de(PreCadastro p, boolean cpfJaCadastrado, List<String> anexosFaltando,
                                           LocalDate hoje) {
@@ -44,7 +45,8 @@ public record PreCadastroResumoDTO(
                 anexosFaltando,
                 p.getDados().rendaFamiliar(),
                 p.getDados().saude() != null ? p.getDados().saude().possuiProblema() : null,
-                programasRecebidos(p.getDados()));
+                programasRecebidos(p.getDados()),
+                p.isVistoAssistenteSocial());
     }
 
     private static Set<ProgramaTransferencia> programasRecebidos(PreCadastroDadosDTO dados) {

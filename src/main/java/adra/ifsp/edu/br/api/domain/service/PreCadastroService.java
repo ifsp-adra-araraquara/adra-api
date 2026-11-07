@@ -20,6 +20,7 @@ import adra.ifsp.edu.br.api.domain.enums.AcaoSistema;
 import adra.ifsp.edu.br.api.domain.enums.CategoriaArquivo;
 import adra.ifsp.edu.br.api.domain.enums.EntidadeArquivo;
 import adra.ifsp.edu.br.api.domain.enums.ModuloSistema;
+import adra.ifsp.edu.br.api.domain.enums.NomeNivelPermissao;
 import adra.ifsp.edu.br.api.domain.enums.ProgramaTransferencia;
 import adra.ifsp.edu.br.api.domain.enums.StatusPreCadastro;
 import adra.ifsp.edu.br.api.domain.mapper.PreCadastroParaAssistido;
@@ -261,6 +262,13 @@ public class PreCadastroService {
     /** Aprovado: os arquivos já foram para o atendido, não há o que alertar. */
     private List<String> faltandoSeNaoAprovado(PreCadastro registro, Collection<CategoriaArquivo> enviados) {
         return registro.getStatus() == StatusPreCadastro.CONVERTIDO ? List.of() : anexosFaltando(enviados);
+    }
+
+    public PreCadastroResponseDTO abrir(Long preCadastroId) {
+        if (usuarioAutenticadoService.temPerfil(NomeNivelPermissao.ASSISTENTE_SOCIAL)) {
+            repository.marcarVistoPelaAssistenteSocial(preCadastroId);
+        }
+        return buscarDetalhe(preCadastroId);
     }
 
     @Transactional(readOnly = true)

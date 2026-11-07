@@ -62,7 +62,7 @@ public class PreCadastroController {
     @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL')")
     @GetMapping("/{preCadastroId}")
     public ResponseEntity<PreCadastroResponseDTO> buscar(@PathVariable Long preCadastroId) {
-        return ResponseEntity.ok(service.buscarDetalhe(preCadastroId));
+        return ResponseEntity.ok(service.abrir(preCadastroId));
     }
 
     @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL')")
