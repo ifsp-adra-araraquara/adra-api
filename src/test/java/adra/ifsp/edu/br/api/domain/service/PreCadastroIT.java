@@ -105,6 +105,8 @@ class PreCadastroIT {
     private static final String CPF_CRIANCA_SEM_ANEXOS = "74584844208";
     private static final String CPF_CRIANCA_COM_ANEXOS = "67795615848";
     private static final String CPF_MAE_COM_ANEXOS = "18205377570";
+    private static final String CPF_CRIANCA_RENDA_ALTA = "12345678062";
+    private static final String CPF_MAE_RENDA_ALTA = "23456789173";
 
     @Autowired private MockMvc mvc;
     @Autowired private JsonMapper jsonMapper;
@@ -175,6 +177,23 @@ class PreCadastroIT {
         assertThat(maePrincipal).isTrue();
         assertThat(jdbcTemplate.queryForObject("select count(*) from adra.assistido_responsavel where assistido_id = ?",
                 Integer.class, assistido.getAssistidoId())).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("Renda alta nao barra a aprovacao: a renda e so estimativa (reuniao de 05/11)")
+    void rendaAltaNaoBarraAprovacao() throws Exception {
+        Long id = enviarPublico(requisicao(CPF_CRIANCA_RENDA_ALTA, dados(CPF_MAE_RENDA_ALTA)));
+        String rascunho = mvc.perform(get("/api/pre-cadastro/" + id + "/rascunho-assistido").with(comPerfil(ASSISTENTE_SOCIAL)))
+                .andReturn().getResponse().getContentAsString();
+        String rascunhoComRendaAlta = JsonPath.parse(rascunho).set("$.rendaFamiliar", 25000).jsonString();
+
+        mvc.perform(post("/api/pre-cadastro/" + id + "/aprovar").with(comPerfil(ASSISTENTE_SOCIAL))
+                        .contentType(MediaType.APPLICATION_JSON).content(rascunhoComRendaAlta))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CONVERTIDO"));
+
+        assertThat(assistidoRepository.findByCpf(CPF_CRIANCA_RENDA_ALTA).orElseThrow().getRendaFamiliar())
+                .isEqualByComparingTo("25000");
     }
 
     @Test
