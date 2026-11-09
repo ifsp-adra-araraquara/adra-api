@@ -3,6 +3,7 @@ package adra.ifsp.edu.br.api.domain.service;
 import adra.ifsp.edu.br.api.ContainerPostgresAdra;
 import adra.ifsp.edu.br.api.domain.dto.assistido.AssistidoRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.comum.EnderecoDTO;
+import adra.ifsp.edu.br.api.domain.dto.precadastro.ObservacaoPreCadastroRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.precadastro.PreCadastroDadosDTO;
 import adra.ifsp.edu.br.api.domain.dto.precadastro.PreCadastroDadosDTO.Autorizacoes;
 import adra.ifsp.edu.br.api.domain.dto.precadastro.PreCadastroDadosDTO.Mae;
@@ -43,6 +44,7 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import tools.jackson.databind.json.JsonMapper;
@@ -63,6 +65,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import static adra.ifsp.edu.br.api.domain.enums.NomeNivelPermissao.ASSISTENTE_SOCIAL;
+import static adra.ifsp.edu.br.api.domain.enums.NomeNivelPermissao.COORDENADOR;
 import static adra.ifsp.edu.br.api.domain.enums.NomeNivelPermissao.EDUCADOR_SOCIAL;
 import static adra.ifsp.edu.br.api.domain.enums.NomeNivelPermissao.OFICINEIRO;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -107,6 +110,14 @@ class PreCadastroIT {
     private static final String CPF_MAE_COM_ANEXOS = "18205377570";
     private static final String CPF_CRIANCA_RENDA_ALTA = "12345678062";
     private static final String CPF_MAE_RENDA_ALTA = "23456789173";
+    private static final String CPF_CRIANCA_LISTA = "98697990009";
+    private static final String CPF_MAE_LISTA = "32744690333";
+    private static final String CPF_CRIANCA_LISTA_REPROVADA = "53438306921";
+    private static final String CPF_CRIANCA_LISTA_JA_ATENDIDA = "66627433567";
+    private static final String CPF_RESPONSAVEL_LISTA_JA_ATENDIDA = "60936460172";
+    private static final String CPF_CRIANCA_MAIS_ANTIGA = "96132020721";
+    private static final String CPF_CRIANCA_MAIS_NOVA = "99999539998";
+    private static final String CPF_CRIANCA_VISTA = "31415926590";
 
     @Autowired private MockMvc mvc;
     @Autowired private JsonMapper jsonMapper;
@@ -396,7 +407,130 @@ class PreCadastroIT {
             mvc.perform(patch("/api/pre-cadastro/999999/reprovar").with(comPerfil(perfil))
                             .contentType(MediaType.APPLICATION_JSON).content("{\"motivo\": \"Teste\"}"))
                     .andExpect(status().isForbidden());
+            mvc.perform(colocarNaLista(999999L, "Teste").with(comPerfil(perfil)))
+                    .andExpect(status().isForbidden());
+            mvc.perform(patch("/api/pre-cadastro/999999/observacao").with(comPerfil(perfil))
+                            .contentType(MediaType.APPLICATION_JSON).content("{\"observacao\": \"Teste\"}"))
+                    .andExpect(status().isForbidden());
         }
+    }
+
+    @Test
+    @DisplayName("Inscricao vai para a lista de espera com observacao e e aprovada a partir dela")
+    void listaDeEsperaAprovada() throws Exception {
+        Long id = enviarPublico(requisicao(CPF_CRIANCA_LISTA, dados(CPF_MAE_LISTA)));
+        String registroNaLista = "$[?(@.preCadastroId == " + id + ")]";
+
+        mvc.perform(colocarNaLista(id, "Ligar pela manha").with(comPerfil(ASSISTENTE_SOCIAL)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("LISTA_ESPERA"))
+                .andExpect(jsonPath("$.observacao").value("Ligar pela manha"));
+        mvc.perform(colocarNaLista(id, "Segunda vez").with(comPerfil(ASSISTENTE_SOCIAL)))
+                .andExpect(status().isConflict());
+
+        mvc.perform(get("/api/pre-cadastro").param("status", "PENDENTE").with(comPerfil(ASSISTENTE_SOCIAL)))
+                .andExpect(jsonPath(registroNaLista).isEmpty());
+        mvc.perform(get("/api/pre-cadastro").param("status", "LISTA_ESPERA").with(comPerfil(ASSISTENTE_SOCIAL)))
+                .andExpect(jsonPath(registroNaLista + ".rendaFamiliar").value(2300.0))
+                .andExpect(jsonPath(registroNaLista + ".possuiProblemaSaude").value(true))
+                .andExpect(jsonPath(registroNaLista + ".programasTransferencia[0]").value("BOLSA_FAMILIA"));
+
+        mvc.perform(patch("/api/pre-cadastro/" + id + "/observacao").with(comPerfil(ASSISTENTE_SOCIAL))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"observacao\": \"Familia atendeu\"}"))
+                .andExpect(status().isNoContent());
+        String rascunho = mvc.perform(get("/api/pre-cadastro/" + id + "/rascunho-assistido").with(comPerfil(ASSISTENTE_SOCIAL)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        mvc.perform(get("/api/pre-cadastro/" + id).with(comPerfil(ASSISTENTE_SOCIAL)))
+                .andExpect(jsonPath("$.observacao").value("Familia atendeu"));
+
+        mvc.perform(post("/api/pre-cadastro/" + id + "/aprovar").with(comPerfil(ASSISTENTE_SOCIAL))
+                        .contentType(MediaType.APPLICATION_JSON).content(rascunho))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CONVERTIDO"));
+
+        assertThat(jdbcTemplate.queryForObject("""
+                select valor_anterior->>'status' from adra.log_auditoria
+                where entidade_afetada = 'pre_cadastro' and entidade_id = ? and valor_novo->>'status' = 'CONVERTIDO'
+                """, String.class, id)).isEqualTo("LISTA_ESPERA");
+        mvc.perform(patch("/api/pre-cadastro/" + id + "/observacao").with(comPerfil(ASSISTENTE_SOCIAL))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"observacao\": \"Tarde demais\"}"))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    @DisplayName("Inscricao da lista de espera pode ser reprovada")
+    void listaDeEsperaReprovada() throws Exception {
+        Long id = enviarPublico(requisicao(CPF_CRIANCA_LISTA_REPROVADA, dados(CPF_MAE)));
+        mvc.perform(colocarNaLista(id, null).with(comPerfil(ASSISTENTE_SOCIAL)))
+                .andExpect(status().isOk());
+
+        mvc.perform(patch("/api/pre-cadastro/" + id + "/reprovar").with(comPerfil(ASSISTENTE_SOCIAL))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"motivo\": \"Mudou de cidade\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("DESCARTADO"));
+    }
+
+    @Test
+    @DisplayName("Lista de espera mantem o alerta de CPF ja cadastrado")
+    void listaDeEsperaAlertaCpf() throws Exception {
+        Long existenteId = assistidoService.cadastrar(assistido("Crianca Da Lista", CPF_CRIANCA_LISTA_JA_ATENDIDA,
+                CPF_RESPONSAVEL_LISTA_JA_ATENDIDA)).assistidoId();
+        Long id = enviarPublico(requisicao(CPF_CRIANCA_LISTA_JA_ATENDIDA, dados(CPF_MAE)));
+
+        mvc.perform(colocarNaLista(id, null).with(comPerfil(ASSISTENTE_SOCIAL)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.assistidoExistenteId").value(existenteId));
+        mvc.perform(get("/api/pre-cadastro").param("status", "LISTA_ESPERA").with(comPerfil(ASSISTENTE_SOCIAL)))
+                .andExpect(jsonPath("$[?(@.preCadastroId == " + id + ")].cpfJaCadastrado").value(true));
+    }
+
+    @Test
+    @DisplayName("Pendentes e lista de espera vem do mais antigo para o mais novo")
+    void ordemDeChegada() throws Exception {
+        Long maisAntigo = enviarPublico(requisicao(CPF_CRIANCA_MAIS_ANTIGA, dados(CPF_MAE)));
+        Long maisNovo = enviarPublico(requisicao(CPF_CRIANCA_MAIS_NOVA, dados(CPF_MAE)));
+
+        assertThat(idsDaLista("PENDENTE")).containsSubsequence(maisAntigo.intValue(), maisNovo.intValue());
+
+        mvc.perform(colocarNaLista(maisAntigo, null).with(comPerfil(ASSISTENTE_SOCIAL))).andExpect(status().isOk());
+        mvc.perform(colocarNaLista(maisNovo, null).with(comPerfil(ASSISTENTE_SOCIAL))).andExpect(status().isOk());
+
+        assertThat(idsDaLista("LISTA_ESPERA")).containsSubsequence(maisAntigo.intValue(), maisNovo.intValue());
+    }
+
+    @Test
+    @DisplayName("Inscricao so fica vista quando a Assistente Social abre")
+    void vistaPelaAssistenteSocial() throws Exception {
+        Long id = enviarPublico(requisicao(CPF_CRIANCA_VISTA, dados(CPF_MAE)));
+
+        mvc.perform(get("/api/pre-cadastro/" + id).with(comPerfil(COORDENADOR))).andExpect(status().isOk());
+        assertThat(vistaNaLista(id)).isFalse();
+
+        when(usuarioAutenticadoService.temPerfil(ASSISTENTE_SOCIAL)).thenReturn(true);
+        mvc.perform(get("/api/pre-cadastro/" + id).with(comPerfil(ASSISTENTE_SOCIAL))).andExpect(status().isOk());
+        assertThat(vistaNaLista(id)).isTrue();
+    }
+
+    private boolean vistaNaLista(Long id) throws Exception {
+        String lista = mvc.perform(get("/api/pre-cadastro").param("status", "PENDENTE").with(comPerfil(COORDENADOR)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        List<Boolean> vista = JsonPath.read(lista, "$[?(@.preCadastroId == " + id + ")].vistoAssistenteSocial");
+        return vista.getFirst();
+    }
+
+    private MockHttpServletRequestBuilder colocarNaLista(Long id, String observacao) throws Exception {
+        return patch("/api/pre-cadastro/" + id + "/lista-espera")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(jsonMapper.writeValueAsString(new ObservacaoPreCadastroRequestDTO(observacao)));
+    }
+
+    private List<Integer> idsDaLista(String statusDaLista) throws Exception {
+        String lista = mvc.perform(get("/api/pre-cadastro").param("status", statusDaLista).with(comPerfil(ASSISTENTE_SOCIAL)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        return JsonPath.read(lista, "$[*].preCadastroId");
     }
 
     private Long enviarPublico(PreCadastroRequestDTO requisicao, MockMultipartFile... anexos) throws Exception {

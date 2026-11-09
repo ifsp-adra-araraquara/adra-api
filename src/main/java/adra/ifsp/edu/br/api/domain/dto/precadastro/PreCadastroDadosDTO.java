@@ -17,7 +17,9 @@ import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Stream;
 
 /**
  * O que a família respondeu no formulário de inscrição, além das colunas de
@@ -62,6 +64,15 @@ public record PreCadastroDadosDTO(
 
     private static final String TELEFONE = "\\d{10,11}";
     private static final String MENSAGEM_TELEFONE = "Telefone deve ter DDD + número (10 ou 11 dígitos).";
+
+    public BigDecimal rendaFamiliar() {
+        return Stream.of(
+                        mae != null ? mae.renda() : null,
+                        pai != null ? pai.renda() : null)
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal::add)
+                .orElse(null);
+    }
 
     public record Termos(
             @NotNull(message = "Responda a declaração da LGPD.")

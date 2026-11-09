@@ -3,6 +3,7 @@ package adra.ifsp.edu.br.api.web.controller;
 import adra.ifsp.edu.br.api.domain.dto.arquivo.UrlArquivoDTO;
 import adra.ifsp.edu.br.api.domain.dto.assistido.AssistidoRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.precadastro.AnexosPreCadastro;
+import adra.ifsp.edu.br.api.domain.dto.precadastro.ObservacaoPreCadastroRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.precadastro.PreCadastroRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.precadastro.PreCadastroResponseDTO;
 import adra.ifsp.edu.br.api.domain.dto.precadastro.PreCadastroResumoDTO;
@@ -61,7 +62,7 @@ public class PreCadastroController {
     @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL')")
     @GetMapping("/{preCadastroId}")
     public ResponseEntity<PreCadastroResponseDTO> buscar(@PathVariable Long preCadastroId) {
-        return ResponseEntity.ok(service.buscarDetalhe(preCadastroId));
+        return ResponseEntity.ok(service.abrir(preCadastroId));
     }
 
     @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL')")
@@ -92,6 +93,25 @@ public class PreCadastroController {
             @Valid @RequestBody ReprovarPreCadastroRequestDTO dto
     ) {
         return ResponseEntity.ok(service.reprovar(preCadastroId, dto));
+    }
+
+    @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL')")
+    @PatchMapping("/{preCadastroId}/lista-espera")
+    public ResponseEntity<PreCadastroResponseDTO> colocarNaListaEspera(
+            @PathVariable Long preCadastroId,
+            @Valid @RequestBody ObservacaoPreCadastroRequestDTO dto
+    ) {
+        return ResponseEntity.ok(service.colocarNaListaEspera(preCadastroId, dto));
+    }
+
+    @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL')")
+    @PatchMapping("/{preCadastroId}/observacao")
+    public ResponseEntity<Void> salvarObservacao(
+            @PathVariable Long preCadastroId,
+            @Valid @RequestBody ObservacaoPreCadastroRequestDTO dto
+    ) {
+        service.salvarObservacao(preCadastroId, dto);
+        return ResponseEntity.noContent().build();
     }
 
     private String ipDoCliente(HttpServletRequest request) {

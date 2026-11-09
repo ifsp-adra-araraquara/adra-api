@@ -121,7 +121,10 @@ class AvisoServiceIT {
     @DisplayName("CA-FT18.1: suspensão de hoje vai para Coordenador e Educador; recomendação só para o Coordenador")
     void cadaPerfilVeOQueResolve() {
         MotivoDisciplinar bullying = criarMotivo("Bullying", NivelDisciplinar.SUSPENSAO);
-        registrar(bullying);
+        // Período informado: sem ele, a suspensão começa no próximo dia de atividade, não hoje.
+        autenticarComo(coordenador);
+        disciplinarService.registrar(assistido.getAssistidoId(), new RegistroDisciplinarRequestDTO(
+                bullying.getMotivoId(), HOJE, "Descrição do fato", null, HOJE, HOJE.plusDays(2)));
 
         assertThat(avisosComo(coordenador)).extracting(AvisoDTO::tipo).contains(TipoAviso.SUSPENSO_HOJE);
         assertThat(avisosComo(educadorSocial)).extracting(AvisoDTO::tipo).contains(TipoAviso.SUSPENSO_HOJE)
