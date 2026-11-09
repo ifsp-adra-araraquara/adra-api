@@ -1,5 +1,6 @@
 package adra.ifsp.edu.br.api.domain.service;
 
+import adra.ifsp.edu.br.api.domain.enums.NomeNivelPermissao;
 import adra.ifsp.edu.br.api.domain.model.Usuario;
 import adra.ifsp.edu.br.api.domain.repository.UsuarioRepository;
 import adra.ifsp.edu.br.api.exception.AutenticacaoException;
@@ -31,5 +32,11 @@ public class UsuarioAutenticadoServiceImpl implements UsuarioAutenticadoService 
 
         return usuarioRepository.findById(usuarioId)
                 .orElseThrow(() -> new AutenticacaoException("Usuário autenticado não encontrado: id " + usuarioId));
+    }
+
+    @Override
+    public boolean temPerfil(NomeNivelPermissao perfil) {
+        return SecurityContextHolder.getContext().getAuthentication().getAuthorities().stream()
+                .anyMatch(autoridade -> autoridade.getAuthority().equals("ROLE_" + perfil.name()));
     }
 }

@@ -87,6 +87,9 @@ public class PreCadastro {
     @Column(name = "revisado_em")
     private OffsetDateTime revisadoEm;
 
+    @Column(name = "visto_assistente_social", nullable = false)
+    private boolean vistoAssistenteSocial;
+
     @Column(name = "ip_origem", length = 64)
     private String ipOrigem;
 

@@ -22,6 +22,7 @@ public record PreCadastroResponseDTO(
         PreCadastroDadosDTO dados,
         StatusPreCadastro status,
         String motivoReprovacao,
+        String observacao,
         Long assistidoId,
         /** Atendido que já tem este CPF (null se não há): a equipe abre a ficha em vez de aprovar. */
         Long assistidoExistenteId,
@@ -47,6 +48,7 @@ public record PreCadastroResponseDTO(
                 p.getDados(),
                 p.getStatus(),
                 p.getMotivoReprovacao(),
+                p.getObservacao(),
                 p.getAssistidoId(),
                 assistidoExistenteId,
                 arquivos,
