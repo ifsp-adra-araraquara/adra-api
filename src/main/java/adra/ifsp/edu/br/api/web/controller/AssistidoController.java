@@ -35,7 +35,7 @@ public class AssistidoController {
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<AssistidoResponseDTO> cadastrar(@Valid @RequestPart("dados") AssistidoRequestDTO dto,
                                                           @RequestPart(value = "foto", required = false) MultipartFile foto,
-                                                          @RequestPart("documentos") List<MultipartFile> documentos) {
+                                                          @RequestPart(value = "documentos", required = false) List<MultipartFile> documentos) {
         AssistidoResponseDTO criado = assistidoService.cadastrarComArquivos(dto, foto, documentos);
         return ResponseEntity.created(URI.create("/api/assistidos/" + criado.assistidoId())).body(criado);
     }

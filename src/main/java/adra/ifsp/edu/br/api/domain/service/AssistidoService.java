@@ -363,9 +363,7 @@ public class AssistidoService {
         }
 
         for (VinculoFamiliarComResponsavelRequestDTO dtoNovo : novos) {
-            Responsavel responsavel = (dtoNovo.cpf() != null && !dtoNovo.cpf().isBlank())
-                    ? responsavelRepository.findByCpf(dtoNovo.cpf()).orElseGet(() -> criarNovoResponsavel(dtoNovo))
-                    : criarNovoResponsavel(dtoNovo);
+            Responsavel responsavel = obterOuCriarResponsavel(dtoNovo);
 
             AssistidoResponsavel vinculo = AssistidoResponsavel.builder()
                     .id(new AssistidoResponsavelId(assistido.getAssistidoId(), responsavel.getResponsavelId()))
@@ -474,22 +472,14 @@ public class AssistidoService {
 
     /**
      * Cria responsáveis e vínculos em transação atômica.
-     * Se o responsável já existir pelo CPF, reutiliza-o.
+     * Reutiliza o responsável já existente, pelo id ou pelo CPF.
      * Garante que há pelo menos um responsável principal.
      */
     private void criarVinculosResponsaveis(Assistido assistido, List<VinculoFamiliarComResponsavelRequestDTO> responsaveisDTO) {
         boolean temResponsavelPrincipal = false;
 
         for (VinculoFamiliarComResponsavelRequestDTO vinculoDTO : responsaveisDTO) {
-            Responsavel responsavel;
-
-            // Buscar responsável existente pelo CPF ou criar novo
-            if (vinculoDTO.cpf() != null && !vinculoDTO.cpf().isBlank()) {
-                responsavel = responsavelRepository.findByCpf(vinculoDTO.cpf())
-                        .orElseGet(() -> criarNovoResponsavel(vinculoDTO));
-            } else {
-                responsavel = criarNovoResponsavel(vinculoDTO);
-            }
+            Responsavel responsavel = obterOuCriarResponsavel(vinculoDTO);
 
             // Criar vínculo
             AssistidoResponsavel vinculo = AssistidoResponsavel.builder()
@@ -514,6 +504,17 @@ public class AssistidoService {
         if (!temResponsavelPrincipal) {
             throw new RegraNegocioException("Pelo menos um responsavel deve ser marcado como responsavel principal");
         }
+    }
+
+    private Responsavel obterOuCriarResponsavel(VinculoFamiliarComResponsavelRequestDTO dto) {
+        if (dto.responsavelId() != null) {
+            return responsavelRepository.findById(dto.responsavelId())
+                    .orElseThrow(() -> new EntidadeNaoEncontradaException("Responsavel nao encontrado: id " + dto.responsavelId()));
+        }
+        if (StringUtils.hasText(dto.cpf())) {
+            return responsavelRepository.findByCpf(dto.cpf()).orElseGet(() -> criarNovoResponsavel(dto));
+        }
+        return criarNovoResponsavel(dto);
     }
 
     private Responsavel criarNovoResponsavel(VinculoFamiliarComResponsavelRequestDTO dto) {
@@ -545,7 +546,7 @@ public class AssistidoService {
 
     private static final int MAXIMO_DOCUMENTOS_IDENTIDADE = 1;
 
-    /** Cadastro + RG/CPF (obrigatório) + foto de perfil (opcional): grava tudo ou apaga o que foi enviado. */
+    /** Cadastro + RG/CPF (opcional) + foto de perfil (opcional): grava tudo ou apaga o que foi enviado. */
     @CacheEvict(cacheNames = {CacheConfig.ESTRUTURA, CacheConfig.PAINEL}, allEntries = true)
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public AssistidoResponseDTO cadastrarComArquivos(AssistidoRequestDTO dto, MultipartFile foto,
@@ -553,9 +554,6 @@ public class AssistidoService {
         List<MultipartFile> docs = documentos == null ? List.of()
                 : documentos.stream().filter(d -> d != null && !d.isEmpty()).toList();
         // valida antes de criar o assistido, pra não gastar insert/upload à toa
-        if (docs.isEmpty()) {
-            throw new ArquivoInvalidoException("Envie a foto do RG ou CPF do atendido.");
-        }
         if (docs.size() > MAXIMO_DOCUMENTOS_IDENTIDADE) {
             throw new ArquivoInvalidoException("Envie apenas um arquivo do RG ou CPF.");
         }
