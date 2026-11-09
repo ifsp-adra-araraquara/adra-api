@@ -9,6 +9,7 @@ import adra.ifsp.edu.br.api.domain.dto.disciplinar.FichaDisciplinarDTO;
 import adra.ifsp.edu.br.api.domain.dto.disciplinar.GerarPelaRecomendacaoRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.disciplinar.MotivoDisciplinarRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.disciplinar.MotivoDisciplinarResponseDTO;
+import adra.ifsp.edu.br.api.domain.dto.disciplinar.PeriodoSuspensaoDTO;
 import adra.ifsp.edu.br.api.domain.dto.disciplinar.PeriodoSuspensaoRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.disciplinar.RegistroCriadoDTO;
 import adra.ifsp.edu.br.api.domain.dto.disciplinar.RegistroDisciplinarRequestDTO;
@@ -109,6 +110,19 @@ public class DisciplinarController {
             @Valid @RequestBody RegistroDisciplinarRequestDTO dto
     ) {
         return ResponseEntity.status(HttpStatus.CREATED).body(disciplinarService.registrar(assistidoId, dto));
+    }
+
+    /**
+     * Período padrão de uma suspensão pelo fato na data, em dias de atividade do grupo do atendido:
+     * ex.: GET /api/assistidos/7/disciplinar/periodo-suspensao?data=2026-11-05 (quinta) → sexta, segunda e terça.
+     */
+    @PreAuthorize("hasRole('COORDENADOR')")
+    @GetMapping("/assistidos/{assistidoId}/disciplinar/periodo-suspensao")
+    public ResponseEntity<PeriodoSuspensaoDTO> sugerirPeriodoSuspensao(
+            @PathVariable Long assistidoId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate data
+    ) {
+        return ResponseEntity.ok(disciplinarService.sugerirPeriodoSuspensao(assistidoId, data));
     }
 
     /** FT-24: arquiva os registros ativos (de um nível ou de todos) e devolve a ficha atualizada. */
