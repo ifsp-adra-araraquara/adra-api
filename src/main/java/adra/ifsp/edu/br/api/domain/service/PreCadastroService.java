@@ -14,7 +14,6 @@ import adra.ifsp.edu.br.api.domain.dto.precadastro.PreCadastroRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.precadastro.PreCadastroResponseDTO;
 import adra.ifsp.edu.br.api.domain.dto.precadastro.PreCadastroResumoDTO;
 import adra.ifsp.edu.br.api.domain.dto.precadastro.ReprovarPreCadastroRequestDTO;
-import adra.ifsp.edu.br.api.domain.dto.vinculo.VinculoFamiliarComResponsavelRequestDTO;
 import adra.ifsp.edu.br.api.domain.enums.AcaoSistema;
 import adra.ifsp.edu.br.api.domain.enums.CategoriaArquivo;
 import adra.ifsp.edu.br.api.domain.enums.EntidadeArquivo;
@@ -24,11 +23,12 @@ import adra.ifsp.edu.br.api.domain.enums.StatusPreCadastro;
 import adra.ifsp.edu.br.api.domain.mapper.PreCadastroParaAssistido;
 import adra.ifsp.edu.br.api.domain.model.Arquivo;
 import adra.ifsp.edu.br.api.domain.model.Assistido;
+import adra.ifsp.edu.br.api.domain.model.AssistidoResponsavel;
 import adra.ifsp.edu.br.api.domain.model.PreCadastro;
 import adra.ifsp.edu.br.api.domain.repository.ArquivoRepository;
 import adra.ifsp.edu.br.api.domain.repository.AssistidoRepository;
+import adra.ifsp.edu.br.api.domain.repository.AssistidoResponsavelRepository;
 import adra.ifsp.edu.br.api.domain.repository.PreCadastroRepository;
-import adra.ifsp.edu.br.api.domain.repository.ResponsavelRepository;
 import adra.ifsp.edu.br.api.exception.ArquivoInvalidoException;
 import adra.ifsp.edu.br.api.exception.AssistidoJaCadastradoException;
 import adra.ifsp.edu.br.api.exception.EntidadeNaoEncontradaException;
@@ -81,7 +81,7 @@ public class PreCadastroService {
     private final UsuarioAutenticadoService usuarioAutenticadoService;
     private final ArquivoService arquivoService;
     private final ArquivoRepository arquivoRepository;
-    private final ResponsavelRepository responsavelRepository;
+    private final AssistidoResponsavelRepository assistidoResponsavelRepository;
     private final TurnstileClient turnstile;
 
     private final Map<String, EnviosDoIp> enviosPorIp = new ConcurrentHashMap<>();
@@ -294,7 +294,7 @@ public class PreCadastroService {
         });
 
         AssistidoResponseDTO criado = assistidoService.cadastrar(dto);
-        transferirAnexos(preCadastroId, criado.assistidoId(), dto);
+        transferirAnexos(preCadastroId, criado.assistidoId());
         registro.setStatus(StatusPreCadastro.CONVERTIDO);
         registro.setAssistidoId(criado.assistidoId());
         marcarRevisado(registro);
@@ -306,20 +306,19 @@ public class PreCadastroService {
     }
 
     /** Foto, documento e comprovante vão para o atendido; o documento do responsável, para o responsável principal. */
-    private void transferirAnexos(Long preCadastroId, Long assistidoId, AssistidoRequestDTO dto) {
+    private void transferirAnexos(Long preCadastroId, Long assistidoId) {
         arquivoService.transferir(EntidadeArquivo.PRE_CADASTRO, preCadastroId, CategoriaArquivo.FOTO_PERFIL,
                 EntidadeArquivo.ASSISTIDO, assistidoId, CategoriaArquivo.FOTO_PERFIL);
         arquivoService.transferir(EntidadeArquivo.PRE_CADASTRO, preCadastroId, CategoriaArquivo.DOCUMENTO_IDENTIDADE,
                 EntidadeArquivo.ASSISTIDO, assistidoId, CategoriaArquivo.DOCUMENTO_IDENTIDADE);
         arquivoService.transferir(EntidadeArquivo.PRE_CADASTRO, preCadastroId, CategoriaArquivo.DECLARACAO_RESIDENCIA,
                 EntidadeArquivo.ASSISTIDO, assistidoId, CategoriaArquivo.DECLARACAO_RESIDENCIA);
-        dto.responsaveis().stream()
-                .filter(VinculoFamiliarComResponsavelRequestDTO::responsavelPrincipal)
+        assistidoResponsavelRepository.findByIdAssistidoId(assistidoId).stream()
+                .filter(AssistidoResponsavel::isResponsavelPrincipal)
                 .findFirst()
-                .flatMap(principal -> responsavelRepository.findByCpf(principal.cpf()))
-                .ifPresent(responsavel -> arquivoService.transferir(EntidadeArquivo.PRE_CADASTRO, preCadastroId,
+                .ifPresent(principal -> arquivoService.transferir(EntidadeArquivo.PRE_CADASTRO, preCadastroId,
                         CategoriaArquivo.DOCUMENTO_RESPONSAVEL, EntidadeArquivo.RESPONSAVEL,
-                        responsavel.getResponsavelId(), CategoriaArquivo.DOCUMENTO_IDENTIDADE));
+                        principal.getId().getResponsavelId(), CategoriaArquivo.DOCUMENTO_IDENTIDADE));
     }
 
     @CacheEvict(cacheNames = CacheConfig.PAINEL, allEntries = true)

@@ -20,8 +20,8 @@ import java.util.stream.Stream;
 
 /**
  * Monta o cadastro do atendido a partir do que a família enviou, para a equipe
- * revisar e aprovar sem redigitar. Só entra como responsável quem tem CPF
- * (o cadastro exige); quem não tem, o contato de emergência e "quem busca"
+ * revisar e aprovar sem redigitar. Só entra como responsável quem tem CPF;
+ * quem não tem, o contato de emergência e "quem busca"
  * vão para as observações do atendido.
  */
 @Component
@@ -88,17 +88,17 @@ public class PreCadastroParaAssistido {
                     ? "Estado civil: " + mae.estadoCivilOutro() : null;
             responsaveis.add(new VinculoFamiliarComResponsavelRequestDTO(mae.nomeCompleto(), mae.dataNascimento(),
                     mae.cpf(), mae.telefone(), null, endereco, observacao, mae.escolaridade(), mae.estadoCivil(),
-                    mae.profissao(), mae.renda(), "Mãe", true, false, false));
+                    mae.profissao(), mae.renda(), "Mãe", true, false, false, null));
         }
         if (pai != null && StringUtils.hasText(pai.cpf())) {
             responsaveis.add(new VinculoFamiliarComResponsavelRequestDTO(pai.nomeCompleto(), null,
                     pai.cpf(), pai.telefone(), null, endereco, null, null, null,
-                    pai.profissao(), pai.renda(), "Pai", false, false, false));
+                    pai.profissao(), pai.renda(), "Pai", false, false, false, null));
         }
         if (legal != null && StringUtils.hasText(legal.cpf())) {
             responsaveis.add(new VinculoFamiliarComResponsavelRequestDTO(legal.nomeCompleto(), null,
                     legal.cpf(), legal.telefone(), null, endereco, null, null, null,
-                    null, null, legal.parentesco(), mae == null, false, false));
+                    null, null, legal.parentesco(), mae == null, false, false, null));
         }
         return responsaveis;
     }

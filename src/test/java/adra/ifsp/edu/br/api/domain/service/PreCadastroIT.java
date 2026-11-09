@@ -22,6 +22,7 @@ import adra.ifsp.edu.br.api.domain.enums.Sexo;
 import adra.ifsp.edu.br.api.domain.model.Assistido;
 import adra.ifsp.edu.br.api.domain.repository.AssistidoRepository;
 import adra.ifsp.edu.br.api.domain.repository.PreCadastroRepository;
+import adra.ifsp.edu.br.api.domain.model.Responsavel;
 import adra.ifsp.edu.br.api.domain.repository.ResponsavelRepository;
 import adra.ifsp.edu.br.api.exception.RegraNegocioException;
 import adra.ifsp.edu.br.api.infra.armazenamento.ArmazenamentoArquivos;
@@ -105,6 +106,7 @@ class PreCadastroIT {
     private static final String CPF_CRIANCA_SEM_ANEXOS = "74584844208";
     private static final String CPF_CRIANCA_COM_ANEXOS = "67795615848";
     private static final String CPF_MAE_COM_ANEXOS = "18205377570";
+    private static final String CPF_CRIANCA_PRINCIPAL_SEM_CPF = "73421965099";
 
     @Autowired private MockMvc mvc;
     @Autowired private JsonMapper jsonMapper;
@@ -257,7 +259,7 @@ class PreCadastroIT {
     }
 
     @Test
-    @DisplayName("NIS, regra de frequencia e comprovante de endereco sao obrigatorios no envio publico")
+    @DisplayName("NIS, regra de frequencia, CPF da mae e comprovante de endereco sao obrigatorios no envio publico")
     void camposObrigatoriosDoEnvioPublico() throws Exception {
         PreCadastroDadosDTO base = dados(CPF_MAE);
         long antes = preCadastroRepository.count();
@@ -270,6 +272,10 @@ class PreCadastroIT {
                 base.pai(), base.responsavelLegal(), base.enderecoFamilia(), base.transferencia(), base.saude(), base.autorizacoes());
         mvc.perform(multipart("/api/pre-cadastro")
                         .file(partDados(requisicao(CPF_CRIANCA, semCiencia)))
+                        .file(imagem("comprovanteEndereco")).param("captcha", TOKEN_VALIDO).header("X-Forwarded-For", ipNovo()))
+                .andExpect(status().isBadRequest());
+        mvc.perform(multipart("/api/pre-cadastro")
+                        .file(partDados(requisicao(CPF_CRIANCA, dados(null))))
                         .file(imagem("comprovanteEndereco")).param("captcha", TOKEN_VALIDO).header("X-Forwarded-For", ipNovo()))
                 .andExpect(status().isBadRequest());
         mvc.perform(multipart("/api/pre-cadastro")
@@ -367,6 +373,27 @@ class PreCadastroIT {
     }
 
     @Test
+    @DisplayName("Aprovar com principal sem CPF leva o documento para ele, mesmo com outro responsavel sem CPF no banco")
+    void aprovarComPrincipalSemCpf() throws Exception {
+        Long outroSemCpf = responsavelRepository.save(Responsavel.builder().nomeCompleto("Outro Sem CPF").build()).getResponsavelId();
+        Long id = enviarPublico(requisicao(CPF_CRIANCA_PRINCIPAL_SEM_CPF, dados(CPF_MAE)), imagem("documentosResponsavel"));
+
+        mvc.perform(post("/api/pre-cadastro/" + id + "/aprovar").with(comPerfil(ASSISTENTE_SOCIAL))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(jsonMapper.writeValueAsString(assistido("Principal Sem CPF", CPF_CRIANCA_PRINCIPAL_SEM_CPF, null))))
+                .andExpect(status().isOk());
+
+        Long assistidoId = assistidoRepository.findByCpf(CPF_CRIANCA_PRINCIPAL_SEM_CPF).orElseThrow().getAssistidoId();
+        Long principalId = jdbcTemplate.queryForObject(
+                "select responsavel_id from adra.assistido_responsavel where assistido_id = ? and responsavel_principal",
+                Long.class, assistidoId);
+        assertThat(principalId).isNotEqualTo(outroSemCpf);
+        assertThat(jdbcTemplate.queryForList(
+                "select categoria from adra.arquivo where entidade_tipo = 'RESPONSAVEL' and entidade_id = ?",
+                String.class, principalId)).containsExactly("DOCUMENTO_IDENTIDADE");
+    }
+
+    @Test
     @DisplayName("Educador Social e Oficineiro recebem 403 ao aprovar e reprovar")
     void educadorEOficineiroNaoAprovamNemReprovam() throws Exception {
         String corpoAprovar = jsonMapper.writeValueAsString(assistido("Qualquer", CPF_CRIANCA, CPF_MAE));
@@ -454,7 +481,7 @@ class PreCadastroIT {
     private static AssistidoRequestDTO assistido(String nome, String cpf, String cpfResponsavel) {
         VinculoFamiliarComResponsavelRequestDTO responsavel = new VinculoFamiliarComResponsavelRequestDTO(
                 "Responsavel " + nome, null, cpfResponsavel, null, null, null, null,
-                null, null, null, null, "Mãe", true, false, false);
+                null, null, null, null, "Mãe", true, false, false, null);
         return new AssistidoRequestDTO(nome, LocalDate.of(2015, 6, 1), cpf, null, null, null, null,
                 null, null, null, null, null, null, null, null, null, null,
                 null, null, null, null, null, null, null, null, null, null,
