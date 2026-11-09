@@ -65,7 +65,6 @@ public class AssistidoService {
     private final AssistidoRepository assistidoRepository;
     private final AssistidoMapper assistidoMapper;
     private final ResponsavelMapper responsavelMapper;
-    private final ElegibilidadeService elegibilidadeService;
     private final AssistidoIndicadoresService indicadoresService;
     private final TurmaRepository turmaRepository;
     private final ResponsavelRepository responsavelRepository;
@@ -76,8 +75,6 @@ public class AssistidoService {
 
     private void validarNovoCadastro(AssistidoRequestDTO dto) {
         validarDadosComplementares(dto);
-        // Regra de corte so na entrada: familia ja atendida nao e' barrada ao editar.
-        elegibilidadeService.validarRendaFamiliar(dto.rendaFamiliar());
         verificarDuplicidade(dto, null);
 
         // CA-A02.3: Validar pelo menos um responsável

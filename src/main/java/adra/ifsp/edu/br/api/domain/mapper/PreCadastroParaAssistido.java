@@ -11,12 +11,9 @@ import adra.ifsp.edu.br.api.domain.model.PreCadastro;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
-import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
-import java.util.stream.Stream;
 
 /**
  * Monta o cadastro do atendido a partir do que a família enviou, para a equipe
@@ -49,7 +46,7 @@ public class PreCadastroParaAssistido {
                 null,
                 null,
                 enderecoDaCrianca(dados),
-                rendaFamiliar(dados),
+                dados.rendaFamiliar(),
                 dados.transferencia().recebe(),
                 dados.transferencia().programas(),
                 dados.transferencia().outro(),
@@ -66,15 +63,6 @@ public class PreCadastroParaAssistido {
     private EnderecoDTO enderecoDaCrianca(PreCadastroDadosDTO dados) {
         EnderecoDTO daCrianca = dados.crianca() != null ? dados.crianca().endereco() : null;
         return daCrianca != null && StringUtils.hasText(daCrianca.logradouro()) ? daCrianca : dados.enderecoFamilia();
-    }
-
-    private BigDecimal rendaFamiliar(PreCadastroDadosDTO dados) {
-        return Stream.of(
-                        dados.mae() != null ? dados.mae().renda() : null,
-                        dados.pai() != null ? dados.pai().renda() : null)
-                .filter(Objects::nonNull)
-                .reduce(BigDecimal::add)
-                .orElse(null);
     }
 
     private List<VinculoFamiliarComResponsavelRequestDTO> responsaveis(PreCadastroDadosDTO dados, EnderecoDTO endereco) {

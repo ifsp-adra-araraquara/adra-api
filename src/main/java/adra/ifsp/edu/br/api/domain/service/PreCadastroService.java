@@ -7,6 +7,7 @@ import adra.ifsp.edu.br.api.domain.dto.arquivo.UrlArquivoDTO;
 import adra.ifsp.edu.br.api.domain.dto.assistido.AssistidoRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.assistido.AssistidoResponseDTO;
 import adra.ifsp.edu.br.api.domain.dto.precadastro.AnexosPreCadastro;
+import adra.ifsp.edu.br.api.domain.dto.precadastro.ObservacaoPreCadastroRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.precadastro.PreCadastroDadosDTO;
 import adra.ifsp.edu.br.api.domain.dto.precadastro.PreCadastroDadosDTO.Mae;
 import adra.ifsp.edu.br.api.domain.dto.precadastro.PreCadastroDadosDTO.ResponsavelLegal;
@@ -18,6 +19,7 @@ import adra.ifsp.edu.br.api.domain.enums.AcaoSistema;
 import adra.ifsp.edu.br.api.domain.enums.CategoriaArquivo;
 import adra.ifsp.edu.br.api.domain.enums.EntidadeArquivo;
 import adra.ifsp.edu.br.api.domain.enums.ModuloSistema;
+import adra.ifsp.edu.br.api.domain.enums.NomeNivelPermissao;
 import adra.ifsp.edu.br.api.domain.enums.ProgramaTransferencia;
 import adra.ifsp.edu.br.api.domain.enums.StatusPreCadastro;
 import adra.ifsp.edu.br.api.domain.mapper.PreCadastroParaAssistido;
@@ -226,17 +228,21 @@ public class PreCadastroService {
 
     @Transactional(readOnly = true)
     public List<PreCadastroResumoDTO> listar(StatusPreCadastro status) {
-        List<PreCadastro> registros = repository.findByStatusOrderByCriadoEmDesc(status);
+        List<PreCadastro> registros = status.emAvaliacao()
+                ? repository.findByStatusOrderByCriadoEmAsc(status)
+                : repository.findByStatusOrderByCriadoEmDesc(status);
         Set<String> cpfs = registros.stream()
                 .map(PreCadastro::getCpf)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
-        Set<String> cadastrados = cpfs.isEmpty() ? Set.of() : new HashSet<>(assistidoRepository.findCpfsCadastrados(cpfs));
+        Set<String> cadastrados = status.emAvaliacao() && !cpfs.isEmpty()
+                ? new HashSet<>(assistidoRepository.findCpfsCadastrados(cpfs))
+                : Set.of();
         Map<Long, Set<CategoriaArquivo>> anexos = categoriasEnviadas(registros);
         LocalDate hoje = LocalDate.now();
         return registros.stream()
                 .map(p -> PreCadastroResumoDTO.de(p,
-                        p.getStatus() == StatusPreCadastro.PENDENTE && cadastrados.contains(p.getCpf()),
+                        p.getCpf() != null && cadastrados.contains(p.getCpf()),
                         faltandoSeNaoAprovado(p, anexos.getOrDefault(p.getPreCadastroId(), Set.of())), hoje))
                 .toList();
     }
@@ -258,10 +264,17 @@ public class PreCadastroService {
         return registro.getStatus() == StatusPreCadastro.CONVERTIDO ? List.of() : anexosFaltando(enviados);
     }
 
+    public PreCadastroResponseDTO abrir(Long preCadastroId) {
+        if (usuarioAutenticadoService.temPerfil(NomeNivelPermissao.ASSISTENTE_SOCIAL)) {
+            repository.marcarVistoPelaAssistenteSocial(preCadastroId);
+        }
+        return buscarDetalhe(preCadastroId);
+    }
+
     @Transactional(readOnly = true)
     public PreCadastroResponseDTO buscarDetalhe(Long preCadastroId) {
         PreCadastro registro = buscar(preCadastroId);
-        Long assistidoExistenteId = registro.getStatus() == StatusPreCadastro.PENDENTE && registro.getCpf() != null
+        Long assistidoExistenteId = registro.getStatus().emAvaliacao() && registro.getCpf() != null
                 ? assistidoRepository.findByCpf(registro.getCpf()).map(Assistido::getAssistidoId).orElse(null)
                 : null;
         List<ArquivoResponseDTO> arquivos = arquivoService.listar(EntidadeArquivo.PRE_CADASTRO, preCadastroId, null);
@@ -288,7 +301,8 @@ public class PreCadastroService {
     /** Cria o assistido (com os responsáveis) a partir do rascunho revisado pela equipe, numa transação só. */
     @CacheEvict(cacheNames = {CacheConfig.ESTRUTURA, CacheConfig.PAINEL}, allEntries = true)
     public PreCadastroResponseDTO aprovar(Long preCadastroId, AssistidoRequestDTO dto) {
-        PreCadastro registro = buscarPendente(preCadastroId);
+        PreCadastro registro = buscarEmAvaliacao(preCadastroId);
+        String statusAnterior = registro.getStatus().name();
         assistidoRepository.findByCpf(dto.cpf()).ifPresent(existente -> {
             throw new AssistidoJaCadastradoException(existente.getAssistidoId(), existente.getNomeCompleto());
         });
@@ -300,7 +314,7 @@ public class PreCadastroService {
         marcarRevisado(registro);
 
         auditoriaService.registrar(ModuloSistema.PRE_CADASTRO, "pre_cadastro", preCadastroId, AcaoSistema.EDITAR,
-                Map.of("status", "PENDENTE"), Map.of("status", "CONVERTIDO", "assistidoId", criado.assistidoId()),
+                Map.of("status", statusAnterior), Map.of("status", "CONVERTIDO", "assistidoId", criado.assistidoId()),
                 "Pré-cadastro aprovado: assistido cadastrado");
         return PreCadastroResponseDTO.de(registro, null, List.of(), List.of());
     }
@@ -323,15 +337,42 @@ public class PreCadastroService {
 
     @CacheEvict(cacheNames = CacheConfig.PAINEL, allEntries = true)
     public PreCadastroResponseDTO reprovar(Long preCadastroId, ReprovarPreCadastroRequestDTO dto) {
-        PreCadastro registro = buscarPendente(preCadastroId);
+        PreCadastro registro = buscarEmAvaliacao(preCadastroId);
+        String statusAnterior = registro.getStatus().name();
         registro.setStatus(StatusPreCadastro.DESCARTADO);
         registro.setMotivoReprovacao(dto.motivo().trim());
         marcarRevisado(registro);
 
         // O motivo é texto livre (pode citar saúde, renda...): não vai para a auditoria.
         auditoriaService.registrar(ModuloSistema.PRE_CADASTRO, "pre_cadastro", preCadastroId, AcaoSistema.EDITAR,
-                Map.of("status", "PENDENTE"), Map.of("status", "DESCARTADO"), "Pré-cadastro reprovado");
+                Map.of("status", statusAnterior), Map.of("status", "DESCARTADO"), "Pré-cadastro reprovado");
         return buscarDetalhe(preCadastroId);
+    }
+
+    @CacheEvict(cacheNames = CacheConfig.PAINEL, allEntries = true)
+    public PreCadastroResponseDTO colocarNaListaEspera(Long preCadastroId, ObservacaoPreCadastroRequestDTO dto) {
+        PreCadastro registro = buscar(preCadastroId);
+        if (registro.getStatus() != StatusPreCadastro.PENDENTE) {
+            throw new RegraNegocioException("Só inscrições pendentes podem ir para a lista de espera.");
+        }
+        registro.setStatus(StatusPreCadastro.LISTA_ESPERA);
+        registro.setObservacao(textoOuNulo(dto.observacao()));
+
+        auditoriaService.registrar(ModuloSistema.PRE_CADASTRO, "pre_cadastro", preCadastroId, AcaoSistema.EDITAR,
+                Map.of("status", "PENDENTE"), Map.of("status", "LISTA_ESPERA"), "Pré-cadastro colocado na lista de espera");
+        return buscarDetalhe(preCadastroId);
+    }
+
+    public void salvarObservacao(Long preCadastroId, ObservacaoPreCadastroRequestDTO dto) {
+        PreCadastro registro = buscarEmAvaliacao(preCadastroId);
+        registro.setObservacao(textoOuNulo(dto.observacao()));
+
+        auditoriaService.registrar(ModuloSistema.PRE_CADASTRO, "pre_cadastro", preCadastroId, AcaoSistema.EDITAR,
+                null, null, "Observação do pré-cadastro atualizada");
+    }
+
+    private String textoOuNulo(String texto) {
+        return StringUtils.hasText(texto) ? texto.trim() : null;
     }
 
     private void marcarRevisado(PreCadastro registro) {
@@ -339,9 +380,9 @@ public class PreCadastroService {
         registro.setRevisadoEm(OffsetDateTime.now());
     }
 
-    private PreCadastro buscarPendente(Long preCadastroId) {
+    private PreCadastro buscarEmAvaliacao(Long preCadastroId) {
         PreCadastro registro = buscar(preCadastroId);
-        if (registro.getStatus() != StatusPreCadastro.PENDENTE) {
+        if (!registro.getStatus().emAvaliacao()) {
             throw new RegraNegocioException("Este pré-cadastro já foi revisado.");
         }
         return registro;

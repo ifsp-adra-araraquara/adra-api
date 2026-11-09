@@ -19,13 +19,19 @@ import adra.ifsp.edu.br.api.domain.enums.OrigemRegistroDisciplinar;
 import adra.ifsp.edu.br.api.domain.enums.Sexo;
 import adra.ifsp.edu.br.api.domain.enums.StatusDocumentoDisciplinar;
 import adra.ifsp.edu.br.api.domain.enums.StatusGeral;
+import adra.ifsp.edu.br.api.domain.dto.disciplinar.PeriodoSuspensaoDTO;
+import adra.ifsp.edu.br.api.domain.enums.Turno;
 import adra.ifsp.edu.br.api.domain.model.Assistido;
 import adra.ifsp.edu.br.api.domain.model.MotivoDisciplinar;
 import adra.ifsp.edu.br.api.domain.model.NivelPermissao;
+import adra.ifsp.edu.br.api.domain.model.Turma;
+import adra.ifsp.edu.br.api.domain.model.TurmaAlunos;
 import adra.ifsp.edu.br.api.domain.model.Usuario;
 import adra.ifsp.edu.br.api.domain.repository.AssistidoRepository;
 import adra.ifsp.edu.br.api.domain.repository.MotivoDisciplinarRepository;
 import adra.ifsp.edu.br.api.domain.repository.NivelPermissaoRepository;
+import adra.ifsp.edu.br.api.domain.repository.TurmaAlunosRepository;
+import adra.ifsp.edu.br.api.domain.repository.TurmaRepository;
 import adra.ifsp.edu.br.api.domain.repository.UsuarioRepository;
 import adra.ifsp.edu.br.api.exception.AcessoNegadoException;
 import adra.ifsp.edu.br.api.exception.RegraNegocioException;
@@ -47,6 +53,8 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 import javax.sql.DataSource;
 import java.sql.SQLException;
+import java.time.DayOfWeek;
+import java.util.ArrayList;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -80,8 +88,12 @@ class DisciplinarServiceIT {
     @Autowired private DisciplinarService disciplinarService;
     @Autowired private DisciplinarController disciplinarController;
     @Autowired private DataSource dataSource;
+    @Autowired private TurmaRepository turmaRepository;
+    @Autowired private TurmaAlunosRepository turmaAlunosRepository;
 
     private static final LocalDate HOJE = LocalDate.now();
+    /** Exemplo do Eugênio na reunião de 05/11: suspensão aplicada numa quinta-feira. */
+    private static final LocalDate QUINTA = LocalDate.of(2026, 11, 5);
 
     private Usuario coordenador;
     private Usuario educadorSocial;
@@ -221,18 +233,76 @@ class DisciplinarServiceIT {
 
         RegistroDisciplinarResponseDTO suspensao = disciplinarService.gerarPelaRecomendacao(
                 terceira.registro().registroId(),
-                new GerarPelaRecomendacaoRequestDTO(HOJE, "Suspensão pela 3ª advertência", null, null)).registro();
+                new GerarPelaRecomendacaoRequestDTO(QUINTA, "Suspensão pela 3ª advertência", null, null)).registro();
         assertThat(suspensao.nivel()).isEqualTo(NivelDisciplinar.SUSPENSAO);
-        assertThat(suspensao.suspensaoInicio()).isEqualTo(HOJE);
-        assertThat(suspensao.suspensaoFim()).isEqualTo(HOJE.plusDays(2));
+        assertThat(suspensao.suspensaoInicio()).isEqualTo(LocalDate.of(2026, 11, 6));
+        assertThat(suspensao.suspensaoFim()).isEqualTo(LocalDate.of(2026, 11, 10));
 
         List<SinalizacaoDisciplinarDTO> sinalizacoes =
-                disciplinarService.buscarSinalizacoes(List.of(assistido.getAssistidoId()), HOJE.plusDays(1));
+                disciplinarService.buscarSinalizacoes(List.of(assistido.getAssistidoId()), LocalDate.of(2026, 11, 9));
         assertThat(sinalizacoes).singleElement()
-                .extracting(SinalizacaoDisciplinarDTO::suspensoAte).isEqualTo(HOJE.plusDays(2));
+                .extracting(SinalizacaoDisciplinarDTO::suspensoAte).isEqualTo(LocalDate.of(2026, 11, 10));
 
-        assertThat(disciplinarService.buscarSinalizacoes(List.of(assistido.getAssistidoId()), HOJE.plusDays(3)))
+        assertThat(disciplinarService.buscarSinalizacoes(List.of(assistido.getAssistidoId()), LocalDate.of(2026, 11, 11)))
                 .isEmpty();
+    }
+
+    // ---- Suspensão em dias de atividade (reunião de 05/11) ----
+
+    @Test
+    @DisplayName("Suspensão aplicada na quinta vale sexta, segunda e terça, e o retorno é na quarta")
+    void suspensaoContaDiasDeAtividade() {
+        PeriodoSuspensaoDTO periodo = disciplinarService.sugerirPeriodoSuspensao(assistido.getAssistidoId(), QUINTA);
+
+        assertThat(periodo.inicio()).isEqualTo(LocalDate.of(2026, 11, 6));
+        assertThat(periodo.fim()).isEqualTo(LocalDate.of(2026, 11, 10));
+        assertThat(periodo.diasDeAtividade()).isEqualTo(3);
+        assertThat(periodo.retorno()).isEqualTo(LocalDate.of(2026, 11, 11));
+    }
+
+    @Test
+    @DisplayName("Num grupo de segunda a quarta, só esses dias contam")
+    void suspensaoSegueOsDiasDoGrupo() {
+        matricularEmGrupo(assistido, DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY);
+
+        PeriodoSuspensaoDTO periodo = disciplinarService.sugerirPeriodoSuspensao(assistido.getAssistidoId(), QUINTA);
+
+        assertThat(periodo.inicio()).isEqualTo(LocalDate.of(2026, 11, 9));
+        assertThat(periodo.fim()).isEqualTo(LocalDate.of(2026, 11, 11));
+        assertThat(periodo.retorno()).isEqualTo(LocalDate.of(2026, 11, 16));
+    }
+
+    @Test
+    @DisplayName("Feriado não conta: na quinta 19/11, a sexta 20/11 (Consciência Negra) fica de fora")
+    void suspensaoPulaFeriado() {
+        PeriodoSuspensaoDTO periodo =
+                disciplinarService.sugerirPeriodoSuspensao(assistido.getAssistidoId(), LocalDate.of(2026, 11, 19));
+
+        assertThat(periodo.inicio()).isEqualTo(LocalDate.of(2026, 11, 23));
+        assertThat(periodo.fim()).isEqualTo(LocalDate.of(2026, 11, 25));
+        assertThat(periodo.retorno()).isEqualTo(LocalDate.of(2026, 11, 26));
+    }
+
+    @Test
+    @DisplayName("Registrar sem período usa os dias de atividade, e o registro traz dias e retorno para a carta")
+    void registroDeSuspensaoTrazDiasERetorno() {
+        Long registroId = disciplinarService.registrar(assistido.getAssistidoId(),
+                new RegistroDisciplinarRequestDTO(bullying.getMotivoId(), QUINTA, "Fato", null, null, null))
+                .registro().registroId();
+
+        RegistroDisciplinarResponseDTO registro = disciplinarService.buscarRegistro(registroId);
+        assertThat(registro.suspensaoInicio()).isEqualTo(LocalDate.of(2026, 11, 6));
+        assertThat(registro.suspensaoFim()).isEqualTo(LocalDate.of(2026, 11, 10));
+        assertThat(registro.suspensaoDiasDeAtividade()).isEqualTo(3);
+        assertThat(registro.suspensaoRetorno()).isEqualTo(LocalDate.of(2026, 11, 11));
+    }
+
+    @Test
+    @DisplayName("Só o Coordenador consulta o período sugerido de suspensão")
+    void periodoSugeridoSoParaCoordenador() {
+        autenticarComo(educadorSocial);
+        assertThatThrownBy(() -> disciplinarController.sugerirPeriodoSuspensao(assistido.getAssistidoId(), QUINTA))
+                .isInstanceOf(AuthorizationDeniedException.class);
     }
 
     @Test
@@ -463,6 +533,22 @@ class DisciplinarServiceIT {
                 .dataEntrada(HOJE.minusMonths(6))
                 .status(status)
                 .build());
+    }
+
+    private void matricularEmGrupo(Assistido atendido, DayOfWeek... dias) {
+        Turma grupo = new Turma();
+        grupo.setNomeTurma("Grupo de segunda a quarta");
+        grupo.setTurno(Turno.MANHA);
+        grupo.setCapacidade(20);
+        grupo.setDiasDaSemana(new ArrayList<>(List.of(dias)));
+        grupo = turmaRepository.save(grupo);
+
+        TurmaAlunos vinculo = new TurmaAlunos();
+        vinculo.setTurma(grupo);
+        vinculo.setAssistido(atendido);
+        vinculo.setDataEntrada(LocalDate.of(2026, 1, 1));
+        vinculo.setStatus(StatusGeral.ATIVO);
+        turmaAlunosRepository.save(vinculo);
     }
 
     private MotivoDisciplinar criarMotivo(String nome, NivelDisciplinar nivel) {

@@ -42,9 +42,18 @@ public record RegistroDisciplinarResponseDTO(
         String arquivadoPorNome,
         Long registradoPorId,
         String registradoPorNome,
-        OffsetDateTime criadoEm
+        OffsetDateTime criadoEm,
+        /** Só na consulta de um registro de suspensão (carta): dias de atividade do grupo no período. */
+        Integer suspensaoDiasDeAtividade,
+        /** Só na consulta de um registro de suspensão (carta): próximo dia de atividade depois do fim. */
+        LocalDate suspensaoRetorno
 ) {
     public static RegistroDisciplinarResponseDTO de(RegistroDisciplinar r) {
+        return de(r, null);
+    }
+
+    /** Com o período em dias de atividade (suspensão), para a carta. */
+    public static RegistroDisciplinarResponseDTO de(RegistroDisciplinar r, PeriodoSuspensaoDTO periodo) {
         var motivo = r.getMotivo();
         var origem = r.getRegistroOrigem();
         return new RegistroDisciplinarResponseDTO(
@@ -76,7 +85,9 @@ public record RegistroDisciplinarResponseDTO(
                 r.getArquivadoPor() != null ? r.getArquivadoPor().getNomeCompleto() : null,
                 r.getRegistradoPor().getUsuarioId(),
                 r.getRegistradoPor().getNomeCompleto(),
-                r.getCriadoEm()
+                r.getCriadoEm(),
+                periodo != null ? periodo.diasDeAtividade() : null,
+                periodo != null ? periodo.retorno() : null
         );
     }
 

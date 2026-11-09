@@ -108,7 +108,6 @@ class AcessoPorPerfilIT {
                 arguments(HttpMethod.GET, "/api/arquivos/fotos-perfil?entidadeTipo=ASSISTIDO&entidadeIds=" + INEXISTENTE, Set.of(COORDENADOR, ASSISTENTE_SOCIAL, EDUCADOR_SOCIAL)),
                 arguments(HttpMethod.GET, "/api/arquivos/fotos-perfil?entidadeTipo=PRE_CADASTRO&entidadeIds=" + INEXISTENTE, Set.of()),
                 arguments(HttpMethod.GET, "/api/assistidos/" + INEXISTENTE, Set.of(COORDENADOR, ASSISTENTE_SOCIAL, EDUCADOR_SOCIAL)),
-                arguments(HttpMethod.GET, "/api/assistidos/elegibilidade", Set.of(COORDENADOR, ASSISTENTE_SOCIAL)),
                 arguments(HttpMethod.GET, "/api/responsaveis", Set.of(COORDENADOR, ASSISTENTE_SOCIAL, EDUCADOR_SOCIAL)),
                 arguments(HttpMethod.DELETE, "/api/assistidos/" + INEXISTENTE + "/responsaveis/1", Set.of()),
 
