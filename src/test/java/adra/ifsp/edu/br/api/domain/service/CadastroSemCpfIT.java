@@ -101,6 +101,40 @@ class CadastroSemCpfIT {
                 .isEqualTo(2);
     }
 
+    @Test
+    @DisplayName("Cadastra atendidos sem CPF (vazio ou nulo) e grava CPF nulo, sem violar a unicidade")
+    void atendidosSemCpf() throws Exception {
+        Long responsavelId = cadastrarResponsavel("Mae Sem CPF Da Crianca", null);
+
+        cadastrarAtendido("Crianca Sem CPF", "", responsavelId);
+        cadastrarAtendido("Outra Crianca Sem CPF", null, responsavelId);
+
+        assertThat(jdbcTemplate.queryForObject(
+                "select count(*) from adra.assistido where cpf is null and nome_completo like '%Sem CPF'", Integer.class))
+                .isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("Validacao do cadastro em massa aceita linha sem CPF do atendido")
+    void loteValidaLinhaSemCpf() throws Exception {
+        VinculoFamiliarComResponsavelRequestDTO vinculo = new VinculoFamiliarComResponsavelRequestDTO(
+                "Mae Da Planilha", null, null, null, null, null, null,
+                null, null, null, null, "Mãe", true, false, false, null);
+        AssistidoRequestDTO linha = new AssistidoRequestDTO("Crianca Da Planilha", LocalDate.of(2016, 3, 1), "",
+                null, null, null, null, null, null, null, null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null, null, null, null,
+                List.of(vinculo), null);
+
+        String resposta = mvc.perform(post("/api/assistidos/lote/validar").with(comPerfilAssistenteSocial())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(jsonMapper.writeValueAsString(List.of(linha))))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat((String) JsonPath.read(resposta, "$[0].status")).isEqualTo("VALIDA");
+        assertThat((List<?>) JsonPath.read(resposta, "$[0].erros")).isEmpty();
+    }
+
     private Long cadastrarResponsavel(String nome, String cpf) throws Exception {
         String resposta = mvc.perform(post("/api/responsaveis").with(comPerfilAssistenteSocial())
                         .contentType(MediaType.APPLICATION_JSON)
