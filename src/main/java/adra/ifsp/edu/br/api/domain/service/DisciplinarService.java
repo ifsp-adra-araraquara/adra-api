@@ -9,6 +9,7 @@ import adra.ifsp.edu.br.api.domain.dto.disciplinar.FichaDisciplinarDTO;
 import adra.ifsp.edu.br.api.domain.dto.disciplinar.GerarPelaRecomendacaoRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.disciplinar.MotivoDisciplinarRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.disciplinar.MotivoDisciplinarResponseDTO;
+import adra.ifsp.edu.br.api.domain.dto.disciplinar.PeriodoSuspensaoDTO;
 import adra.ifsp.edu.br.api.domain.dto.disciplinar.PeriodoSuspensaoRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.disciplinar.RegistroCriadoDTO;
 import adra.ifsp.edu.br.api.domain.dto.disciplinar.RegistroDisciplinarRequestDTO;
@@ -83,8 +84,6 @@ import java.util.Objects;
 @Transactional
 public class DisciplinarService {
 
-    /** "Suspenso por três dias": do dia do fato até 2 dias depois, quando o período não é informado. */
-    private static final int DIAS_SUSPENSAO_PADRAO = 3;
 
     private final RegistroDisciplinarRepository registroRepository;
     private final MotivoDisciplinarRepository motivoRepository;
@@ -94,6 +93,7 @@ public class DisciplinarService {
     private final AuditoriaService auditoriaService;
     private final UsuarioAutenticadoService usuarioAutenticadoService;
     private final FaltaPorSuspensaoService faltaPorSuspensaoService;
+    private final PeriodoSuspensaoService periodoSuspensaoService;
 
     // ------------------------------------------------------------------
     // Motivos
@@ -171,8 +171,9 @@ public class DisciplinarService {
         LocalDate inicio = null;
         LocalDate fim = null;
         if (motivo.getNivel() == NivelDisciplinar.SUSPENSAO) {
-            inicio = dto.suspensaoInicio() != null ? dto.suspensaoInicio() : dto.data();
-            fim = dto.suspensaoFim() != null ? dto.suspensaoFim() : inicio.plusDays(DIAS_SUSPENSAO_PADRAO - 1);
+            inicio = dto.suspensaoInicio() != null ? dto.suspensaoInicio()
+                    : periodoSuspensaoService.sugerir(assistido, dto.data()).inicio();
+            fim = dto.suspensaoFim() != null ? dto.suspensaoFim() : periodoSuspensaoService.fimContandoDe(assistido, inicio);
             validarPeriodo(inicio, fim);
         }
 
@@ -216,8 +217,10 @@ public class DisciplinarService {
         LocalDate inicio = null;
         LocalDate fim = null;
         if (nivel == NivelDisciplinar.SUSPENSAO) {
-            inicio = dto.suspensaoInicio() != null ? dto.suspensaoInicio() : dto.data();
-            fim = dto.suspensaoFim() != null ? dto.suspensaoFim() : inicio.plusDays(DIAS_SUSPENSAO_PADRAO - 1);
+            inicio = dto.suspensaoInicio() != null ? dto.suspensaoInicio()
+                    : periodoSuspensaoService.sugerir(origem.getAssistido(), dto.data()).inicio();
+            fim = dto.suspensaoFim() != null ? dto.suspensaoFim()
+                    : periodoSuspensaoService.fimContandoDe(origem.getAssistido(), inicio);
             validarPeriodo(inicio, fim);
         }
 
@@ -493,7 +496,17 @@ public class DisciplinarService {
 
     @Transactional(readOnly = true)
     public RegistroDisciplinarResponseDTO buscarRegistro(Long registroId) {
-        return RegistroDisciplinarResponseDTO.de(buscarRegistroEntidade(registroId));
+        RegistroDisciplinar registro = buscarRegistroEntidade(registroId);
+        PeriodoSuspensaoDTO periodo = registro.getNivel() == NivelDisciplinar.SUSPENSAO
+                ? periodoSuspensaoService.periodo(registro.getAssistido(), registro.getSuspensaoInicio(), registro.getSuspensaoFim())
+                : null;
+        return RegistroDisciplinarResponseDTO.de(registro, periodo);
+    }
+
+    /** Período padrão de uma suspensão pelo fato nesta data, em dias de atividade do grupo (telas de registro). */
+    @Transactional(readOnly = true)
+    public PeriodoSuspensaoDTO sugerirPeriodoSuspensao(Long assistidoId, LocalDate dataDoFato) {
+        return periodoSuspensaoService.sugerir(buscarAssistido(assistidoId), dataDoFato);
     }
 
     /**
