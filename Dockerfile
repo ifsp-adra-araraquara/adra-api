@@ -8,7 +8,7 @@ RUN ./gradlew --no-daemon bootJar
 
 FROM eclipse-temurin:21-jre-alpine
 RUN adduser -S -u 10001 adra
-ENV TZ=UTC
+ENV TZ=America/Sao_Paulo
 WORKDIR /app
 COPY --from=build /build/build/libs/*.jar app.jar
 USER adra
