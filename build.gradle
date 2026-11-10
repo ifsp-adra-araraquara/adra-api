@@ -50,6 +50,8 @@ dependencies {
 }
 
 tasks.named('test') {
+	// Mesmo fuso da aplicação (ApiApplication.FUSO): o CI roda em UTC.
+	systemProperty 'user.timezone', 'America/Sao_Paulo'
 	// Testes marcados @Tag("stage") batem no Postgres real do time (precisam
 	// de .env.stage + rede) — nunca rodam num "./gradlew test" comum, só
 	// explicitamente via "-PstageTests" (ex.: ./gradlew test -PstageTests --tests "*StageIT").
