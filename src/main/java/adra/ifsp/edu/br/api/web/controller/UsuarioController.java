@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import adra.ifsp.edu.br.api.domain.dto.PaginaDTO;
+import adra.ifsp.edu.br.api.domain.dto.usuario.MeuPerfilRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.usuario.RedefinicaoSenhaResponseDTO;
 import adra.ifsp.edu.br.api.domain.dto.usuario.UsuarioRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.usuario.UsuarioResponseDTO;
@@ -77,6 +78,18 @@ public class UsuarioController {
         return ResponseEntity.ok(usuarioService.listarOficineiros());
     }
 
+    @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL', 'EDUCADOR_SOCIAL', 'OFICINEIRO')")
+    @GetMapping("/me")
+    public ResponseEntity<UsuarioResponseDTO> buscarMeuPerfil() {
+        return ResponseEntity.ok(usuarioService.buscarMeuPerfil());
+    }
+
+    @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL', 'EDUCADOR_SOCIAL', 'OFICINEIRO')")
+    @PutMapping("/me")
+    public ResponseEntity<UsuarioResponseDTO> atualizarMeuPerfil(@Valid @RequestBody MeuPerfilRequestDTO dto) {
+        return ResponseEntity.ok(usuarioService.atualizarMeuPerfil(dto));
+    }
+
     @PreAuthorize("hasAuthority('ADMINISTRADOR')")
     @GetMapping("/{id}")
     public ResponseEntity<UsuarioResponseDTO> buscarPorId(@PathVariable Long id) {
@@ -100,4 +113,3 @@ public class UsuarioController {
     // Propositalmente sem DELETE: usuario nunca e' removido fisicamente
     // (comentario original do schema). Use PATCH /{id}/status com ativo=false.
 }
-

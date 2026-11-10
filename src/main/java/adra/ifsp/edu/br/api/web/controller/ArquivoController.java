@@ -26,8 +26,9 @@ import lombok.RequiredArgsConstructor;
 
 /**
  * Permissões:
- * - Assistido/responsável/usuário: Coordenador e Assistente Social enviam e excluem; Educador Social só vê.
- * - Material de AULA:
+ * - Assistido/responsável: Coordenador e Assistente Social enviam e excluem; Educador Social só vê.
+ * - Usuário (FOTO_PERFIL): o próprio usuário logado (em qualquer perfil) envia, vê e exclui a sua foto.
+ * - Material de AULA (SEMANARIO):
  *   - Oficineiro responsável pela turma ENVIA; vê, abre e exclui SÓ os que ele enviou
  *     (a listagem é filtrada no ArquivoService; abrir/excluir de outro = 403).
  *   - Coordenador, Assistente Social e Educador Social VEEM todos (com quem enviou), mas não enviam nem excluem.
@@ -40,8 +41,13 @@ public class ArquivoController {
 
     private final ArquivoService arquivoService;
 
-    @PreAuthorize("(hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL') and #entidadeTipo != T(adra.ifsp.edu.br.api.domain.enums.EntidadeArquivo).SEMANARIO) "
-            + "or (hasRole('OFICINEIRO') and #entidadeTipo == T(adra.ifsp.edu.br.api.domain.enums.EntidadeArquivo).SEMANARIO and @acessoTurma.podeAcessarSemanario(#entidadeId))")
+    @PreAuthorize("(hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL') "
+            + "and #entidadeTipo != T(adra.ifsp.edu.br.api.domain.enums.EntidadeArquivo).SEMANARIO "
+            + "and #entidadeTipo != T(adra.ifsp.edu.br.api.domain.enums.EntidadeArquivo).USUARIO) "
+            + "or (hasRole('OFICINEIRO') and #entidadeTipo == T(adra.ifsp.edu.br.api.domain.enums.EntidadeArquivo).SEMANARIO and @acessoTurma.podeAcessarSemanario(#entidadeId)) "
+            + "or (#entidadeTipo == T(adra.ifsp.edu.br.api.domain.enums.EntidadeArquivo).USUARIO "
+            + "and #categoria == T(adra.ifsp.edu.br.api.domain.enums.CategoriaArquivo).FOTO_PERFIL "
+            + "and @acessoTurma.ehProprioUsuario(#entidadeId))")
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ArquivoResponseDTO> enviar(@RequestParam EntidadeArquivo entidadeTipo,
                                                      @RequestParam Long entidadeId,
@@ -53,7 +59,8 @@ public class ArquivoController {
 
     // Arquivos de pré-cadastro só pela tela de pré-cadastros (GET /api/pre-cadastro/{id}).
     @PreAuthorize("(hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL', 'EDUCADOR_SOCIAL') and #entidadeTipo != T(adra.ifsp.edu.br.api.domain.enums.EntidadeArquivo).PRE_CADASTRO) "
-            + "or (hasRole('OFICINEIRO') and #entidadeTipo == T(adra.ifsp.edu.br.api.domain.enums.EntidadeArquivo).SEMANARIO and @acessoTurma.podeAcessarSemanario(#entidadeId))")
+            + "or (hasRole('OFICINEIRO') and #entidadeTipo == T(adra.ifsp.edu.br.api.domain.enums.EntidadeArquivo).SEMANARIO and @acessoTurma.podeAcessarSemanario(#entidadeId)) "
+            + "or (#entidadeTipo == T(adra.ifsp.edu.br.api.domain.enums.EntidadeArquivo).USUARIO and @acessoTurma.ehProprioUsuario(#entidadeId))")
     @GetMapping
     public ResponseEntity<List<ArquivoResponseDTO>> listar(@RequestParam EntidadeArquivo entidadeTipo,
                                                            @RequestParam Long entidadeId,
@@ -61,8 +68,9 @@ public class ArquivoController {
         return ResponseEntity.ok(arquivoService.listar(entidadeTipo, entidadeId, categoria));
     }
 
-    @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL', 'EDUCADOR_SOCIAL') "
-            + "and #entidadeTipo != T(adra.ifsp.edu.br.api.domain.enums.EntidadeArquivo).PRE_CADASTRO")
+    @PreAuthorize("(hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL', 'EDUCADOR_SOCIAL') "
+            + "and #entidadeTipo != T(adra.ifsp.edu.br.api.domain.enums.EntidadeArquivo).PRE_CADASTRO) "
+            + "or (#entidadeTipo == T(adra.ifsp.edu.br.api.domain.enums.EntidadeArquivo).USUARIO and @acessoTurma.ehProprioUsuario(#entidadeIds))")
     @GetMapping("/fotos-perfil")
     public ResponseEntity<Map<Long, UrlArquivoDTO>> urlsDasFotosDePerfil(@RequestParam EntidadeArquivo entidadeTipo,
                                                                          @RequestParam List<Long> entidadeIds) {
@@ -70,14 +78,16 @@ public class ArquivoController {
     }
 
     @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL', 'EDUCADOR_SOCIAL') "
-            + "or (hasRole('OFICINEIRO') and @acessoTurma.ehAutorDoArquivoDeSemanario(#id))")
+            + "or (hasRole('OFICINEIRO') and @acessoTurma.ehAutorDoArquivoDeSemanario(#id)) "
+            + "or @acessoTurma.ehFotoPerfilDoProprioUsuario(#id)")
     @GetMapping("/{id}/url")
     public ResponseEntity<UrlArquivoDTO> gerarUrl(@PathVariable Long id) {
         return ResponseEntity.ok(arquivoService.gerarUrl(id));
     }
 
-    @PreAuthorize("(hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL') and !@acessoTurma.ehArquivoDeSemanario(#id)) "
-            + "or (hasRole('OFICINEIRO') and @acessoTurma.ehAutorDoArquivoDeSemanario(#id))")
+    @PreAuthorize("(hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL') and !@acessoTurma.ehArquivoDeSemanario(#id) and !@acessoTurma.ehArquivoDeUsuario(#id)) "
+            + "or (hasRole('OFICINEIRO') and @acessoTurma.ehAutorDoArquivoDeSemanario(#id)) "
+            + "or @acessoTurma.ehFotoPerfilDoProprioUsuario(#id)")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> remover(@PathVariable Long id) {
         arquivoService.remover(id);

@@ -6,26 +6,37 @@ import static adra.ifsp.edu.br.api.domain.enums.NomeNivelPermissao.EDUCADOR_SOCI
 import static adra.ifsp.edu.br.api.domain.enums.NomeNivelPermissao.OFICINEIRO;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
+import java.net.URI;
 import java.time.DayOfWeek;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Stream;
 
+import javax.imageio.ImageIO;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -157,6 +168,103 @@ class AcessoPorPerfilIT {
         }
     }
 
+    @ParameterizedTest(name = "/api/usuarios/me com {0}")
+    @EnumSource(NomeNivelPermissao.class)
+    void cadaPerfilLeEAtualizaOProprioPerfilSemAlterarEmailNemPerfil(NomeNivelPermissao perfil) throws Exception {
+        Usuario usuario = criarUsuario(perfil, false);
+        Usuario outroUsuario = criarUsuario(COORDENADOR, true);
+        String emailOriginal = usuario.getEmail();
+        RequestPostProcessor autenticado = comoUsuario(usuario);
+
+        mvc.perform(get("/api/usuarios/me").with(autenticado))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.usuarioId").value(usuario.getUsuarioId()))
+                .andExpect(jsonPath("$.email").value(emailOriginal))
+                .andExpect(jsonPath("$.nivelPermissao").value(perfil.name()));
+
+        String payload = """
+                {
+                  "usuarioId": %d,
+                  "nomeCompleto": "Nome Atualizado %s",
+                  "telefone": "16991234567",
+                  "email": "invasor@teste.local",
+                  "nivelPermissao": "COORDENADOR",
+                  "administrador": true,
+                  "ativo": false
+                }
+                """.formatted(outroUsuario.getUsuarioId(), perfil.name());
+
+        mvc.perform(put("/api/usuarios/me")
+                        .with(autenticado)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.usuarioId").value(usuario.getUsuarioId()))
+                .andExpect(jsonPath("$.nomeCompleto").value("Nome Atualizado " + perfil.name()))
+                .andExpect(jsonPath("$.telefone").value("16991234567"))
+                .andExpect(jsonPath("$.email").value(emailOriginal))
+                .andExpect(jsonPath("$.nivelPermissao").value(perfil.name()))
+                .andExpect(jsonPath("$.administrador").value(false))
+                .andExpect(jsonPath("$.ativo").value(true));
+
+        Usuario noBanco = usuarioRepository.findById(usuario.getUsuarioId()).orElseThrow();
+        assertThat(noBanco.getNomeCompleto()).isEqualTo("Nome Atualizado " + perfil.name());
+        assertThat(noBanco.getTelefone()).isEqualTo("16991234567");
+        assertThat(noBanco.getEmail()).isEqualTo(emailOriginal);
+        assertThat(noBanco.isAdministrador()).isFalse();
+        assertThat(noBanco.isAtivo()).isTrue();
+
+        Usuario outroNoBanco = usuarioRepository.findById(outroUsuario.getUsuarioId()).orElseThrow();
+        assertThat(outroNoBanco.getNomeCompleto()).isEqualTo("Usuario COORDENADOR");
+    }
+
+    @ParameterizedTest(name = "FOTO_PERFIL do próprio usuário ({0})")
+    @EnumSource(NomeNivelPermissao.class)
+    void cadaPerfilEnviaConsultaERemoveAPropriaFotoDePerfilMasNaoADeOutro(NomeNivelPermissao perfil) throws Exception {
+        when(storage.provedor()).thenReturn(ProvedorArmazenamento.SUPABASE);
+        when(storage.urlsTemporarias(anyList(), any())).thenAnswer(inv -> {
+            List<String> chaves = inv.getArgument(0);
+            return Map.of(chaves.getFirst(), URI.create("https://storage.test/" + chaves.getFirst()));
+        });
+
+        Usuario eu = criarUsuario(perfil, false);
+        Usuario outro = criarUsuario(COORDENADOR, false);
+        RequestPostProcessor comoEu = comoUsuario(eu);
+        byte[] png = pngMinimo();
+
+        mvc.perform(multipart("/api/arquivos")
+                        .file(new MockMultipartFile("arquivo", "foto.png", MediaType.IMAGE_PNG_VALUE, png))
+                        .param("entidadeTipo", "USUARIO")
+                        .param("entidadeId", outro.getUsuarioId().toString())
+                        .param("categoria", "FOTO_PERFIL")
+                        .with(comoEu))
+                .andExpect(status().isForbidden());
+
+        String salvoJson = mvc.perform(multipart("/api/arquivos")
+                        .file(new MockMultipartFile("arquivo", "foto.png", MediaType.IMAGE_PNG_VALUE, png))
+                        .param("entidadeTipo", "USUARIO")
+                        .param("entidadeId", eu.getUsuarioId().toString())
+                        .param("categoria", "FOTO_PERFIL")
+                        .with(comoEu))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+
+        Number arquivoId = JsonPath.read(salvoJson, "$.arquivoId");
+
+        mvc.perform(get("/api/arquivos/fotos-perfil")
+                        .param("entidadeTipo", "USUARIO")
+                        .param("entidadeIds", eu.getUsuarioId().toString())
+                        .with(comoEu))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$." + eu.getUsuarioId() + ".url").exists());
+
+        mvc.perform(delete("/api/arquivos/{id}", arquivoId).with(comoUsuario(outro)))
+                .andExpect(status().isForbidden());
+
+        mvc.perform(delete("/api/arquivos/{id}", arquivoId).with(comoEu))
+                .andExpect(status().isNoContent());
+    }
+
     /** Sem login e contra o schema das migrations (enum de auditoria incluso). Dados inventados. */
     @Test
     void linkPublicoDePreCadastroGravaSemLogin() throws Exception {
@@ -278,6 +386,12 @@ class AcessoPorPerfilIT {
         return "%PDF-1.4\n%%EOF".getBytes();
     }
 
+    private static byte[] pngMinimo() throws Exception {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        ImageIO.write(new BufferedImage(2, 2, BufferedImage.TYPE_INT_RGB), "png", out);
+        return out.toByteArray();
+    }
+
     private Usuario criarUsuario(NomeNivelPermissao perfil, boolean administrador) {
         return usuarioRepository.save(Usuario.builder()
                 .nivelPermissao(nivelPermissaoRepository.findByNome(perfil).orElseThrow())
@@ -313,6 +427,16 @@ class AcessoPorPerfilIT {
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
         return JsonPath.read(resposta, "$.usuario.modulos[*].codigo");
+    }
+
+    private RequestPostProcessor comoUsuario(Usuario usuario) {
+        NomeNivelPermissao perfil = usuario.getNivelPermissao().getNome();
+        return jwt()
+                .jwt(token -> token
+                        .subject(usuario.getUsuarioId().toString())
+                        .claim(TokenService.CLAIM_PERFIL, perfil.name())
+                        .claim(TokenService.CLAIM_ADMINISTRADOR, usuario.isAdministrador()))
+                .authorities(new SimpleGrantedAuthority("ROLE_" + perfil.name()));
     }
 
     private RequestPostProcessor comPerfil(NomeNivelPermissao perfil) {

@@ -1,6 +1,7 @@
 package adra.ifsp.edu.br.api.domain.mapper;
 
 import adra.ifsp.edu.br.api.domain.dto.modulo.ModuloDTO;
+import adra.ifsp.edu.br.api.domain.dto.usuario.MeuPerfilRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.usuario.UsuarioRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.usuario.UsuarioResponseDTO;
 import adra.ifsp.edu.br.api.domain.model.NivelPermissao;
@@ -33,6 +34,11 @@ public class UsuarioMapper {
         entidade.setCargoFuncao(dto.cargoFuncao());
         entidade.setTelefone(dto.telefone());
         entidade.setAdministrador(dto.administrador());
+    }
+
+    public void atualizarMeuPerfil(Usuario entidade, MeuPerfilRequestDTO dto) {
+        entidade.setNomeCompleto(dto.nomeCompleto() != null ? dto.nomeCompleto().trim() : null);
+        entidade.setTelefone(dto.telefone());
     }
 
     public UsuarioResponseDTO paraDTO(Usuario entidade) {
