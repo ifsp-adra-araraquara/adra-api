@@ -2,6 +2,7 @@ package adra.ifsp.edu.br.api.domain.service;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 import org.springframework.cache.annotation.CacheEvict;
@@ -14,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import adra.ifsp.edu.br.api.config.CacheConfig;
 import adra.ifsp.edu.br.api.domain.dto.PaginaDTO;
+import adra.ifsp.edu.br.api.domain.dto.usuario.MeuPerfilRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.usuario.UsuarioRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.usuario.UsuarioResponseDTO;
 import adra.ifsp.edu.br.api.domain.dto.usuario.UsuarioStatusRequestDTO;
@@ -39,6 +41,7 @@ public class UsuarioService {
     private final NivelPermissaoRepository nivelPermissaoRepository;
     private final UsuarioMapper usuarioMapper;
     private final AuditoriaService auditoriaService;
+    private final UsuarioAutenticadoService usuarioAutenticadoService;
 
     @Cacheable(CacheConfig.USUARIOS_ATIVOS)
     @Transactional(readOnly = true)
@@ -88,6 +91,40 @@ public class UsuarioService {
     @Transactional(readOnly = true)
     public UsuarioResponseDTO buscarPorId(Long id) {
         return usuarioMapper.paraDTO(buscarEntidadePorId(id));
+    }
+
+    @Transactional(readOnly = true)
+    public UsuarioResponseDTO buscarMeuPerfil() {
+        Usuario usuario = usuarioAutenticadoService.getUsuarioAtual();
+        return usuarioMapper.paraDTO(usuario);
+    }
+
+    @CacheEvict(cacheNames = CacheConfig.REFERENCIAS, allEntries = true)
+    public UsuarioResponseDTO atualizarMeuPerfil(MeuPerfilRequestDTO dto) {
+        Usuario usuario = usuarioAutenticadoService.getUsuarioAtual();
+
+        Map<String, Object> valorAnterior = Map.of(
+                "nomeCompleto", usuario.getNomeCompleto(),
+                "telefone", Objects.toString(usuario.getTelefone(), "")
+        );
+
+        usuarioMapper.atualizarMeuPerfil(usuario, dto);
+        usuario = usuarioRepository.save(usuario);
+
+        auditoriaService.registrar(
+                ModuloSistema.USUARIOS,
+                "usuario",
+                usuario.getUsuarioId(),
+                AcaoSistema.EDITAR,
+                valorAnterior,
+                Map.of(
+                        "nomeCompleto", usuario.getNomeCompleto(),
+                        "telefone", Objects.toString(usuario.getTelefone(), "")
+                ),
+                "Atualizacao do proprio perfil pelo usuario"
+        );
+
+        return usuarioMapper.paraDTO(usuario);
     }
 
     @Transactional(readOnly = true)
@@ -197,23 +234,4 @@ public class UsuarioService {
                 .orElseThrow(() -> new EntidadeNaoEncontradaException(
                         "Nivel de permissao '" + nome + "' nao encontrado. Rode a migracao/seed antes de cadastrar usuarios."));
     }
-
-
-//    public UsuarioResponseDTO autenticar(LoginRequestDTO dto) {
-//        Usuario usuario = usuarioRepository.findByEmail(dto.email())
-//                .filter(Usuario::isAtivo)
-//                .filter(u -> passwordEncoder.matches(dto.senha(), u.getSenhaHash()))
-//                .orElseThrow(() -> new CredenciaisInvalidasException("Email ou senha invalidos"));
-//
-//        usuario.setUltimoLogin(OffsetDateTime.now());
-//        usuarioRepository.save(usuario);
-//
-//        List<ModuloDTO> modulos = nivelPermissaoModuloRepository
-//                .findComModuloById_NivelPermissaoIdOrderByOrdemAsc(usuario.getNivelPermissao().getNivelPermissaoId())
-//                .stream()
-//                .map(npm -> moduloMapper.paraDTO(npm.getModulo()))
-//                .toList();
-//
-//        return usuarioMapper.paraDTO(usuario, modulos);
-//    }
 }
