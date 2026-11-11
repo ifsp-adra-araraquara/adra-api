@@ -16,6 +16,7 @@ import org.springframework.stereotype.Component;
 
 import adra.ifsp.edu.br.api.domain.enums.CategoriaArquivo;
 import adra.ifsp.edu.br.api.exception.ArquivoInvalidoException;
+import adra.ifsp.edu.br.api.exception.ArquivoMuitoGrandeException;
 import net.coobird.thumbnailator.Thumbnails;
 import net.coobird.thumbnailator.geometry.Positions;
 
@@ -55,7 +56,8 @@ public class ProcessadorArquivo {
                 : processarImagem(original, categoria);
 
         if (processado.conteudo().length > categoria.getTamanhoMaximoBytes()) {
-            throw new ArquivoInvalidoException("Arquivo muito grande para " + categoria + ".");
+            throw ArquivoMuitoGrandeException.de(processado.conteudo().length, categoria.getTamanhoMaximoBytes(),
+                    "application/pdf".equals(processado.mimeType()));
         }
         return processado;
     }

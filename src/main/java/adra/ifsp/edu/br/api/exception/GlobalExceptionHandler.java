@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import adra.ifsp.edu.br.api.domain.dto.comum.AlertaAssistidoExistenteDTO;
 import adra.ifsp.edu.br.api.domain.dto.comum.AlertaCpfDuplicadoDTO;
+import adra.ifsp.edu.br.api.domain.enums.CategoriaArquivo;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import java.util.List;
@@ -143,12 +144,21 @@ public class GlobalExceptionHandler {
                 ErroRespostaDTO.de(400, "Arquivo invalido", ex.getMessage(), request.getRequestURI()));
     }
 
+    @ExceptionHandler(ArquivoMuitoGrandeException.class)
+    public ResponseEntity<ErroRespostaDTO> tratarArquivoMuitoGrande(ArquivoMuitoGrandeException ex,
+                                                                    HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.CONTENT_TOO_LARGE).body(
+                ErroRespostaDTO.de(413, "Arquivo muito grande", ex.getMessage(), request.getRequestURI()));
+    }
+
+    /** Barrado pelo multipart antes de chegar ao service (arquivo ou envio inteiro grande demais). */
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ResponseEntity<ErroRespostaDTO> tratarArquivoGrande(MaxUploadSizeExceededException ex,
                                                                HttpServletRequest request) {
         return ResponseEntity.status(HttpStatus.CONTENT_TOO_LARGE).body(
                 ErroRespostaDTO.de(413, "Arquivo muito grande",
-                        "O arquivo excede o limite de 3 MB.", request.getRequestURI()));
+                        ArquivoMuitoGrandeException.acimaDe(CategoriaArquivo.Limite.BUCKET).getMessage(),
+                        request.getRequestURI()));
     }
 
     @ExceptionHandler(MissingServletRequestPartException.class)

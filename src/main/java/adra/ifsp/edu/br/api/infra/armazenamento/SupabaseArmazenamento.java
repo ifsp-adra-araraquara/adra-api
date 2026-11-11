@@ -9,6 +9,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -17,12 +19,17 @@ import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestClientResponseException;
 
+import adra.ifsp.edu.br.api.domain.enums.CategoriaArquivo;
 import adra.ifsp.edu.br.api.domain.enums.ProvedorArmazenamento;
 import adra.ifsp.edu.br.api.exception.ArmazenamentoException;
+import adra.ifsp.edu.br.api.exception.ArquivoMuitoGrandeException;
 
 @Component
 public class SupabaseArmazenamento implements ArmazenamentoArquivos {
+
+    private static final Logger log = LoggerFactory.getLogger(SupabaseArmazenamento.class);
 
     private final RestClient rest;
     private final String storageUrl;
@@ -61,9 +68,30 @@ public class SupabaseArmazenamento implements ArmazenamentoArquivos {
                     .body(conteudo)
                     .retrieve()
                     .toBodilessEntity();
+        } catch (RestClientResponseException e) {
+            if (recusadoPorTamanho(e)) {
+                // Rede de segurança: a API já barra acima de CategoriaArquivo.Limite.BUCKET; se o limite do
+                // bucket mudar no painel, o usuário recebe a mensagem certa em vez de "tente novamente".
+                log.warn("Supabase recusou {} ({} bytes) por tamanho: {}", chave, conteudo.length,
+                        e.getResponseBodyAsString());
+                throw ArquivoMuitoGrandeException.acimaDe(CategoriaArquivo.Limite.BUCKET);
+            }
+            throw new ArmazenamentoException("Falha ao enviar arquivo ao Supabase: " + chave, e);
         } catch (RestClientException e) {
             throw new ArmazenamentoException("Falha ao enviar arquivo ao Supabase: " + chave, e);
         }
+    }
+
+    /**
+     * O Storage responde 413 ou, em versões antigas, 400 com {"statusCode":"413","error":"Payload too large"}.
+     */
+    static boolean recusadoPorTamanho(RestClientResponseException e) {
+        if (e.getStatusCode().value() == 413) {
+            return true;
+        }
+        String corpo = e.getResponseBodyAsString();
+        return corpo.contains("\"413\"") || corpo.contains("Payload too large")
+                || corpo.contains("maximum allowed size");
     }
 
     @Override
