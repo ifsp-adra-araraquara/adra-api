@@ -5,6 +5,9 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Optional;
 
+/** @deprecated ver {@link adra.ifsp.edu.br.api.domain.model.AssistidoTurmaHistorico}. */
+@Deprecated(forRemoval = true)
+@SuppressWarnings("removal")
 public interface AssistidoTurmaHistoricoRepository extends JpaRepository<AssistidoTurmaHistorico, Long> {
 
     /** Vinculo de turma ainda aberto (data_fim nulo) do assistido, se houver. */

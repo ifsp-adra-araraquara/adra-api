@@ -4,6 +4,7 @@ import adra.ifsp.edu.br.api.domain.dto.assistido.AssistidoRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.assistido.AssistidoResponseDTO;
 import adra.ifsp.edu.br.api.domain.model.Assistido;
 import adra.ifsp.edu.br.api.domain.model.AssistidoResponsavel;
+import adra.ifsp.edu.br.api.domain.model.Matricula;
 import adra.ifsp.edu.br.api.domain.service.IndicadorFrequencia;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
@@ -37,8 +38,7 @@ public class AssistidoMapper {
                 .endereco(EnderecoMapper.paraEntidade(dto.endereco()))
                 .build();
         aplicarSocioeconomico(assistido, dto);
-        aplicarTermos(assistido, dto, false);
-        return assistido;
+        return assistido; // termos vão para a matrícula (MatriculaService.abrir)
     }
 
     /** Atualiza apenas os campos cadastrais editaveis por este card (nao mexe em status/contadores). */
@@ -62,7 +62,7 @@ public class AssistidoMapper {
         entidade.setEstudaContraturno(dto.estudaContraturno());
         entidade.setEndereco(EnderecoMapper.paraEntidade(dto.endereco()));
         aplicarSocioeconomico(entidade, dto);
-        aplicarTermos(entidade, dto, true);
+        // termos: MatriculaService.atualizarTermos (pertencem à matrícula do ano)
     }
 
     private void aplicarSocioeconomico(Assistido entidade, AssistidoRequestDTO dto) {
@@ -83,21 +83,21 @@ public class AssistidoMapper {
     }
 
     /**
-     * Termos: no cadastro, null vira "nao autorizado"; na edicao, null mantem o
+     * Termos da matrícula: no cadastro, null vira "nao autorizado"; na edicao, null mantem o
      * valor atual. A data do aceite LGPD e' registrada quando ele passa a true.
      */
-    private void aplicarTermos(Assistido entidade, AssistidoRequestDTO dto, boolean edicao) {
-        boolean aceiteAnterior = entidade.isAceiteLgpd();
-        entidade.setAceiteLgpd(valorTermo(dto.aceiteLgpd(), aceiteAnterior, edicao));
-        if (entidade.isAceiteLgpd() && !aceiteAnterior) {
-            entidade.setAceiteLgpdEm(OffsetDateTime.now());
-        } else if (!entidade.isAceiteLgpd()) {
-            entidade.setAceiteLgpdEm(null);
+    public void aplicarTermos(Matricula matricula, AssistidoRequestDTO dto, boolean edicao) {
+        boolean aceiteAnterior = matricula.isAceiteLgpd();
+        matricula.setAceiteLgpd(valorTermo(dto.aceiteLgpd(), aceiteAnterior, edicao));
+        if (matricula.isAceiteLgpd() && !aceiteAnterior) {
+            matricula.setAceiteLgpdEm(OffsetDateTime.now());
+        } else if (!matricula.isAceiteLgpd()) {
+            matricula.setAceiteLgpdEm(null);
         }
-        entidade.setAutorizaUsoImagem(valorTermo(dto.autorizaUsoImagem(), entidade.isAutorizaUsoImagem(), edicao));
-        entidade.setAutorizaEventosPasseios(valorTermo(dto.autorizaEventosPasseios(), entidade.isAutorizaEventosPasseios(), edicao));
-        entidade.setPodeIrEmboraSozinho(valorTermo(dto.podeIrEmboraSozinho(), entidade.isPodeIrEmboraSozinho(), edicao));
-        entidade.setCienteFrequenciaObrigatoria(valorTermo(dto.cienteFrequenciaObrigatoria(), entidade.isCienteFrequenciaObrigatoria(), edicao));
+        matricula.setAutorizaUsoImagem(valorTermo(dto.autorizaUsoImagem(), matricula.isAutorizaUsoImagem(), edicao));
+        matricula.setAutorizaEventosPasseios(valorTermo(dto.autorizaEventosPasseios(), matricula.isAutorizaEventosPasseios(), edicao));
+        matricula.setPodeIrEmboraSozinho(valorTermo(dto.podeIrEmboraSozinho(), matricula.isPodeIrEmboraSozinho(), edicao));
+        matricula.setCienteFrequenciaObrigatoria(valorTermo(dto.cienteFrequenciaObrigatoria(), matricula.isCienteFrequenciaObrigatoria(), edicao));
     }
 
     private boolean valorTermo(Boolean informado, boolean atual, boolean edicao) {

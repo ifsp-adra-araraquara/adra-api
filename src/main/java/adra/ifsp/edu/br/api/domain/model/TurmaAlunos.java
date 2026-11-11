@@ -34,6 +34,11 @@ public class TurmaAlunos {
     @JoinColumn(name = "assistido_id", nullable = false)
     private Assistido assistido;
 
+    /** Matrícula do ano a que este vínculo pertence (sai junto com ela no descarte). */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "matricula_id")
+    private Matricula matricula;
+
     @Column(name = "data_entrada", nullable = false)
     private LocalDate dataEntrada;
 

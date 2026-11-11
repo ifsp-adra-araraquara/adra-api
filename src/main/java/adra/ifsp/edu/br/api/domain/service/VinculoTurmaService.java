@@ -62,6 +62,7 @@ public class VinculoTurmaService {
             TurmaAlunos novo = new TurmaAlunos();
             novo.setTurma(turma);
             novo.setAssistido(assistido);
+            novo.setMatricula(assistido.getMatriculaAtual()); // grupo do ano da matrícula
             novo.setDataEntrada(hoje);
             novo.setStatus(StatusGeral.ATIVO);
             turmaAlunosRepository.save(novo);

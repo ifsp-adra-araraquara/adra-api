@@ -62,6 +62,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -190,6 +191,14 @@ class PreCadastroIT {
         assertThat(maePrincipal).isTrue();
         assertThat(jdbcTemplate.queryForObject("select count(*) from adra.assistido_responsavel where assistido_id = ?",
                 Integer.class, assistido.getAssistidoId())).isEqualTo(1);
+
+        // A matrícula do ano guarda de qual envio da família ela veio, com os termos do formulário.
+        Map<String, Object> matricula = jdbcTemplate.queryForMap(
+                "select ano, pre_cadastro_id, aceite_lgpd from adra.matricula where assistido_id = ?",
+                assistido.getAssistidoId());
+        assertThat(((Number) matricula.get("ano")).intValue()).isEqualTo(LocalDate.now().getYear());
+        assertThat(((Number) matricula.get("pre_cadastro_id")).longValue()).isEqualTo(id);
+        assertThat(matricula.get("aceite_lgpd")).isEqualTo(true);
     }
 
     @Test

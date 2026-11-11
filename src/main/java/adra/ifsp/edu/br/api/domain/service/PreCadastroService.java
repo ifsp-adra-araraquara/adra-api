@@ -307,7 +307,7 @@ public class PreCadastroService {
             throw new AssistidoJaCadastradoException(existente.getAssistidoId(), existente.getNomeCompleto());
         });
 
-        AssistidoResponseDTO criado = assistidoService.cadastrar(dto);
+        AssistidoResponseDTO criado = assistidoService.cadastrar(dto, preCadastroId);
         transferirAnexos(preCadastroId, criado.assistidoId());
         registro.setStatus(StatusPreCadastro.CONVERTIDO);
         registro.setAssistidoId(criado.assistidoId());
