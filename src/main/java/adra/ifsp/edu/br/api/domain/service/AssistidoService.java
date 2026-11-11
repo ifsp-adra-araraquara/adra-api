@@ -103,6 +103,12 @@ public class AssistidoService {
 
         Assistido assistido = assistidoMapper.paraNovaEntidade(dto);
         assistido.setTurma(turma);
+        // Matrícula do próximo ano: o atendido só começa em 1º de janeiro — painel,
+        // contagens e a lista de atendidos de agora não o contam antes disso.
+        LocalDate inicioDoAno = LocalDate.of(ano, 1, 1);
+        if (assistido.getDataEntrada().isBefore(inicioDoAno)) {
+            assistido.setDataEntrada(inicioDoAno);
+        }
 
         // CA-A02.4: Criar assistido e vínculos em transação atômica
         assistido = assistidoRepository.save(assistido);
@@ -156,11 +162,22 @@ public class AssistidoService {
     @Transactional(readOnly = true)
     public PaginaDTO<AssistidoResponseDTO> listarPaginado(String busca, Long turmaId, Long oficinaId, StatusGeral status,
                                                           boolean emAcompanhamento, int pagina, int tamanho) {
+        return listarPaginado(busca, turmaId, oficinaId, status, emAcompanhamento, false, pagina, tamanho);
+    }
+
+    /**
+     * {@code proximoAno=true}: só quem foi matriculado para o ano seguinte e ainda não começou
+     * (entrada depois de hoje). Fora isso, a lista é a dos atendidos de agora.
+     */
+    @Transactional(readOnly = true)
+    public PaginaDTO<AssistidoResponseDTO> listarPaginado(String busca, Long turmaId, Long oficinaId, StatusGeral status,
+                                                          boolean emAcompanhamento, boolean proximoAno,
+                                                          int pagina, int tamanho) {
         tamanho = Math.min(tamanho, TAMANHO_MAXIMO_PAGINA);
         Sort porNome = Sort.by(Sort.Direction.ASC, "nomeCompleto");
 
         if (emAcompanhamento) {
-            Specification<Assistido> spec = AssistidoSpecification.comFiltros(busca, turmaId, oficinaId, StatusGeral.ATIVO);
+            Specification<Assistido> spec = filtro(busca, turmaId, oficinaId, StatusGeral.ATIVO, proximoAno);
             List<Assistido> ativos = assistidoRepository.findAll(spec, porNome);
             Map<Long, IndicadorFrequencia> frequencias = indicadoresService.frequencias(ativos);
             List<Assistido> filtrados = ativos.stream()
@@ -179,7 +196,7 @@ public class AssistidoService {
             );
         }
 
-        Specification<Assistido> spec = AssistidoSpecification.comFiltros(busca, turmaId, oficinaId, status);
+        Specification<Assistido> spec = filtro(busca, turmaId, oficinaId, status, proximoAno);
         Page<Assistido> page = assistidoRepository.findAll(spec, PageRequest.of(pagina, tamanho, porNome));
         List<AssistidoResponseDTO> linhas = paraLinhas(page.getContent(), indicadoresService.frequencias(page.getContent()), turmaId);
         return new PaginaDTO<>(linhas, page.getNumber(), page.getSize(), page.getTotalElements(), page.getTotalPages());
@@ -188,14 +205,21 @@ public class AssistidoService {
     /** Totais das abas (Todos / Ativos / Inativos / Em acompanhamento) para o recorte de busca, turma e oficina. */
     @Transactional(readOnly = true)
     public AssistidoContagemDTO contar(String busca, Long turmaId, Long oficinaId) {
-        long todos = assistidoRepository.count(AssistidoSpecification.comFiltros(busca, turmaId, oficinaId, null));
-        List<Assistido> ativos = assistidoRepository.findAll(
-                AssistidoSpecification.comFiltros(busca, turmaId, oficinaId, StatusGeral.ATIVO));
+        long todos = assistidoRepository.count(filtro(busca, turmaId, oficinaId, null, false));
+        List<Assistido> ativos = assistidoRepository.findAll(filtro(busca, turmaId, oficinaId, StatusGeral.ATIVO, false));
         long emAcompanhamento = indicadoresService.frequencias(ativos).values().stream()
                 .filter(IndicadorFrequencia::emAcompanhamento)
                 .count();
-        long inativos = assistidoRepository.count(AssistidoSpecification.comFiltros(busca, turmaId, oficinaId, StatusGeral.INATIVO));
-        return new AssistidoContagemDTO(todos, ativos.size(), inativos, emAcompanhamento);
+        long inativos = assistidoRepository.count(filtro(busca, turmaId, oficinaId, StatusGeral.INATIVO, false));
+        long proximoAno = assistidoRepository.count(filtro(busca, turmaId, oficinaId, StatusGeral.ATIVO, true));
+        return new AssistidoContagemDTO(todos, ativos.size(), inativos, emAcompanhamento, proximoAno,
+                proximoAno > 0 ? LocalDate.now().getYear() + 1 : null);
+    }
+
+    private static Specification<Assistido> filtro(String busca, Long turmaId, Long oficinaId, StatusGeral status,
+                                                    boolean proximoAno) {
+        return AssistidoSpecification.comFiltros(busca, turmaId, oficinaId, status)
+                .and(AssistidoSpecification.doProximoAno(proximoAno, LocalDate.now()));
     }
 
     private List<AssistidoResponseDTO> paraLinhas(List<Assistido> assistidos, Map<Long, IndicadorFrequencia> frequencias,

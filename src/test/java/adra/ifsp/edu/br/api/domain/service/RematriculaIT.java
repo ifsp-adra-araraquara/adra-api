@@ -99,6 +99,11 @@ class RematriculaIT {
     private static final String CPF_MAE_VOLTA = "96372845598";
     private static final String CPF_ANO_SEGUINTE = "17283956409";
     private static final String CPF_MAE_ANO_SEGUINTE = "28192067351";
+    private static final String CPF_MOVE = "45333147833";
+    private static final String CPF_MAE_MOVE = "93288040786";
+    private static final String CPF_FICHA_ANTIGA = "23862551156";
+    private static final String CPF_NOVO_ENVIO = "84873331170";
+    private static final String CPF_MAE_SEM_CPF = "38798113500";
 
     private final int ano = LocalDate.now().getYear();
     private final int proximoAno = ano + 1;
@@ -287,7 +292,79 @@ class RematriculaIT {
         assertThat(matriculaStatus(assistidoId, proximoAno)).isEqualTo("ATIVA");
     }
 
+    @Test
+    @DisplayName("Matrícula do próximo ano: a inscrição muda de ano sem aprovar, volta se preciso e, aprovada, só começa em janeiro")
+    void matriculaDoProximoAno() throws Exception {
+        Long envio = enviar(CPF_MOVE, CPF_MAE_MOVE, "Rua C", false);
+        mvc.perform(get("/api/pre-cadastro/" + envio).with(perfil(ASSISTENTE_SOCIAL)))
+                .andExpect(jsonPath("$.anoReferencia").value(ano))
+                .andExpect(jsonPath("$.anoParaMover").value(proximoAno));
+
+        // Só para o ano seguinte (ou de volta), nunca dois anos à frente.
+        moverAno(envio, proximoAno + 1).andExpect(status().isConflict());
+        moverAno(envio, proximoAno)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.anoReferencia").value(proximoAno))
+                .andExpect(jsonPath("$.status").value("PENDENTE"))
+                .andExpect(jsonPath("$.anoParaMover").value(ano));
+        assertThat(idsNaLista(proximoAno)).contains(envio.intValue());
+        assertThat(idsNaLista(ano)).doesNotContain(envio.intValue());
+
+        moverAno(envio, ano).andExpect(status().isOk()).andExpect(jsonPath("$.anoReferencia").value(ano));
+        moverAno(envio, proximoAno).andExpect(status().isOk());
+
+        // Aprovado: a ficha e o grupo começam em 1º de janeiro do ano seguinte.
+        String inicio = proximoAno + "-01-01";
+        mvc.perform(get("/api/pre-cadastro/" + envio + "/rascunho-assistido").with(perfil(ASSISTENTE_SOCIAL)))
+                .andExpect(jsonPath("$.dataEntrada").value(inicio));
+        Long assistidoId = aprovar(envio, grupo("Grupo Próximo Ano"));
+        assertThat(jdbc.queryForObject("select data_entrada from adra.assistido where assistido_id = ?",
+                LocalDate.class, assistidoId)).hasToString(inicio);
+        assertThat(jdbc.queryForObject("select data_entrada from adra.turma_aluno where assistido_id = ?",
+                LocalDate.class, assistidoId)).hasToString(inicio);
+        assertThat(matriculaStatus(assistidoId, proximoAno)).isEqualTo("ATIVA");
+
+        // Lista de atendidos: fora das abas de agora, só em "Próximo ano".
+        assertThat(atendidos(false)).doesNotContain(assistidoId.intValue());
+        assertThat(atendidos(true)).contains(assistidoId.intValue());
+        mvc.perform(get("/api/assistidos/contagem").with(perfil(COORDENADOR)))
+                .andExpect(jsonPath("$.proximoAno").value(org.hamcrest.Matchers.greaterThanOrEqualTo(1)))
+                .andExpect(jsonPath("$.anoProximo").value(proximoAno));
+
+        // Já revisado: não muda mais de ano.
+        moverAno(envio, ano).andExpect(status().isConflict());
+    }
+
+    @Test
+    @DisplayName("Ficha sem CPF com o mesmo nome e nascimento: a avaliação avisa que pode ser rematrícula")
+    void avisaPossivelRematriculaSemCpfNaFicha() throws Exception {
+        String nome = "Criança Ficha Antiga";
+        Long assistidoId = aprovar(enviar(nome, CPF_FICHA_ANTIGA, CPF_MAE_SEM_CPF, "Rua D", false), grupo("Grupo Ficha Antiga"));
+        jdbc.update("update adra.assistido set cpf = null where assistido_id = ?", assistidoId);
+
+        Long novoEnvio = enviar("crianca  FICHA antiga", CPF_NOVO_ENVIO, CPF_MAE_SEM_CPF, "Rua D", false);
+        mvc.perform(get("/api/pre-cadastro/" + novoEnvio).with(perfil(ASSISTENTE_SOCIAL)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.assistidoExistenteId").doesNotExist())
+                .andExpect(jsonPath("$.possivelMesmoAtendido.assistidoId").value(assistidoId))
+                .andExpect(jsonPath("$.possivelMesmoAtendido.nomeCompleto").value(nome))
+                .andExpect(jsonPath("$.possivelMesmoAtendido.fichaSemCpf").value(true));
+    }
+
     // ---------------------------------------------------------------
+
+    private org.springframework.test.web.servlet.ResultActions moverAno(Long preCadastroId, int novoAno) throws Exception {
+        return mvc.perform(patch("/api/pre-cadastro/" + preCadastroId + "/ano").with(perfil(ASSISTENTE_SOCIAL))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"ano\":" + novoAno + "}"));
+    }
+
+    private List<Integer> atendidos(boolean proximoAnoApenas) throws Exception {
+        String pagina = mvc.perform(get("/api/assistidos").param("proximoAno", String.valueOf(proximoAnoApenas))
+                        .param("tamanho", "100").with(perfil(COORDENADOR)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        return JsonPath.read(pagina, "$.conteudo[*].assistidoId");
+    }
 
     private List<Long> noGrupo(Turma turma, LocalDate dia) {
         return transacao.execute(t -> turmaAlunosRepository.findElegiveisParaChamada(turma, dia).stream()
@@ -337,7 +414,11 @@ class RematriculaIT {
     }
 
     private Long enviar(String cpf, String cpfMae, String rua, boolean comAnexos) throws Exception {
-        PreCadastroRequestDTO requisicao = new PreCadastroRequestDTO("Crianca " + cpf, LocalDate.of(2016, 4, 12), cpf,
+        return enviar("Crianca " + cpf, cpf, cpfMae, rua, comAnexos);
+    }
+
+    private Long enviar(String nome, String cpf, String cpfMae, String rua, boolean comAnexos) throws Exception {
+        PreCadastroRequestDTO requisicao = new PreCadastroRequestDTO(nome, LocalDate.of(2016, 4, 12), cpf,
                 Sexo.FEMININO, "familia@teste.local", dados(cpfMae, rua), "");
         var envio = multipart("/api/pre-cadastro")
                 .file(new MockMultipartFile("dados", "", MediaType.APPLICATION_JSON_VALUE, jsonMapper.writeValueAsBytes(requisicao)))

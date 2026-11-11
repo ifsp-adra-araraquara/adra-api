@@ -24,6 +24,9 @@ public interface AssistidoRepository extends JpaRepository<Assistido, Long>, Jpa
 
     Optional<Assistido> findByCpf(String cpf);
 
+    /** Mesma data de nascimento: poucos por dia; o nome é comparado sem acento no serviço. */
+    List<Assistido> findByDataNascimento(LocalDate dataNascimento);
+
     /** Quais destes CPFs já são de algum atendido — uma query para a lista de pré-cadastros inteira. */
     @Query("SELECT a.cpf FROM Assistido a WHERE a.cpf IN :cpfs")
     List<String> findCpfsCadastrados(@Param("cpfs") Collection<String> cpfs);

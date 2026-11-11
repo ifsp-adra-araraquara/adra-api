@@ -36,10 +36,26 @@ public record PreCadastroResponseDTO(
         List<String> anexosFaltando,
         String revisadoPorNome,
         OffsetDateTime revisadoEm,
-        OffsetDateTime criadoEm
+        OffsetDateTime criadoEm,
+        /**
+         * Nenhum atendido com este CPF, mas há um com o mesmo nome e data de nascimento
+         * (ficha sem CPF ou com outro): provável rematrícula — a equipe confere antes de criar outra ficha.
+         */
+        PossivelMesmoAtendido possivelMesmoAtendido,
+        /** Para qual ano a inscrição em avaliação pode ser movida (o seguinte ou de volta ao atual); null se não pode. */
+        Integer anoParaMover
 ) {
+    public record PossivelMesmoAtendido(Long assistidoId, String nomeCompleto, boolean fichaSemCpf) {
+    }
+
     public static PreCadastroResponseDTO de(PreCadastro p, Long assistidoExistenteId, boolean jaMatriculadoNoAno,
                                             List<ArquivoResponseDTO> arquivos, List<String> anexosFaltando) {
+        return de(p, assistidoExistenteId, jaMatriculadoNoAno, arquivos, anexosFaltando, null, null);
+    }
+
+    public static PreCadastroResponseDTO de(PreCadastro p, Long assistidoExistenteId, boolean jaMatriculadoNoAno,
+                                            List<ArquivoResponseDTO> arquivos, List<String> anexosFaltando,
+                                            PossivelMesmoAtendido possivelMesmoAtendido, Integer anoParaMover) {
         return new PreCadastroResponseDTO(
                 p.getPreCadastroId(),
                 p.getNomeCompleto(),
@@ -61,6 +77,8 @@ public record PreCadastroResponseDTO(
                 anexosFaltando,
                 p.getRevisadoPor() != null ? p.getRevisadoPor().getNomeCompleto() : null,
                 p.getRevisadoEm(),
-                p.getCriadoEm());
+                p.getCriadoEm(),
+                possivelMesmoAtendido,
+                anoParaMover);
     }
 }
