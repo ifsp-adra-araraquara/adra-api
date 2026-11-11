@@ -242,7 +242,23 @@ public class ArquivoService {
     @CacheEvict(cacheNames = {CacheConfig.FOTOS_PERFIL, CacheConfig.URLS_ARQUIVO}, allEntries = true)
     public void transferir(EntidadeArquivo deTipo, Long deId, CategoriaArquivo deCategoria,
                            EntidadeArquivo paraTipo, Long paraId, CategoriaArquivo paraCategoria) {
-        arquivoRepository.transferirDono(deTipo, deId, deCategoria, paraTipo, paraId, paraCategoria);
+        transferir(deTipo, deId, deCategoria, paraTipo, paraId, paraCategoria, null);
+    }
+
+    /**
+     * Passa os arquivos ativos para o novo dono, marcando a matrícula do ano a que
+     * pertencem ({@code matriculaId}, null para os que não são de matrícula).
+     * Categoria única por dono (foto de perfil): a nova substitui a atual, que sai
+     * do Storage depois do commit — não fica duplicada nem órfã.
+     */
+    @CacheEvict(cacheNames = {CacheConfig.FOTOS_PERFIL, CacheConfig.URLS_ARQUIVO}, allEntries = true)
+    public void transferir(EntidadeArquivo deTipo, Long deId, CategoriaArquivo deCategoria,
+                           EntidadeArquivo paraTipo, Long paraId, CategoriaArquivo paraCategoria, Long matriculaId) {
+        if (paraCategoria.isUnicoPorDono()
+                && arquivoRepository.existsByEntidadeTipoAndEntidadeIdAndCategoriaAndExcluidoEmIsNull(deTipo, deId, deCategoria)) {
+            substituirAnteriores(paraTipo, paraId, paraCategoria);
+        }
+        arquivoRepository.transferirDono(deTipo, deId, deCategoria, paraTipo, paraId, paraCategoria, matriculaId);
     }
 
     private UrlArquivoDTO urlTemporaria(Arquivo arquivo) {

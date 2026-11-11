@@ -61,6 +61,14 @@ class MigracaoMatriculaIT {
                 values ('Atendido Ativo', 'Mãe', 'CONVERTIDO', ?)
                 returning pre_cadastro_id""", Long.class, ativoId);
 
+        for (String categoria : new String[] {"DOCUMENTO_IDENTIDADE", "FOTO_PERFIL"}) {
+            jdbc.update("""
+                    insert into adra.arquivo (entidade_tipo, entidade_id, categoria, provedor, chave, mime_type,
+                                              tamanho_bytes, hash_sha256)
+                    values ('ASSISTIDO', ?, ?, 'SUPABASE', ?, 'image/jpeg', 10, repeat('a', 64))""",
+                    ativoId, categoria, "assistido/" + categoria.toLowerCase() + "/x.jpg");
+        }
+
         flyway(dataSource, "latest").migrate();
     }
 
@@ -111,6 +119,31 @@ class MigracaoMatriculaIT {
                 Long.class, ativoId)).isEqualTo(matriculaAtiva);
         assertThat(jdbc.queryForObject(
                 "select count(*) from adra.assistido where matricula_atual_id is null", Integer.class)).isZero();
+    }
+
+    @Test
+    @DisplayName("Pré-cadastros existentes ficam no ano em que chegaram; documentos do atendido vão para a matrícula de 2026")
+    void anoDoPreCadastroEDocumentos() {
+        assertThat(jdbc.queryForObject("select ano_referencia from adra.pre_cadastro where pre_cadastro_id = ?",
+                Integer.class, preCadastroId)).isEqualTo(java.time.LocalDate.now().getYear());
+
+        Long matricula = jdbc.queryForObject(
+                "select matricula_id from adra.matricula where assistido_id = ?", Long.class, ativoId);
+        assertThat(jdbc.queryForObject(
+                "select matricula_id from adra.arquivo where entidade_id = ? and categoria = 'DOCUMENTO_IDENTIDADE'",
+                Long.class, ativoId)).isEqualTo(matricula);
+        assertThat(jdbc.queryForObject(
+                "select matricula_id from adra.arquivo where entidade_id = ? and categoria = 'FOTO_PERFIL'",
+                Long.class, ativoId)).isNull();
+    }
+
+    @Test
+    @DisplayName("Matrícula com documento não pode ser apagada antes dos arquivos (nada fica órfão no Storage)")
+    void matriculaComArquivoNaoSomeSozinha() {
+        Long matricula = jdbc.queryForObject(
+                "select matricula_id from adra.matricula where assistido_id = ?", Long.class, ativoId);
+        assertThatThrownBy(() -> jdbc.update("delete from adra.matricula where matricula_id = ?", matricula))
+                .hasMessageContaining("arquivo");
     }
 
     @Test

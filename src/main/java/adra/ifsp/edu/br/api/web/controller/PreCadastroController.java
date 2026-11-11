@@ -2,6 +2,9 @@ package adra.ifsp.edu.br.api.web.controller;
 
 import adra.ifsp.edu.br.api.domain.dto.arquivo.UrlArquivoDTO;
 import adra.ifsp.edu.br.api.domain.dto.assistido.AssistidoRequestDTO;
+import adra.ifsp.edu.br.api.domain.dto.matricula.ComparacaoRematriculaDTO;
+import adra.ifsp.edu.br.api.domain.dto.matricula.InscricaoAbertaDTO;
+import adra.ifsp.edu.br.api.domain.dto.matricula.RematricularRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.precadastro.AnexosPreCadastro;
 import adra.ifsp.edu.br.api.domain.dto.precadastro.ObservacaoPreCadastroRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.precadastro.PreCadastroRequestDTO;
@@ -9,7 +12,9 @@ import adra.ifsp.edu.br.api.domain.dto.precadastro.PreCadastroResponseDTO;
 import adra.ifsp.edu.br.api.domain.dto.precadastro.PreCadastroResumoDTO;
 import adra.ifsp.edu.br.api.domain.dto.precadastro.ReprovarPreCadastroRequestDTO;
 import adra.ifsp.edu.br.api.domain.enums.StatusPreCadastro;
+import adra.ifsp.edu.br.api.domain.service.PeriodoMatriculaService;
 import adra.ifsp.edu.br.api.domain.service.PreCadastroService;
+import adra.ifsp.edu.br.api.domain.service.RematriculaService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +39,8 @@ import java.util.Map;
 public class PreCadastroController {
 
     private final PreCadastroService service;
+    private final RematriculaService rematriculaService;
+    private final PeriodoMatriculaService periodoMatriculaService;
 
     /** Multipart: "dados" (JSON) + comprovante de endereço + foto e documentos opcionais. */
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -54,9 +61,10 @@ public class PreCadastroController {
     @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL')")
     @GetMapping
     public ResponseEntity<List<PreCadastroResumoDTO>> listar(
-            @RequestParam(defaultValue = "PENDENTE") StatusPreCadastro status
+            @RequestParam(defaultValue = "PENDENTE") StatusPreCadastro status,
+            @RequestParam(required = false) Integer ano
     ) {
-        return ResponseEntity.ok(service.listar(status));
+        return ResponseEntity.ok(service.listar(status, ano));
     }
 
     @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL')")
@@ -93,6 +101,25 @@ public class PreCadastroController {
             @Valid @RequestBody ReprovarPreCadastroRequestDTO dto
     ) {
         return ResponseEntity.ok(service.reprovar(preCadastroId, dto));
+    }
+
+    /** Link público: de que ano é a inscrição feita hoje (sem login). */
+    @GetMapping("/inscricao")
+    public ResponseEntity<InscricaoAbertaDTO> inscricao() {
+        return ResponseEntity.ok(periodoMatriculaService.inscricaoDeHoje());
+    }
+
+    @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL')")
+    @GetMapping("/{preCadastroId}/comparacao")
+    public ResponseEntity<ComparacaoRematriculaDTO> comparacao(@PathVariable Long preCadastroId) {
+        return ResponseEntity.ok(rematriculaService.comparar(preCadastroId));
+    }
+
+    @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL')")
+    @PostMapping("/{preCadastroId}/rematricular")
+    public ResponseEntity<PreCadastroResponseDTO> rematricular(@PathVariable Long preCadastroId,
+                                                               @RequestBody @Valid RematricularRequestDTO dto) {
+        return ResponseEntity.ok(rematriculaService.rematricular(preCadastroId, dto));
     }
 
     @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL')")

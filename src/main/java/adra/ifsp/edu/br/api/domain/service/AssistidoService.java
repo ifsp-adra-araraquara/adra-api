@@ -81,11 +81,14 @@ public class AssistidoService {
     }
 
     AssistidoResponseDTO cadastrar(AssistidoRequestDTO dto) {
-        return cadastrar(dto, null);
+        return cadastrar(dto, null, matriculaService.anoCorrente());
     }
 
-    /** {@code preCadastroId}: envio da família que originou o cadastro (fica na matrícula do ano). */
-    AssistidoResponseDTO cadastrar(AssistidoRequestDTO dto, Long preCadastroId) {
+    /**
+     * {@code preCadastroId}: envio da família que originou o cadastro; {@code ano}: ano
+     * letivo da matrícula (o da inscrição — pode ser o seguinte, no período de matrícula).
+     */
+    AssistidoResponseDTO cadastrar(AssistidoRequestDTO dto, Long preCadastroId, int ano) {
         validarNovoCadastro(dto);
 
         // CA-A02.3: Validar turma ativa
@@ -105,7 +108,7 @@ public class AssistidoService {
         assistido = assistidoRepository.save(assistido);
         criarVinculosResponsaveis(assistido, dto.responsaveis());
         // Antes do vínculo com o grupo: o vínculo pertence à matrícula do ano.
-        matriculaService.abrir(assistido, matriculaService.anoCorrente(), dto, preCadastroId);
+        matriculaService.abrir(assistido, ano, dto, preCadastroId);
 
         // Mantém turma_aluno em dia — é o que o CA-65 (chamada) usa pra montar
         // o roster de uma aula, não Assistido.turma diretamente.

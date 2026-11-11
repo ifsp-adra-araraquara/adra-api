@@ -42,8 +42,24 @@ public class MatriculaService {
             matricula.desligar();
         }
         matricula = repository.save(matricula);
-        assistido.setMatriculaAtual(matricula);
+        if (passaASerAtual(assistido.getMatriculaAtual(), ano)) {
+            assistido.setMatriculaAtual(matricula);
+        }
         return matricula;
+    }
+
+    /**
+     * A matrícula atual é a do ano em curso. Rematrícula para o ano seguinte não
+     * a substitui (os termos de agora continuam valendo até o fim do ano); quem
+     * ainda não tem matrícula fica com a nova, mesmo que seja do ano seguinte.
+     */
+    private boolean passaASerAtual(Matricula atual, int ano) {
+        return atual == null || (ano > atual.getAno() && ano <= anoCorrente());
+    }
+
+    @Transactional(readOnly = true)
+    public boolean jaMatriculado(Long assistidoId, int ano) {
+        return repository.findByAssistido_AssistidoIdAndAno(assistidoId, ano).isPresent();
     }
 
     /**
