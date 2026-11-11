@@ -117,6 +117,16 @@ public class AssistidoSpecification {
         };
     }
 
+    /**
+     * Matrícula do próximo ano: o atendido entra em 1º de janeiro. Até lá ele fica
+     * só na aba "Próximo ano" ({@code proximoAno=true}); as demais listam quem já começou.
+     */
+    public static Specification<Assistido> doProximoAno(boolean proximoAno, LocalDate hoje) {
+        return (root, query, cb) -> proximoAno
+                ? cb.greaterThan(root.get("dataEntrada"), hoje)
+                : cb.lessThanOrEqualTo(root.get("dataEntrada"), hoje);
+    }
+
     /** Termo só com dígitos e pontuação de CPF (ex.: "123", "123.456"): também busca no CPF. */
     public static boolean pareceCpf(String texto) {
         return texto != null && !apenasDigitos(texto).isEmpty() && texto.strip().matches("[\\d.\\-\\s]+");

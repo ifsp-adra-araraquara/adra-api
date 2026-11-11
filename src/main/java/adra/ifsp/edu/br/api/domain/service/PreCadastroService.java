@@ -13,6 +13,7 @@ import adra.ifsp.edu.br.api.domain.dto.precadastro.PreCadastroDadosDTO.Mae;
 import adra.ifsp.edu.br.api.domain.dto.precadastro.PreCadastroDadosDTO.ResponsavelLegal;
 import adra.ifsp.edu.br.api.domain.dto.precadastro.PreCadastroRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.precadastro.PreCadastroResponseDTO;
+import adra.ifsp.edu.br.api.domain.dto.precadastro.PreCadastroResponseDTO.PossivelMesmoAtendido;
 import adra.ifsp.edu.br.api.domain.dto.precadastro.PreCadastroResumoDTO;
 import adra.ifsp.edu.br.api.domain.dto.precadastro.ReprovarPreCadastroRequestDTO;
 import adra.ifsp.edu.br.api.domain.enums.AcaoSistema;
@@ -28,6 +29,7 @@ import adra.ifsp.edu.br.api.domain.model.Assistido;
 import adra.ifsp.edu.br.api.domain.model.PreCadastro;
 import adra.ifsp.edu.br.api.domain.repository.ArquivoRepository;
 import adra.ifsp.edu.br.api.domain.repository.AssistidoRepository;
+import adra.ifsp.edu.br.api.domain.repository.AssistidoSpecification;
 import adra.ifsp.edu.br.api.domain.repository.MatriculaRepository;
 import adra.ifsp.edu.br.api.domain.repository.PreCadastroRepository;
 import adra.ifsp.edu.br.api.exception.ArquivoInvalidoException;
@@ -85,6 +87,7 @@ public class PreCadastroService {
     private final AnexosDoPreCadastro anexosDoPreCadastro;
     private final MatriculaRepository matriculaRepository;
     private final PeriodoMatriculaService periodoMatriculaService;
+    private final MatriculaService matriculaService;
     private final TurnstileClient turnstile;
 
     private final Map<String, EnviosDoIp> enviosPorIp = new ConcurrentHashMap<>();
@@ -292,7 +295,67 @@ public class PreCadastroService {
         List<ArquivoResponseDTO> arquivos = arquivoService.listar(EntidadeArquivo.PRE_CADASTRO, preCadastroId, null);
         List<String> faltando = faltandoSeNaoAprovado(registro,
                 arquivos.stream().map(ArquivoResponseDTO::categoria).toList());
-        return PreCadastroResponseDTO.de(registro, assistidoExistenteId, jaMatriculadoNoAno, arquivos, faltando);
+        PossivelMesmoAtendido possivel = registro.getStatus().emAvaliacao() && assistidoExistenteId == null
+                ? possivelMesmoAtendido(registro)
+                : null;
+        return PreCadastroResponseDTO.de(registro, assistidoExistenteId, jaMatriculadoNoAno, arquivos, faltando,
+                possivel, anoParaMover(registro));
+    }
+
+    /**
+     * Mesmo nome (sem acento/caixa/espaços extras) e mesma data de nascimento de um atendido,
+     * sem bater o CPF: em geral é a ficha antiga sem CPF. Só avisa — irmãos gêmeos existem.
+     */
+    private PossivelMesmoAtendido possivelMesmoAtendido(PreCadastro registro) {
+        if (registro.getDataNascimento() == null || registro.getNomeCompleto() == null) {
+            return null;
+        }
+        String nome = nomeComparavel(registro.getNomeCompleto());
+        return assistidoRepository.findByDataNascimento(registro.getDataNascimento()).stream()
+                .filter(a -> nomeComparavel(a.getNomeCompleto()).equals(nome))
+                .findFirst()
+                .map(a -> new PossivelMesmoAtendido(a.getAssistidoId(), a.getNomeCompleto(), a.getCpf() == null))
+                .orElse(null);
+    }
+
+    private static String nomeComparavel(String nome) {
+        return AssistidoSpecification.removerAcentos(nome).replaceAll("\\s+", " ");
+    }
+
+    /**
+     * Inscrição em avaliação do ano vigente pode ir para o seguinte ("Matrícula do próximo ano")
+     * e voltar. Ano vigente: o corrente, ou o seguinte se o corrente já foi encerrado.
+     */
+    private Integer anoParaMover(PreCadastro registro) {
+        if (!registro.getStatus().emAvaliacao()) {
+            return null;
+        }
+        int vigente = matriculaService.anoParaNovoCadastro();
+        int ano = registro.getAnoReferencia();
+        if (ano == vigente) {
+            return vigente + 1;
+        }
+        return ano == vigente + 1 ? vigente : null;
+    }
+
+    /** Move a inscrição para o ano seguinte (ou de volta), sem aprovar: continua em avaliação, agora na lista daquele ano. */
+    @CacheEvict(cacheNames = CacheConfig.PAINEL, allEntries = true)
+    public PreCadastroResponseDTO moverParaAno(Long preCadastroId, int ano) {
+        PreCadastro registro = buscarEmAvaliacao(preCadastroId);
+        Integer permitido = anoParaMover(registro);
+        if (permitido == null || permitido != ano) {
+            throw new RegraNegocioException(permitido == null
+                    ? "A inscrição de " + registro.getAnoReferencia() + " não pode mudar de ano."
+                    : "A inscrição de " + registro.getAnoReferencia() + " só pode ir para " + permitido + ".");
+        }
+        int anterior = registro.getAnoReferencia();
+        registro.setAnoReferencia(ano);
+
+        auditoriaService.registrar(ModuloSistema.PRE_CADASTRO, "pre_cadastro", preCadastroId, AcaoSistema.EDITAR,
+                Map.of("anoReferencia", anterior), Map.of("anoReferencia", ano),
+                ano > anterior ? "Pré-cadastro movido para a matrícula de " + ano
+                        : "Pré-cadastro devolvido para a matrícula de " + ano);
+        return buscarDetalhe(preCadastroId);
     }
 
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
@@ -307,7 +370,10 @@ public class PreCadastroService {
         if (registro.getCpf() == null) {
             throw new RegraNegocioException("Pré-cadastro enviado pelo formulário antigo: reprove e peça um novo envio.");
         }
-        return paraAssistido.montar(registro, LocalDate.now());
+        // Inscrição do próximo ano: a ficha já nasce com entrada em 1º de janeiro.
+        LocalDate hoje = LocalDate.now();
+        LocalDate inicioDoAno = LocalDate.of(registro.getAnoReferencia(), 1, 1);
+        return paraAssistido.montar(registro, hoje.isBefore(inicioDoAno) ? inicioDoAno : hoje);
     }
 
     /** Cria o assistido (com os responsáveis) a partir do rascunho revisado pela equipe, numa transação só. */

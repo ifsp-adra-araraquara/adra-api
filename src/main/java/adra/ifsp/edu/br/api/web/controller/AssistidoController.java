@@ -56,10 +56,11 @@ public class AssistidoController {
             @RequestParam(required = false) Long oficinaId,
             @RequestParam(required = false) StatusGeral status,
             @RequestParam(defaultValue = "false") boolean emAcompanhamento,
+            @RequestParam(defaultValue = "false") boolean proximoAno,
             @RequestParam(defaultValue = "0") int pagina,
             @RequestParam(defaultValue = "20") int tamanho) {
         return ResponseEntity.ok(assistidoService.listarPaginado(
-                busca, turmaId, oficinaId, status, emAcompanhamento, pagina, tamanho));
+                busca, turmaId, oficinaId, status, emAcompanhamento, proximoAno, pagina, tamanho));
     }
 
     /** Totais das abas da listagem (Todos / Ativos / Inativos / Em acompanhamento). */

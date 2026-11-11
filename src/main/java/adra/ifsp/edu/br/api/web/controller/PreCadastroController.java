@@ -6,6 +6,7 @@ import adra.ifsp.edu.br.api.domain.dto.matricula.ComparacaoRematriculaDTO;
 import adra.ifsp.edu.br.api.domain.dto.matricula.InscricaoAbertaDTO;
 import adra.ifsp.edu.br.api.domain.dto.matricula.RematricularRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.precadastro.AnexosPreCadastro;
+import adra.ifsp.edu.br.api.domain.dto.precadastro.MoverAnoPreCadastroRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.precadastro.ObservacaoPreCadastroRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.precadastro.PreCadastroRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.precadastro.PreCadastroResponseDTO;
@@ -129,6 +130,15 @@ public class PreCadastroController {
             @Valid @RequestBody ObservacaoPreCadastroRequestDTO dto
     ) {
         return ResponseEntity.ok(service.colocarNaListaEspera(preCadastroId, dto));
+    }
+
+    @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL')")
+    @PatchMapping("/{preCadastroId}/ano")
+    public ResponseEntity<PreCadastroResponseDTO> moverParaAno(
+            @PathVariable Long preCadastroId,
+            @Valid @RequestBody MoverAnoPreCadastroRequestDTO dto
+    ) {
+        return ResponseEntity.ok(service.moverParaAno(preCadastroId, dto.ano()));
     }
 
     @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL')")
