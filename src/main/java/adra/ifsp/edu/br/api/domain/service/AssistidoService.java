@@ -81,7 +81,7 @@ public class AssistidoService {
     }
 
     AssistidoResponseDTO cadastrar(AssistidoRequestDTO dto) {
-        return cadastrar(dto, null, matriculaService.anoCorrente());
+        return cadastrar(dto, null, matriculaService.anoParaNovoCadastro());
     }
 
     /**

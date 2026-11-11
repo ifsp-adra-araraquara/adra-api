@@ -14,6 +14,7 @@ import adra.ifsp.edu.br.api.domain.dto.matricula.PeriodoMatriculaRequestDTO;
 import adra.ifsp.edu.br.api.domain.enums.AcaoSistema;
 import adra.ifsp.edu.br.api.domain.enums.ModuloSistema;
 import adra.ifsp.edu.br.api.domain.model.PeriodoMatricula;
+import adra.ifsp.edu.br.api.domain.repository.EncerramentoAnoRepository;
 import adra.ifsp.edu.br.api.domain.repository.PeriodoMatriculaRepository;
 import adra.ifsp.edu.br.api.exception.RegraNegocioException;
 import lombok.RequiredArgsConstructor;
@@ -30,13 +31,16 @@ public class PeriodoMatriculaService {
     private final PeriodoMatriculaRepository repository;
     private final UsuarioAutenticadoService usuarioAutenticadoService;
     private final AuditoriaService auditoriaService;
+    private final EncerramentoAnoRepository encerramentoRepository;
 
     @Transactional(readOnly = true)
     public InscricaoAbertaDTO inscricaoDeHoje() {
         LocalDate hoje = LocalDate.now();
+        // Sem período aberto: o ano corrente, ou o seguinte se o corrente já foi encerrado.
+        int semPeriodo = encerramentoRepository.existsById(hoje.getYear()) ? hoje.getYear() + 1 : hoje.getYear();
         return repository.findAbertoEm(hoje)
                 .map(periodo -> new InscricaoAbertaDTO(periodo.getAno(), true))
-                .orElseGet(() -> new InscricaoAbertaDTO(hoje.getYear(), false));
+                .orElseGet(() -> new InscricaoAbertaDTO(semPeriodo, false));
     }
 
     /** Ano gravado no pré-cadastro enviado hoje. */
@@ -59,6 +63,9 @@ public class PeriodoMatriculaService {
         }
         if (ano > hoje.getYear() + 1) {
             throw new RegraNegocioException("Abra a matrícula de " + ano + " a partir de " + (ano - 1) + ".");
+        }
+        if (encerramentoRepository.existsById(ano)) {
+            throw new RegraNegocioException("O ano " + ano + " já foi encerrado.");
         }
         if (dto.fim() != null && dto.fim().isBefore(dto.inicio())) {
             throw new RegraNegocioException("O fim das inscrições não pode ser antes do início.");
