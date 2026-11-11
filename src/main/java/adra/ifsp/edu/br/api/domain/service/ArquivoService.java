@@ -65,6 +65,7 @@ public class ArquivoService {
     private final AcessoTurmaService acessoTurma;
     private final ProcessadorArquivo processador;
     private final List<ArmazenamentoArquivos> armazenamentos;
+    private final RemocaoNoArmazenamento remocao;
     private final UsuarioAutenticadoService usuarioAutenticadoService;
     private final AuditoriaService auditoriaService;
     private final TransactionTemplate transacao;
@@ -242,7 +243,23 @@ public class ArquivoService {
     @CacheEvict(cacheNames = {CacheConfig.FOTOS_PERFIL, CacheConfig.URLS_ARQUIVO}, allEntries = true)
     public void transferir(EntidadeArquivo deTipo, Long deId, CategoriaArquivo deCategoria,
                            EntidadeArquivo paraTipo, Long paraId, CategoriaArquivo paraCategoria) {
-        arquivoRepository.transferirDono(deTipo, deId, deCategoria, paraTipo, paraId, paraCategoria);
+        transferir(deTipo, deId, deCategoria, paraTipo, paraId, paraCategoria, null);
+    }
+
+    /**
+     * Passa os arquivos ativos para o novo dono, marcando a matrícula do ano a que
+     * pertencem ({@code matriculaId}, null para os que não são de matrícula).
+     * Categoria única por dono (foto de perfil): a nova substitui a atual, que sai
+     * do Storage depois do commit — não fica duplicada nem órfã.
+     */
+    @CacheEvict(cacheNames = {CacheConfig.FOTOS_PERFIL, CacheConfig.URLS_ARQUIVO}, allEntries = true)
+    public void transferir(EntidadeArquivo deTipo, Long deId, CategoriaArquivo deCategoria,
+                           EntidadeArquivo paraTipo, Long paraId, CategoriaArquivo paraCategoria, Long matriculaId) {
+        if (paraCategoria.isUnicoPorDono()
+                && arquivoRepository.existsByEntidadeTipoAndEntidadeIdAndCategoriaAndExcluidoEmIsNull(deTipo, deId, deCategoria)) {
+            substituirAnteriores(paraTipo, paraId, paraCategoria);
+        }
+        arquivoRepository.transferirDono(deTipo, deId, deCategoria, paraTipo, paraId, paraCategoria, matriculaId);
     }
 
     private UrlArquivoDTO urlTemporaria(Arquivo arquivo) {
@@ -255,9 +272,9 @@ public class ArquivoService {
     public void remover(Long arquivoId) {
         Arquivo arquivo = buscarAtivo(arquivoId);
         arquivo.marcarComoExcluido();
-        ArmazenamentoArquivos storage = armazenamento(arquivo.getProvedor());
         String chave = arquivo.getChave();
-        aposCommit(() -> removerDoStorageSemFalhar(storage, chave));
+        ProvedorArmazenamento provedor = arquivo.getProvedor();
+        aposCommit(() -> removerDoStorageSemFalhar(provedor, chave));
 
         auditoriaService.registrar(ModuloSistema.DOCUMENTOS, "arquivo", arquivoId, AcaoSistema.EXCLUIR,
                 Map.of("categoria", arquivo.getCategoria().name()), null, null);
@@ -277,9 +294,9 @@ public class ArquivoService {
         arquivoRepository.saveAllAndFlush(anteriores);
 
         for (Arquivo antigo : anteriores) {
-            ArmazenamentoArquivos storage = armazenamento(antigo.getProvedor());
             String chave = antigo.getChave();
-            aposCommit(() -> removerDoStorageSemFalhar(storage, chave));
+            ProvedorArmazenamento provedor = antigo.getProvedor();
+            aposCommit(() -> removerDoStorageSemFalhar(provedor, chave));
         }
     }
 
@@ -353,18 +370,12 @@ public class ArquivoService {
     }
 
     private void apagarDoStorage(ArquivoEnviado enviado) {
-        removerDoStorageSemFalhar(armazenamento(enviado.provedor()), enviado.chave());
+        removerDoStorageSemFalhar(enviado.provedor(), enviado.chave());
     }
 
-    private static void removerDoStorageSemFalhar(ArmazenamentoArquivos storage, String chave) {
-        Thread.startVirtualThread(() -> {
-            try {
-                storage.remover(chave);
-            } catch (RuntimeException e) {
-                // Fica órfão no bucket, mas não derruba a requisição. Dá pra varrer depois.
-                log.warn("Nao foi possivel remover {} do storage {}", chave, storage.provedor(), e);
-            }
-        });
+    /** Em segundo plano, sem derrubar a requisição; se o Storage falhar, a chave vai para a fila de remoção. */
+    private void removerDoStorageSemFalhar(ProvedorArmazenamento provedor, String chave) {
+        Thread.startVirtualThread(() -> remocao.removerOuEnfileirar(new RemocaoNoArmazenamento.Chave(provedor, chave)));
     }
 
     private static void aposCommit(Runnable acao) {

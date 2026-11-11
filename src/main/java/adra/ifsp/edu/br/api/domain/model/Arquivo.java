@@ -73,6 +73,10 @@ public class Arquivo {
     @Column(name = "criado_em", nullable = false, updatable = false)
     private LocalDateTime criadoEm;
 
+    /** Matrícula do ano a que o documento pertence (null: foto de perfil e arquivos que não são de matrícula). */
+    @Column(name = "matricula_id")
+    private Long matriculaId;
+
     @Column(name = "excluido_em")
     private LocalDateTime excluidoEm;
 

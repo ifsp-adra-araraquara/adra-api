@@ -15,7 +15,12 @@ import java.time.OffsetDateTime;
  * data_fim nulo = vinculo aberto (turma atual do assistido).
  * Trocar de turma fecha o registro aberto e abre um novo - nunca
  * sobrescreve, para preservar o historico (CA-A04.2).
+ *
+ * @deprecated Não é mais gravada nem lida: o histórico de grupo é turma_aluno,
+ * ligado à matrícula do ano. A tabela sai num PR posterior (junto com as
+ * colunas antigas de termos em adra.assistido).
  */
+@Deprecated(forRemoval = true)
 @Entity
 @Table(name = "assistido_turma_historico", schema = "adra")
 @Getter

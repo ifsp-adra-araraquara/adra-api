@@ -2,6 +2,7 @@ package adra.ifsp.edu.br.api.domain.service;
 
 import adra.ifsp.edu.br.api.domain.enums.StatusGeral;
 import adra.ifsp.edu.br.api.domain.model.Assistido;
+import adra.ifsp.edu.br.api.domain.model.Matricula;
 import adra.ifsp.edu.br.api.domain.model.Turma;
 import adra.ifsp.edu.br.api.domain.model.TurmaAlunos;
 import adra.ifsp.edu.br.api.domain.repository.TurmaAlunosRepository;
@@ -10,6 +11,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Centraliza a criação/encerramento de vínculos em TurmaAlunos. Usado tanto
@@ -33,15 +35,25 @@ public class VinculoTurmaService {
     private final TurmaAlunosRepository turmaAlunosRepository;
 
     /**
-     * Encerra o(s) vínculo(s) ativo(s) do assistido (em qualquer turma) e abre
-     * um novo vínculo ativo na turma informada. Se o assistido já estiver
-     * vinculado ativamente a essa mesma turma, não faz nada (evita linha
-     * duplicada num reenvio). turma == null só encerra o vínculo atual, sem
-     * abrir um novo (assistido fica sem turma).
+     * Troca o grupo do atendido na matrícula atual: encerra o vínculo aberto
+     * dessa matrícula e abre um novo no grupo informado. Já vinculado ao mesmo
+     * grupo: não faz nada. turma == null só encerra (atendido fica sem grupo).
      */
     public void vincular(Assistido assistido, Turma turma) {
+        vincularNaMatricula(assistido, turma, assistido.getMatriculaAtual());
+    }
+
+    /**
+     * Grupo do atendido numa matrícula específica (ex.: rematrícula para o ano
+     * seguinte). Só mexe nos vínculos dessa matrícula: o grupo do ano em curso
+     * continua valendo até o fim do ano. O vínculo começa hoje ou, para um ano
+     * que ainda não começou, em 1º de janeiro dele.
+     */
+    public void vincularNaMatricula(Assistido assistido, Turma turma, Matricula matricula) {
         List<TurmaAlunos> ativos = turmaAlunosRepository
-                .findByAssistidoAndStatusAndDataSaidaIsNull(assistido, StatusGeral.ATIVO);
+                .findByAssistidoAndStatusAndDataSaidaIsNull(assistido, StatusGeral.ATIVO).stream()
+                .filter(vinculo -> mesmaMatricula(vinculo, matricula))
+                .toList();
 
         boolean jaVinculadoNaTurma = turma != null && ativos.stream()
                 .anyMatch(v -> v.getTurma().getTurmaId().equals(turma.getTurmaId()));
@@ -53,6 +65,11 @@ public class VinculoTurmaService {
         LocalDate hoje = LocalDate.now();
 
         for (TurmaAlunos vinculoAntigo : ativos) {
+            if (vinculoAntigo.getDataEntrada().isAfter(hoje)) {
+                // Ainda nem começou (ano seguinte): trocar de grupo é corrigir, não encerrar.
+                turmaAlunosRepository.delete(vinculoAntigo);
+                continue;
+            }
             vinculoAntigo.setDataSaida(hoje);
             vinculoAntigo.setStatus(StatusGeral.INATIVO);
             turmaAlunosRepository.saveAndFlush(vinculoAntigo);
@@ -62,9 +79,39 @@ public class VinculoTurmaService {
             TurmaAlunos novo = new TurmaAlunos();
             novo.setTurma(turma);
             novo.setAssistido(assistido);
-            novo.setDataEntrada(hoje);
+            novo.setMatricula(matricula); // grupo do ano da matrícula
+            novo.setDataEntrada(inicioDoVinculo(matricula, hoje));
             novo.setStatus(StatusGeral.ATIVO);
             turmaAlunosRepository.save(novo);
         }
+    }
+
+    /**
+     * Fecha os vínculos ainda abertos de matrículas anteriores à informada
+     * (quem estava desligado e voltou na rematrícula), na data de saída dele.
+     */
+    public void encerrarVinculosAnteriores(Assistido assistido, Matricula matricula, LocalDate saida) {
+        turmaAlunosRepository.findByAssistidoAndStatusAndDataSaidaIsNull(assistido, StatusGeral.ATIVO).stream()
+                .filter(vinculo -> vinculo.getMatricula() == null || vinculo.getMatricula().getAno() < matricula.getAno())
+                .forEach(vinculo -> {
+                    vinculo.setDataSaida(saida.isBefore(vinculo.getDataEntrada()) ? vinculo.getDataEntrada() : saida);
+                    vinculo.setStatus(StatusGeral.INATIVO);
+                });
+    }
+
+    static LocalDate inicioDoVinculo(Matricula matricula, LocalDate hoje) {
+        if (matricula == null) {
+            return hoje;
+        }
+        LocalDate inicioDoAno = LocalDate.of(matricula.getAno(), 1, 1);
+        return hoje.isBefore(inicioDoAno) ? inicioDoAno : hoje;
+    }
+
+    /** Vínculo sem matrícula (anterior à matrícula anual) conta como da matrícula atual. */
+    private static boolean mesmaMatricula(TurmaAlunos vinculo, Matricula matricula) {
+        if (vinculo.getMatricula() == null || matricula == null) {
+            return true;
+        }
+        return Objects.equals(vinculo.getMatricula().getMatriculaId(), matricula.getMatriculaId());
     }
 }

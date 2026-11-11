@@ -39,10 +39,15 @@ public interface ArquivoRepository extends JpaRepository<Arquivo, Long> {
      */
     @Modifying(flushAutomatically = true)
     @Query("""
-            UPDATE Arquivo a SET a.entidadeTipo = :paraTipo, a.entidadeId = :paraId, a.categoria = :paraCategoria
+            UPDATE Arquivo a SET a.entidadeTipo = :paraTipo, a.entidadeId = :paraId, a.categoria = :paraCategoria,
+                                 a.matriculaId = :matriculaId
             WHERE a.entidadeTipo = :deTipo AND a.entidadeId = :deId AND a.categoria = :deCategoria AND a.excluidoEm IS NULL
             """)
     int transferirDono(@Param("deTipo") EntidadeArquivo deTipo, @Param("deId") Long deId,
                        @Param("deCategoria") CategoriaArquivo deCategoria, @Param("paraTipo") EntidadeArquivo paraTipo,
-                       @Param("paraId") Long paraId, @Param("paraCategoria") CategoriaArquivo paraCategoria);
+                       @Param("paraId") Long paraId, @Param("paraCategoria") CategoriaArquivo paraCategoria,
+                       @Param("matriculaId") Long matriculaId);
+
+    boolean existsByEntidadeTipoAndEntidadeIdAndCategoriaAndExcluidoEmIsNull(EntidadeArquivo entidadeTipo, Long entidadeId,
+                                                                          CategoriaArquivo categoria);
 }

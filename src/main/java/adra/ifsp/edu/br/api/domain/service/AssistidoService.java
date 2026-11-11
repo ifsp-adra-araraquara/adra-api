@@ -17,13 +17,11 @@ import adra.ifsp.edu.br.api.exception.ArquivoInvalidoException;
 import adra.ifsp.edu.br.api.domain.model.Assistido;
 import adra.ifsp.edu.br.api.domain.model.AssistidoResponsavel;
 import adra.ifsp.edu.br.api.domain.model.AssistidoResponsavelId;
-import adra.ifsp.edu.br.api.domain.model.AssistidoTurmaHistorico;
 import adra.ifsp.edu.br.api.domain.model.Responsavel;
 import adra.ifsp.edu.br.api.domain.model.Turma;
 import adra.ifsp.edu.br.api.domain.model.TurmaAlunos;
 import adra.ifsp.edu.br.api.domain.repository.AssistidoRepository;
 import adra.ifsp.edu.br.api.domain.repository.AssistidoSpecification;
-import adra.ifsp.edu.br.api.domain.repository.AssistidoTurmaHistoricoRepository;
 import adra.ifsp.edu.br.api.domain.repository.ResponsavelRepository;
 import adra.ifsp.edu.br.api.domain.repository.TurmaAlunosRepository;
 import adra.ifsp.edu.br.api.domain.repository.TurmaRepository;
@@ -44,7 +42,6 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDate;
-import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -68,7 +65,7 @@ public class AssistidoService {
     private final AssistidoIndicadoresService indicadoresService;
     private final TurmaRepository turmaRepository;
     private final ResponsavelRepository responsavelRepository;
-    private final AssistidoTurmaHistoricoRepository turmaHistoricoRepository;
+    private final MatriculaService matriculaService;
     private final AuditoriaService auditoriaService;
     private final VinculoTurmaService vinculoTurmaService;
     private final TurmaAlunosRepository turmaAlunosRepository;
@@ -84,6 +81,14 @@ public class AssistidoService {
     }
 
     AssistidoResponseDTO cadastrar(AssistidoRequestDTO dto) {
+        return cadastrar(dto, null, matriculaService.anoParaNovoCadastro());
+    }
+
+    /**
+     * {@code preCadastroId}: envio da família que originou o cadastro; {@code ano}: ano
+     * letivo da matrícula (o da inscrição — pode ser o seguinte, no período de matrícula).
+     */
+    AssistidoResponseDTO cadastrar(AssistidoRequestDTO dto, Long preCadastroId, int ano) {
         validarNovoCadastro(dto);
 
         // CA-A02.3: Validar turma ativa
@@ -102,19 +107,12 @@ public class AssistidoService {
         // CA-A02.4: Criar assistido e vínculos em transação atômica
         assistido = assistidoRepository.save(assistido);
         criarVinculosResponsaveis(assistido, dto.responsaveis());
+        // Antes do vínculo com o grupo: o vínculo pertence à matrícula do ano.
+        matriculaService.abrir(assistido, ano, dto, preCadastroId);
 
         // Mantém turma_aluno em dia — é o que o CA-65 (chamada) usa pra montar
         // o roster de uma aula, não Assistido.turma diretamente.
         vinculoTurmaService.vincular(assistido, turma);
-
-        // Abre o primeiro periodo de historico de turma (CA-A04.2), se ja
-        // entrou vinculado a uma turma.
-        if (turma != null) {
-            turmaHistoricoRepository.save(AssistidoTurmaHistorico.builder()
-                    .assistido(assistido)
-                    .turma(turma)
-                    .build());
-        }
 
         auditoriaService.registrar(
                 ModuloSistema.ASSISTIDOS,
@@ -258,6 +256,7 @@ public class AssistidoService {
         valorAnterior.put("dataNascimento", assistido.getDataNascimento() == null ? null : assistido.getDataNascimento().toString());
 
         assistidoMapper.atualizarEntidade(assistido, dto);
+        matriculaService.atualizarTermos(assistido, dto);
         atualizarTurma(assistido, dto.turmaId());
         atualizarResponsaveis(assistido, dto.responsaveisVinculados(), dto.responsaveis());
 
@@ -282,17 +281,14 @@ public class AssistidoService {
     }
 
     /**
-     * CA-A04.2: so mexe no historico se a turma realmente mudou. Fecha o
-     * periodo aberto (se houver) e abre um novo - nunca sobrescreve.
+     * CA-A04.2: so troca se a turma realmente mudou. O historico fica em
+     * turma_aluno (VinculoTurmaService), ligado a matricula do ano.
      */
     private void atualizarTurma(Assistido assistido, Long novaTurmaId) {
         Long turmaAtualId = assistido.getTurma() != null ? assistido.getTurma().getTurmaId() : null;
         if (Objects.equals(turmaAtualId, novaTurmaId)) {
             return;
         }
-
-        turmaHistoricoRepository.findByAssistido_AssistidoIdAndDataFimIsNull(assistido.getAssistidoId())
-                .ifPresent(historico -> historico.setDataFim(OffsetDateTime.now()));
 
         Turma novaTurma = null;
         if (novaTurmaId != null) {
@@ -301,10 +297,6 @@ public class AssistidoService {
             if (!Boolean.TRUE.equals(novaTurma.getAtivo())) {
                 throw new RegraNegocioException("O grupo informado nao esta ativo");
             }
-            turmaHistoricoRepository.save(AssistidoTurmaHistorico.builder()
-                    .assistido(assistido)
-                    .turma(novaTurma)
-                    .build());
         }
 
         assistido.setTurma(novaTurma);
@@ -406,6 +398,7 @@ public class AssistidoService {
         assistido.setStatus(dto.status());
         assistido.setDataSaida(dto.dataSaida());
         assistido.setMotivoSaida(dto.motivoSaida());
+        matriculaService.acompanharStatus(assistido);
         assistido = assistidoRepository.save(assistido);
 
         auditoriaService.registrar(

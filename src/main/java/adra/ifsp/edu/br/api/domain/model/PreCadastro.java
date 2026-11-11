@@ -77,6 +77,10 @@ public class PreCadastro {
     private String motivoReprovacao;
 
     /** Atendido criado na aprovação. */
+    /** Ano letivo da inscrição: o do período de matrícula aberto no envio, senão o ano corrente. */
+    @Column(name = "ano_referencia", nullable = false)
+    private Integer anoReferencia;
+
     @Column(name = "assistido_id")
     private Long assistidoId;
 

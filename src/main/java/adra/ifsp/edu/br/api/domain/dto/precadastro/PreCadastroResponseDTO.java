@@ -24,8 +24,12 @@ public record PreCadastroResponseDTO(
         String motivoReprovacao,
         String observacao,
         Long assistidoId,
-        /** Atendido que já tem este CPF (null se não há): a equipe abre a ficha em vez de aprovar. */
+        /** Ano letivo da inscrição. */
+        Integer anoReferencia,
+        /** Atendido que já tem este CPF (null se não há): a equipe rematricula em vez de aprovar. */
         Long assistidoExistenteId,
+        /** O atendido existente já tem matrícula no ano da inscrição (rematrícula já feita). */
+        boolean jaMatriculadoNoAno,
         /** Foto e documentos enviados pela família (só enquanto não foi aprovado: depois vão para o atendido). */
         List<ArquivoResponseDTO> arquivos,
         /** O que a família não enviou ("Foto da criança"...), para a equipe pedir na entrevista. */
@@ -34,7 +38,7 @@ public record PreCadastroResponseDTO(
         OffsetDateTime revisadoEm,
         OffsetDateTime criadoEm
 ) {
-    public static PreCadastroResponseDTO de(PreCadastro p, Long assistidoExistenteId,
+    public static PreCadastroResponseDTO de(PreCadastro p, Long assistidoExistenteId, boolean jaMatriculadoNoAno,
                                             List<ArquivoResponseDTO> arquivos, List<String> anexosFaltando) {
         return new PreCadastroResponseDTO(
                 p.getPreCadastroId(),
@@ -50,7 +54,9 @@ public record PreCadastroResponseDTO(
                 p.getMotivoReprovacao(),
                 p.getObservacao(),
                 p.getAssistidoId(),
+                p.getAnoReferencia(),
                 assistidoExistenteId,
+                jaMatriculadoNoAno,
                 arquivos,
                 anexosFaltando,
                 p.getRevisadoPor() != null ? p.getRevisadoPor().getNomeCompleto() : null,

@@ -25,11 +25,10 @@ import adra.ifsp.edu.br.api.domain.enums.StatusPreCadastro;
 import adra.ifsp.edu.br.api.domain.mapper.PreCadastroParaAssistido;
 import adra.ifsp.edu.br.api.domain.model.Arquivo;
 import adra.ifsp.edu.br.api.domain.model.Assistido;
-import adra.ifsp.edu.br.api.domain.model.AssistidoResponsavel;
 import adra.ifsp.edu.br.api.domain.model.PreCadastro;
 import adra.ifsp.edu.br.api.domain.repository.ArquivoRepository;
 import adra.ifsp.edu.br.api.domain.repository.AssistidoRepository;
-import adra.ifsp.edu.br.api.domain.repository.AssistidoResponsavelRepository;
+import adra.ifsp.edu.br.api.domain.repository.MatriculaRepository;
 import adra.ifsp.edu.br.api.domain.repository.PreCadastroRepository;
 import adra.ifsp.edu.br.api.exception.ArquivoInvalidoException;
 import adra.ifsp.edu.br.api.exception.AssistidoJaCadastradoException;
@@ -83,7 +82,9 @@ public class PreCadastroService {
     private final UsuarioAutenticadoService usuarioAutenticadoService;
     private final ArquivoService arquivoService;
     private final ArquivoRepository arquivoRepository;
-    private final AssistidoResponsavelRepository assistidoResponsavelRepository;
+    private final AnexosDoPreCadastro anexosDoPreCadastro;
+    private final MatriculaRepository matriculaRepository;
+    private final PeriodoMatriculaService periodoMatriculaService;
     private final TurnstileClient turnstile;
 
     private final Map<String, EnviosDoIp> enviosPorIp = new ConcurrentHashMap<>();
@@ -117,6 +118,7 @@ public class PreCadastroService {
                     .responsavelNome(nomeDoResponsavel(dto.dados()))
                     .responsavelTelefone(telefoneDoResponsavel(dto.dados()))
                     .dados(dto.dados())
+                    .anoReferencia(periodoMatriculaService.anoDaInscricao())
                     .ipOrigem(ip)
                     .build();
             repository.save(registro);
@@ -227,10 +229,18 @@ public class PreCadastroService {
     }
 
     @Transactional(readOnly = true)
-    public List<PreCadastroResumoDTO> listar(StatusPreCadastro status) {
-        List<PreCadastro> registros = status.emAvaliacao()
-                ? repository.findByStatusOrderByCriadoEmAsc(status)
-                : repository.findByStatusOrderByCriadoEmDesc(status);
+    /** {@code ano} null = todos os anos (ordem: em avaliação por chegada; os demais, mais recentes primeiro). */
+    public List<PreCadastroResumoDTO> listar(StatusPreCadastro status, Integer ano) {
+        List<PreCadastro> registros;
+        if (ano == null) {
+            registros = status.emAvaliacao()
+                    ? repository.findByStatusOrderByCriadoEmAsc(status)
+                    : repository.findByStatusOrderByCriadoEmDesc(status);
+        } else {
+            registros = status.emAvaliacao()
+                    ? repository.findByStatusAndAnoReferenciaOrderByCriadoEmAsc(status, ano)
+                    : repository.findByStatusAndAnoReferenciaOrderByCriadoEmDesc(status, ano);
+        }
         Set<String> cpfs = registros.stream()
                 .map(PreCadastro::getCpf)
                 .filter(Objects::nonNull)
@@ -277,10 +287,12 @@ public class PreCadastroService {
         Long assistidoExistenteId = registro.getStatus().emAvaliacao() && registro.getCpf() != null
                 ? assistidoRepository.findByCpf(registro.getCpf()).map(Assistido::getAssistidoId).orElse(null)
                 : null;
+        boolean jaMatriculadoNoAno = assistidoExistenteId != null
+                && matriculaRepository.findByAssistido_AssistidoIdAndAno(assistidoExistenteId, registro.getAnoReferencia()).isPresent();
         List<ArquivoResponseDTO> arquivos = arquivoService.listar(EntidadeArquivo.PRE_CADASTRO, preCadastroId, null);
         List<String> faltando = faltandoSeNaoAprovado(registro,
                 arquivos.stream().map(ArquivoResponseDTO::categoria).toList());
-        return PreCadastroResponseDTO.de(registro, assistidoExistenteId, arquivos, faltando);
+        return PreCadastroResponseDTO.de(registro, assistidoExistenteId, jaMatriculadoNoAno, arquivos, faltando);
     }
 
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
@@ -307,8 +319,11 @@ public class PreCadastroService {
             throw new AssistidoJaCadastradoException(existente.getAssistidoId(), existente.getNomeCompleto());
         });
 
-        AssistidoResponseDTO criado = assistidoService.cadastrar(dto);
-        transferirAnexos(preCadastroId, criado.assistidoId());
+        int ano = registro.getAnoReferencia();
+        AssistidoResponseDTO criado = assistidoService.cadastrar(dto, preCadastroId, ano);
+        Long matriculaId = matriculaRepository.findByAssistido_AssistidoIdAndAno(criado.assistidoId(), ano)
+                .orElseThrow().getMatriculaId();
+        anexosDoPreCadastro.transferir(preCadastroId, criado.assistidoId(), matriculaId);
         registro.setStatus(StatusPreCadastro.CONVERTIDO);
         registro.setAssistidoId(criado.assistidoId());
         marcarRevisado(registro);
@@ -316,23 +331,7 @@ public class PreCadastroService {
         auditoriaService.registrar(ModuloSistema.PRE_CADASTRO, "pre_cadastro", preCadastroId, AcaoSistema.EDITAR,
                 Map.of("status", statusAnterior), Map.of("status", "CONVERTIDO", "assistidoId", criado.assistidoId()),
                 "Pré-cadastro aprovado: assistido cadastrado");
-        return PreCadastroResponseDTO.de(registro, null, List.of(), List.of());
-    }
-
-    /** Foto, documento e comprovante vão para o atendido; o documento do responsável, para o responsável principal. */
-    private void transferirAnexos(Long preCadastroId, Long assistidoId) {
-        arquivoService.transferir(EntidadeArquivo.PRE_CADASTRO, preCadastroId, CategoriaArquivo.FOTO_PERFIL,
-                EntidadeArquivo.ASSISTIDO, assistidoId, CategoriaArquivo.FOTO_PERFIL);
-        arquivoService.transferir(EntidadeArquivo.PRE_CADASTRO, preCadastroId, CategoriaArquivo.DOCUMENTO_IDENTIDADE,
-                EntidadeArquivo.ASSISTIDO, assistidoId, CategoriaArquivo.DOCUMENTO_IDENTIDADE);
-        arquivoService.transferir(EntidadeArquivo.PRE_CADASTRO, preCadastroId, CategoriaArquivo.DECLARACAO_RESIDENCIA,
-                EntidadeArquivo.ASSISTIDO, assistidoId, CategoriaArquivo.DECLARACAO_RESIDENCIA);
-        assistidoResponsavelRepository.findByIdAssistidoId(assistidoId).stream()
-                .filter(AssistidoResponsavel::isResponsavelPrincipal)
-                .findFirst()
-                .ifPresent(principal -> arquivoService.transferir(EntidadeArquivo.PRE_CADASTRO, preCadastroId,
-                        CategoriaArquivo.DOCUMENTO_RESPONSAVEL, EntidadeArquivo.RESPONSAVEL,
-                        principal.getId().getResponsavelId(), CategoriaArquivo.DOCUMENTO_IDENTIDADE));
+        return PreCadastroResponseDTO.de(registro, null, false, List.of(), List.of());
     }
 
     @CacheEvict(cacheNames = CacheConfig.PAINEL, allEntries = true)

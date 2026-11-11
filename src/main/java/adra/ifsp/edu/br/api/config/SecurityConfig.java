@@ -79,6 +79,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/pre-cadastro").permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/pre-cadastro/inscricao").permitAll()
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt
                         .decoder(decoderAplicacao(usuarioService))

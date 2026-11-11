@@ -66,15 +66,29 @@ public interface TurmaAlunosRepository extends JpaRepository<TurmaAlunos, Long> 
      * tem o vínculo antigo fechado como INATIVO, mas continua fazendo parte
      * do histórico dos dias em que esteve aqui.
      */
+    default List<TurmaAlunos> findVinculosNoPeriodo(Turma turma, LocalDate inicio, LocalDate fim) {
+        return findVinculosNoPeriodo(turma, inicio, fim, inicio.getYear(), fim.getYear());
+    }
+
+    /**
+     * Matrícula anual: o vínculo só vale nos dias do ano da matrícula dele.
+     * Quem não renovou sai da chamada do ano seguinte mesmo antes de o
+     * Coordenador encerrar o ano (o vínculo antigo ainda está aberto).
+     * Vínculo sem matrícula (anterior à matrícula anual) vale como antes.
+     */
     @Query("""
             select ta from TurmaAlunos ta
             join fetch ta.assistido
+            left join ta.matricula m
             where ta.turma = :turma
               and ta.dataEntrada <= :fim
               and (ta.dataSaida is null or ta.dataSaida >= :inicio)
+              and (m is null or m.ano between :anoInicio and :anoFim)
             """)
     List<TurmaAlunos> findVinculosNoPeriodo(
             @Param("turma") Turma turma,
             @Param("inicio") LocalDate inicio,
-            @Param("fim") LocalDate fim);
+            @Param("fim") LocalDate fim,
+            @Param("anoInicio") Integer anoInicio,
+            @Param("anoFim") Integer anoFim);
 }

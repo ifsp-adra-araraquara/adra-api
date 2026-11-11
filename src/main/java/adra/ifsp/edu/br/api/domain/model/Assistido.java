@@ -118,30 +118,14 @@ public class Assistido {
     @Column(name = "nis", length = 20)
     private String nis;
 
-    // ---- Termos e autorizações ----
-    @Column(name = "aceite_lgpd", nullable = false)
-    @Builder.Default
-    private boolean aceiteLgpd = false;
-
-    /** Quando o aceite LGPD foi registrado (preenchido pelo back). */
-    @Column(name = "aceite_lgpd_em")
-    private OffsetDateTime aceiteLgpdEm;
-
-    @Column(name = "autoriza_uso_imagem", nullable = false)
-    @Builder.Default
-    private boolean autorizaUsoImagem = false;
-
-    @Column(name = "autoriza_eventos_passeios", nullable = false)
-    @Builder.Default
-    private boolean autorizaEventosPasseios = false;
-
-    @Column(name = "pode_ir_embora_sozinho", nullable = false)
-    @Builder.Default
-    private boolean podeIrEmboraSozinho = false;
-
-    @Column(name = "ciente_frequencia_obrigatoria", nullable = false)
-    @Builder.Default
-    private boolean cienteFrequenciaObrigatoria = false;
+    // ---- Termos e autorizações: refeitos todo ano, ficam na matrícula ----
+    /**
+     * Matrícula mais recente. Os termos são lidos dela (ver os getters abaixo);
+     * as colunas antigas de termos em adra.assistido não são mais usadas.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "matricula_atual_id")
+    private Matricula matriculaAtual;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
@@ -175,6 +159,32 @@ public class Assistido {
     @OneToMany(mappedBy = "assistido", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<AssistidoResponsavel> vinculosFamiliares = new ArrayList<>();
+
+    // Termos da matrícula atual (sem matrícula = nada autorizado).
+
+    public boolean isAceiteLgpd() {
+        return matriculaAtual != null && matriculaAtual.isAceiteLgpd();
+    }
+
+    public OffsetDateTime getAceiteLgpdEm() {
+        return matriculaAtual != null ? matriculaAtual.getAceiteLgpdEm() : null;
+    }
+
+    public boolean isAutorizaUsoImagem() {
+        return matriculaAtual != null && matriculaAtual.isAutorizaUsoImagem();
+    }
+
+    public boolean isAutorizaEventosPasseios() {
+        return matriculaAtual != null && matriculaAtual.isAutorizaEventosPasseios();
+    }
+
+    public boolean isPodeIrEmboraSozinho() {
+        return matriculaAtual != null && matriculaAtual.isPodeIrEmboraSozinho();
+    }
+
+    public boolean isCienteFrequenciaObrigatoria() {
+        return matriculaAtual != null && matriculaAtual.isCienteFrequenciaObrigatoria();
+    }
 
     @PrePersist
     void prePersist() {

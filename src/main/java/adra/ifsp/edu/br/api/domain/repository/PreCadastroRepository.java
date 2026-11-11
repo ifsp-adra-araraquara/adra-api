@@ -14,6 +14,10 @@ public interface PreCadastroRepository extends JpaRepository<PreCadastro, Long> 
 
     List<PreCadastro> findByStatusOrderByCriadoEmAsc(StatusPreCadastro status);
 
+    List<PreCadastro> findByStatusAndAnoReferenciaOrderByCriadoEmDesc(StatusPreCadastro status, Integer anoReferencia);
+
+    List<PreCadastro> findByStatusAndAnoReferenciaOrderByCriadoEmAsc(StatusPreCadastro status, Integer anoReferencia);
+
     long countByStatus(StatusPreCadastro status);
 
     long countByCriadoEmGreaterThanEqual(OffsetDateTime inicio);
