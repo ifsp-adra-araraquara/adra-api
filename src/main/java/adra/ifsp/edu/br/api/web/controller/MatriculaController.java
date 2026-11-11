@@ -14,9 +14,11 @@ import org.springframework.web.bind.annotation.RestController;
 
 import adra.ifsp.edu.br.api.domain.dto.matricula.EncerramentoAnoDTO;
 import adra.ifsp.edu.br.api.domain.dto.matricula.EncerramentoPreviaDTO;
+import adra.ifsp.edu.br.api.domain.dto.matricula.ListaAnualDTO;
 import adra.ifsp.edu.br.api.domain.dto.matricula.PeriodoMatriculaDTO;
 import adra.ifsp.edu.br.api.domain.dto.matricula.PeriodoMatriculaRequestDTO;
 import adra.ifsp.edu.br.api.domain.service.EncerramentoAnoService;
+import adra.ifsp.edu.br.api.domain.service.ListaAnualService;
 import adra.ifsp.edu.br.api.domain.service.PeriodoMatriculaService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +30,7 @@ public class MatriculaController {
 
     private final PeriodoMatriculaService periodoMatriculaService;
     private final EncerramentoAnoService encerramentoAnoService;
+    private final ListaAnualService listaAnualService;
 
     @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL')")
     @GetMapping("/periodos")
@@ -69,5 +72,19 @@ public class MatriculaController {
     @GetMapping("/encerramentos")
     public ResponseEntity<List<EncerramentoAnoDTO>> encerramentos() {
         return ResponseEntity.ok(encerramentoAnoService.listar());
+    }
+
+    /** Anos com matrícula (filtro da lista anual). */
+    @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL')")
+    @GetMapping("/anos")
+    public ResponseEntity<List<Integer>> anos() {
+        return ResponseEntity.ok(listaAnualService.anos());
+    }
+
+    /** Lista de atendidos do ano, com grupo e frequência, para imprimir/PDF e planilha. */
+    @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL')")
+    @GetMapping("/{ano}/atendidos")
+    public ResponseEntity<ListaAnualDTO> atendidosDoAno(@PathVariable int ano) {
+        return ResponseEntity.ok(listaAnualService.doAno(ano));
     }
 }

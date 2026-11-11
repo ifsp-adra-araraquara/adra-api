@@ -109,4 +109,106 @@ public interface MatriculaRepository extends JpaRepository<Matricula, Long> {
     /** Ano mais antigo, até o informado, que ainda tem matrícula ativa (candidato a encerrar). */
     @Query(value = "select min(ano) from adra.matricula where status = 'ATIVA' and ano <= :ateAno", nativeQuery = true)
     Integer menorAnoComMatriculaAtiva(@Param("ateAno") int ateAno);
+
+    // ---------------------------------------------------------------
+    // Lista anual (histórico): uma consulta para o ano inteiro.
+    // ---------------------------------------------------------------
+
+    interface LinhaDoAno {
+        Long getAssistidoId();
+
+        String getNomeCompleto();
+
+        LocalDate getDataNascimento();
+
+        String getStatusMatricula();
+
+        String getNomeTurma();
+
+        LocalDate getEntrada();
+
+        LocalDate getSaida();
+
+        int getTotalChamadas();
+
+        int getPresencas();
+
+        int getFaltas();
+
+        int getFaltasJustificadas();
+    }
+
+    /**
+     * Atendidos matriculados no ano, com o último grupo do ano e a frequência só
+     * das chamadas daquele ano (até {@code ate}: hoje, para o ano em curso).
+     * Presença é esparsa: chamada sem linha em presenca = presente.
+     */
+    @Query(value = """
+            WITH alvo AS (
+                SELECT m.matricula_id, m.assistido_id, m.status
+                  FROM adra.matricula m
+                 WHERE m.ano = :ano
+            ),
+            vinculos AS (
+                SELECT ta.matricula_id, ta.assistido_id, ta.turma_id, ta.data_entrada, ta.data_saida,
+                       a.data_saida AS saida_da_adra
+                  FROM adra.turma_aluno ta
+                  JOIN alvo ON alvo.matricula_id = ta.matricula_id
+                  JOIN adra.assistido a ON a.assistido_id = ta.assistido_id
+            ),
+            ultimo_grupo AS (
+                SELECT DISTINCT ON (v.matricula_id) v.matricula_id, t.nome_turma
+                  FROM vinculos v
+                  JOIN adra.turma t ON t.turma_id = v.turma_id
+                 ORDER BY v.matricula_id, v.data_entrada DESC
+            ),
+            entrada AS (
+                SELECT matricula_id, MIN(data_entrada) AS data_entrada FROM vinculos GROUP BY matricula_id
+            ),
+            chamadas AS (
+                SELECT DISTINCT v.matricula_id, v.assistido_id, c.chamada_id
+                  FROM vinculos v
+                  JOIN adra.chamada c
+                    ON c.turma_id = v.turma_id
+                   AND c.data_chamada >= v.data_entrada
+                   AND c.data_chamada <= LEAST(COALESCE(v.data_saida, :ate), :ate)
+                   AND c.data_chamada BETWEEN :inicioDoAno AND :fimDoAno
+                   -- mesma regra da chamada: desligado deixa de contar a partir do dia da saída
+                   AND (v.saida_da_adra IS NULL OR c.data_chamada < v.saida_da_adra)
+            ),
+            frequencia AS (
+                SELECT ch.matricula_id,
+                       COUNT(*) AS total,
+                       COUNT(*) FILTER (WHERE p.presenca_id IS NULL
+                                           OR CAST(p.status_presenca AS text) = 'PRESENTE') AS presencas,
+                       COUNT(*) FILTER (WHERE CAST(p.status_presenca AS text) = 'FALTA') AS faltas,
+                       COUNT(*) FILTER (WHERE CAST(p.status_presenca AS text) = 'FALTA_JUSTIFICADA') AS justificadas
+                  FROM chamadas ch
+                  LEFT JOIN adra.presenca p ON p.chamada_id = ch.chamada_id AND p.assistido_id = ch.assistido_id
+                 GROUP BY ch.matricula_id
+            )
+            SELECT a.assistido_id                    AS "assistidoId",
+                   a.nome_completo                   AS "nomeCompleto",
+                   a.data_nascimento                 AS "dataNascimento",
+                   alvo.status                       AS "statusMatricula",
+                   g.nome_turma                      AS "nomeTurma",
+                   e.data_entrada                    AS "entrada",
+                   CASE WHEN a.data_saida BETWEEN :inicioDoAno AND :fimDoAno THEN a.data_saida END AS "saida",
+                   COALESCE(f.total, 0)              AS "totalChamadas",
+                   COALESCE(f.presencas, 0)          AS "presencas",
+                   COALESCE(f.faltas, 0)             AS "faltas",
+                   COALESCE(f.justificadas, 0)       AS "faltasJustificadas"
+              FROM alvo
+              JOIN adra.assistido a ON a.assistido_id = alvo.assistido_id
+              LEFT JOIN ultimo_grupo g ON g.matricula_id = alvo.matricula_id
+              LEFT JOIN entrada e ON e.matricula_id = alvo.matricula_id
+              LEFT JOIN frequencia f ON f.matricula_id = alvo.matricula_id
+             ORDER BY g.nome_turma NULLS LAST, a.nome_completo
+            """, nativeQuery = true)
+    List<LinhaDoAno> listarDoAno(@Param("ano") int ano, @Param("inicioDoAno") LocalDate inicioDoAno,
+                                 @Param("fimDoAno") LocalDate fimDoAno, @Param("ate") LocalDate ate);
+
+    /** Anos que têm matrícula, do mais recente para o mais antigo (filtro da lista anual). */
+    @Query(value = "select distinct ano from adra.matricula order by ano desc", nativeQuery = true)
+    List<Integer> anosComMatricula();
 }
