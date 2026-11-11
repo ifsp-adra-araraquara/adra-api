@@ -43,11 +43,17 @@ public class EncerramentoAnoService {
     private final UsuarioAutenticadoService usuarioAutenticadoService;
     private final AuditoriaService auditoriaService;
 
-    /** Ano que está esperando encerramento (o mais antigo com matrícula ativa), se houver. */
+    /**
+     * Ano que está esperando encerramento (o mais antigo com matrícula ativa), só quando
+     * já dá para encerrar: durante o ano, sem a matrícula do seguinte aberta, não há o que avisar.
+     */
     @Transactional(readOnly = true)
     public Optional<EncerramentoPreviaDTO> pendente() {
         Integer ano = matriculaRepository.menorAnoComMatriculaAtiva(LocalDate.now().getYear());
-        return ano == null || encerramentoRepository.existsById(ano) ? Optional.empty() : Optional.of(previa(ano));
+        if (ano == null || motivoBloqueio(ano) != null) {
+            return Optional.empty();
+        }
+        return Optional.of(previa(ano));
     }
 
     @Transactional(readOnly = true)

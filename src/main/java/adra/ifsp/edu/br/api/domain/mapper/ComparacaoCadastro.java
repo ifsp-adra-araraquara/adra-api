@@ -114,9 +114,22 @@ public class ComparacaoCadastro {
         return data == null ? null : data.format(DATA);
     }
 
+    /** Nomes como a família e a equipe escrevem (o nome do enum não tem acento). */
+    private static final Map<String, String> ROTULOS = Map.of(
+            "BOLSA_FAMILIA", "Bolsa Família",
+            "AUXILIO_GAS", "Auxílio Gás",
+            "BOLSA_ESCOLA", "Bolsa Escola",
+            "ALUGUEL_SOCIAL", "Aluguel Social",
+            "BPC", "BPC",
+            "PETI", "PETI",
+            "OUTRO", "Outro");
+
     private static String rotulo(Enum<?> valor) {
         if (valor == null) {
             return null;
+        }
+        if (ROTULOS.containsKey(valor.name())) {
+            return ROTULOS.get(valor.name());
         }
         String texto = valor.name().replace('_', ' ').toLowerCase(Locale.ROOT);
         return Character.toUpperCase(texto.charAt(0)) + texto.substring(1);

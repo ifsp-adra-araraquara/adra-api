@@ -95,6 +95,10 @@ class EncerramentoAnoIT {
         jdbc.execute("alter table adra.responsavel alter column atualizado_em set default now()");
         jdbc.execute("alter table adra.assistido_responsavel alter column criado_em set default now()");
         jdbc.execute("alter table adra.log_auditoria alter column data_hora set default now()");
+        // Mesma regra da migration (o schema dos testes vem das entidades e não tem índices parciais).
+        jdbc.execute("create unique index if not exists uq_turma_aluno_um_ativo_por_matricula"
+                + " on adra.turma_aluno (assistido_id, coalesce(matricula_id, 0))"
+                + " where status = 'ATIVO' and data_saida is null");
         grupoDoAno = grupo("Encerramento Atual");
         grupoDoProximo = grupo("Encerramento Próximo");
     }
@@ -167,6 +171,8 @@ class EncerramentoAnoIT {
         assertThatThrownBy(() -> encerramentoAnoService.encerrar(ano)).isInstanceOf(RegraNegocioException.class);
         assertThatThrownBy(() -> encerramentoAnoService.encerrar(ano + 1)).isInstanceOf(RegraNegocioException.class)
                 .hasMessageContaining("ainda não começou");
+        // Durante o ano, sem a matrícula do seguinte aberta, não há aviso de encerramento.
+        assertThat(encerramentoAnoService.pendente()).isEmpty();
     }
 
     @Test

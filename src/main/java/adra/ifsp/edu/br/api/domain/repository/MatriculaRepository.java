@@ -150,7 +150,7 @@ public interface MatriculaRepository extends JpaRepository<Matricula, Long> {
                  WHERE m.ano = :ano
             ),
             vinculos AS (
-                SELECT ta.matricula_id, ta.assistido_id, ta.turma_id, ta.data_entrada, ta.data_saida,
+                SELECT ta.turma_aluno_id, ta.matricula_id, ta.assistido_id, ta.turma_id, ta.data_entrada, ta.data_saida,
                        a.data_saida AS saida_da_adra
                   FROM adra.turma_aluno ta
                   JOIN alvo ON alvo.matricula_id = ta.matricula_id
@@ -160,7 +160,8 @@ public interface MatriculaRepository extends JpaRepository<Matricula, Long> {
                 SELECT DISTINCT ON (v.matricula_id) v.matricula_id, t.nome_turma
                   FROM vinculos v
                   JOIN adra.turma t ON t.turma_id = v.turma_id
-                 ORDER BY v.matricula_id, v.data_entrada DESC
+                 -- troca de grupo no mesmo dia: vale o vínculo criado por último
+                 ORDER BY v.matricula_id, v.data_entrada DESC, v.turma_aluno_id DESC
             ),
             entrada AS (
                 SELECT matricula_id, MIN(data_entrada) AS data_entrada FROM vinculos GROUP BY matricula_id

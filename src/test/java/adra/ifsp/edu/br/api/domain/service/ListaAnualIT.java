@@ -77,6 +77,7 @@ class ListaAnualIT {
     @Autowired private MockMvc mvc;
     @Autowired private AssistidoService assistidoService;
     @Autowired private MatriculaService matriculaService;
+    @Autowired private VinculoTurmaService vinculoTurmaService;
     @Autowired private ListaAnualService listaAnualService;
     @Autowired private AssistidoRepository assistidoRepository;
     @Autowired private TurmaRepository turmaRepository;
@@ -158,6 +159,25 @@ class ListaAnualIT {
         assertThat(linhaBruno.frequenciaPercentual()).isZero();
 
         assertThat(listaAnualService.anos()).contains(ano, ano + 1);
+    }
+
+    @Test
+    @DisplayName("Trocou de grupo no mesmo dia em que entrou: a lista mostra o grupo atual")
+    void trocaDeGrupoNoMesmoDia() {
+        Turma outro = new Turma();
+        outro.setNomeTurma("Grupo Lista Anual Tarde");
+        outro.setTurno(Turno.TARDE);
+        outro.setCapacidade(20);
+        outro.setDiasDaSemana(new ArrayList<>());
+        outro = turmaRepository.save(outro);
+
+        Long ana = cadastrar("Ana Trocou");
+        sincronizar();
+        Assistido assistido = assistidoRepository.findById(ana).orElseThrow();
+        vinculoTurmaService.vincular(assistido, outro); // mesmo dia da entrada
+        sincronizar();
+
+        assertThat(linha(listaAnualService.doAno(ano), ana).grupo()).isEqualTo("Grupo Lista Anual Tarde");
     }
 
     @Test

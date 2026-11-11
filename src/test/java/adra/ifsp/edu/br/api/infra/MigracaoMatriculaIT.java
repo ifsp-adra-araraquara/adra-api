@@ -153,4 +153,24 @@ class MigracaoMatriculaIT {
                         "insert into adra.matricula (assistido_id, ano) values (?, 2026)", ativoId))
                 .hasMessageContaining("uq_matricula_assistido_ano");
     }
+
+    @Test
+    @DisplayName("Rematrícula: um grupo aberto por matrícula — dois anos ao mesmo tempo pode, dois grupos no mesmo ano não")
+    void umGrupoAbertoPorMatricula() {
+        Long turma = jdbc.queryForObject("select turma_id from adra.turma limit 1", Long.class);
+        Long proxima = jdbc.queryForObject(
+                "insert into adra.matricula (assistido_id, ano) values (?, 2027) returning matricula_id", Long.class, ativoId);
+        String vinculo = """
+                insert into adra.turma_aluno (turma_id, assistido_id, matricula_id, data_entrada)
+                values (?, ?, ?, '2027-01-01')""";
+        try {
+            // O vínculo de 2026 continua aberto: o de 2027 entra junto.
+            jdbc.update(vinculo, turma, ativoId, proxima);
+            assertThatThrownBy(() -> jdbc.update(vinculo, turma, ativoId, proxima))
+                    .hasMessageContaining("uq_turma_aluno_um_ativo_por_matricula");
+        } finally {
+            jdbc.update("delete from adra.turma_aluno where matricula_id = ?", proxima);
+            jdbc.update("delete from adra.matricula where matricula_id = ?", proxima);
+        }
+    }
 }
