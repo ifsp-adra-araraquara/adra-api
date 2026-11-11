@@ -3,6 +3,8 @@ package adra.ifsp.edu.br.api.infra.armazenamento;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.time.Duration;
+import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
@@ -140,6 +142,56 @@ public class SupabaseArmazenamento implements ArmazenamentoArquivos {
         } catch (RestClientException e) {
             throw new ArmazenamentoException("Falha ao remover arquivo do Supabase: " + chave, e);
         }
+    }
+
+    /** Pastas do bucket (tipo/categoria/arquivo) são percorridas em profundidade; 1000 itens por página. */
+    @Override
+    public List<ObjetoArmazenado> listarTodos() {
+        List<ObjetoArmazenado> objetos = new ArrayList<>();
+        listar("", objetos, 0);
+        return objetos;
+    }
+
+    private static final int ITENS_POR_PAGINA = 1000;
+    private static final int PROFUNDIDADE_MAXIMA = 5;
+
+    private void listar(String prefixo, List<ObjetoArmazenado> objetos, int profundidade) {
+        if (profundidade > PROFUNDIDADE_MAXIMA) {
+            return;
+        }
+        for (int offset = 0; ; offset += ITENS_POR_PAGINA) {
+            ItemDaLista[] itens;
+            try {
+                itens = rest.post()
+                        .uri("/object/list/" + bucket)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body(Map.of("prefix", prefixo, "limit", ITENS_POR_PAGINA, "offset", offset,
+                                "sortBy", Map.of("column", "name", "order", "asc")))
+                        .retrieve()
+                        .body(ItemDaLista[].class);
+            } catch (RestClientException e) {
+                throw new ArmazenamentoException("Falha ao listar arquivos do Supabase em '" + prefixo + "'", e);
+            }
+            if (itens == null || itens.length == 0) {
+                return;
+            }
+            for (ItemDaLista item : itens) {
+                String caminho = prefixo.isEmpty() ? item.name() : prefixo + "/" + item.name();
+                if (item.id() == null) {
+                    listar(caminho, objetos, profundidade + 1); // pasta
+                } else {
+                    long tamanho = item.metadata() != null && item.metadata().get("size") instanceof Number n ? n.longValue() : 0;
+                    objetos.add(new ObjetoArmazenado(caminho,
+                            item.created_at() != null ? java.time.OffsetDateTime.parse(item.created_at()).toInstant() : Instant.EPOCH, tamanho));
+                }
+            }
+            if (itens.length < ITENS_POR_PAGINA) {
+                return;
+            }
+        }
+    }
+
+    private record ItemDaLista(String name, String id, String created_at, Map<String, Object> metadata) {
     }
 
     private record Assinatura(String signedURL) {
