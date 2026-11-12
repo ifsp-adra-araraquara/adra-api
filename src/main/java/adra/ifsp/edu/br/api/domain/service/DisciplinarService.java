@@ -198,7 +198,7 @@ public class DisciplinarService {
 
         RegistroDisciplinar registro = salvarRegistro(assistido, motivo, motivoTexto, nivel,
                 OrigemRegistroDisciplinar.MANUAL, null, dto.data(), dto.descricao().trim(), turma, inicio, fim,
-                usuario);
+                usuario);
         marcarRecomendacao(registro);
         if (inicio != null) {
             faltaPorSuspensaoService.sincronizar(assistido, inicio, fim, usuario); // FT-13: suspensão retroativa
