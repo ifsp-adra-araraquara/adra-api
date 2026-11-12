@@ -16,11 +16,13 @@ import adra.ifsp.edu.br.api.domain.repository.AssistidoRepository;
 import adra.ifsp.edu.br.api.domain.repository.PainelRepository;
 import adra.ifsp.edu.br.api.domain.repository.PreCadastroRepository;
 import adra.ifsp.edu.br.api.domain.repository.RegistroDisciplinarRepository;
+import adra.ifsp.edu.br.api.domain.repository.SemanarioRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -49,6 +51,7 @@ public class AvisoService {
     private final PainelRepository painelRepository;
     private final PreCadastroRepository preCadastroRepository;
     private final AssistidoRepository assistidoRepository;
+    private final SemanarioRepository semanarioRepository;
 
     @Cacheable(CacheConfig.PAINEL)
     public List<AvisoDTO> doPerfil(NomeNivelPermissao perfil) {
@@ -59,6 +62,7 @@ public class AvisoService {
                 avisos.addAll(disciplinares(hoje));
                 avisos.addAll(chamadasAtrasadas(hoje));
                 avisos.addAll(faltasSeguidas(hoje));
+                avisos.addAll(semanariosPendentes(hoje));
                 avisos.addAll(cadastro());
             }
             case ASSISTENTE_SOCIAL -> {
@@ -175,6 +179,23 @@ public class AvisoService {
                 .map(f -> new AvisoDTO(TipoAviso.FALTAS_SEGUIDAS, f.nome() + " — " + f.faltas() + " faltas seguidas",
                         (f.turma() != null ? f.turma() : "Sem grupo") + " · última chamada " + f.ultimaChamada().format(DIA_MES),
                         f.assistidoId(), null, f.ultimaChamada()))
+                .toList();
+    }
+
+    /**
+     * Semanário não enviado na semana, um aviso por oficina. A segunda fica para o oficineiro
+     * enviar; de terça em diante, o que falta aparece para o Coordenador.
+     */
+    List<AvisoDTO> semanariosPendentes(LocalDate hoje) {
+        if (hoje.getDayOfWeek() == DayOfWeek.MONDAY) {
+            return List.of();
+        }
+        LocalDate segunda = hoje.with(DayOfWeek.MONDAY);
+        return semanarioRepository.pendentesDaSemana(segunda).stream()
+                .map(p -> new AvisoDTO(TipoAviso.SEMANARIO_PENDENTE, p.getNomeOficina() + " — semanário da semana",
+                        (p.getGrupos() == 1 ? "1 grupo sem semanário" : p.getGrupos() + " grupos sem semanário")
+                                + " na semana de " + segunda.format(DIA_MES),
+                        null, null, segunda))
                 .toList();
     }
 

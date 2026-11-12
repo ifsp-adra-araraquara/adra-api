@@ -1,5 +1,6 @@
 package adra.ifsp.edu.br.api.domain.service;
 
+import adra.ifsp.edu.br.api.config.CacheConfig;
 import adra.ifsp.edu.br.api.domain.dto.semanario.SemanarioRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.semanario.SemanarioResponseDTO;
 import adra.ifsp.edu.br.api.domain.enums.AcaoSistema;
@@ -14,6 +15,7 @@ import adra.ifsp.edu.br.api.exception.EntidadeNaoEncontradaException;
 import adra.ifsp.edu.br.api.exception.RegraNegocioException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.DayOfWeek;
@@ -34,6 +36,7 @@ public class SemanarioService {
     private final ArquivoService arquivoService;
 
     /** Um semanário por oficina, grupo e semana: enviar de novo na mesma semana atualiza o plano. */
+    @CacheEvict(cacheNames = CacheConfig.PAINEL, allEntries = true) // aviso de semanário pendente
     public SemanarioResponseDTO enviar(SemanarioRequestDTO dto) {
         OficinaTurma vinculo = buscarVinculoAtivo(dto.oficinaId(), dto.turmaId());
         LocalDate segunda = dto.semana().with(DayOfWeek.MONDAY);
@@ -63,6 +66,7 @@ public class SemanarioService {
     }
 
     /** Remove o semanário e o material anexado a ele. */
+    @CacheEvict(cacheNames = CacheConfig.PAINEL, allEntries = true)
     public void remover(Long semanarioId) {
         Semanario semanario = semanarioRepository.findById(semanarioId)
                 .orElseThrow(() -> new EntidadeNaoEncontradaException("Semanário não encontrado: id " + semanarioId));

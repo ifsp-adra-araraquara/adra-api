@@ -1,5 +1,14 @@
 package adra.ifsp.edu.br.api.domain.service;
 
+import adra.ifsp.edu.br.api.domain.model.Oficina;
+import adra.ifsp.edu.br.api.domain.model.OficinaTurma;
+import adra.ifsp.edu.br.api.domain.model.Semanario;
+import adra.ifsp.edu.br.api.domain.model.Turma;
+import adra.ifsp.edu.br.api.domain.enums.Turno;
+import adra.ifsp.edu.br.api.domain.repository.OficinaRepository;
+import adra.ifsp.edu.br.api.domain.repository.OficinaTurmaRepository;
+import adra.ifsp.edu.br.api.domain.repository.SemanarioRepository;
+import adra.ifsp.edu.br.api.domain.repository.TurmaRepository;
 import adra.ifsp.edu.br.api.ContainerPostgresAdra;
 import adra.ifsp.edu.br.api.domain.dto.aviso.AvisoDTO;
 import adra.ifsp.edu.br.api.domain.dto.disciplinar.GerarPelaRecomendacaoRequestDTO;
@@ -59,6 +68,10 @@ class AvisoServiceIT {
     @Autowired private MotivoDisciplinarRepository motivoRepository;
     @Autowired private DisciplinarService disciplinarService;
     @Autowired private AvisoService avisoService;
+    @Autowired private OficinaRepository oficinaRepository;
+    @Autowired private TurmaRepository turmaRepository;
+    @Autowired private OficinaTurmaRepository oficinaTurmaRepository;
+    @Autowired private SemanarioRepository semanarioRepository;
     @Autowired private DataSource dataSource;
 
     private static final LocalDate HOJE = LocalDate.now();
@@ -146,6 +159,56 @@ class AvisoServiceIT {
                 .contains(tuple(TipoAviso.CADASTRO_SEM_NASCIMENTO, "1 atendido(s) sem data de nascimento"));
         assertThat(avisosComo(coordenador)).extracting(AvisoDTO::tipo).contains(TipoAviso.CADASTRO_SEM_NASCIMENTO);
         assertThat(avisosComo(educadorSocial)).extracting(AvisoDTO::tipo).doesNotContain(TipoAviso.CADASTRO_SEM_NASCIMENTO);
+    }
+
+    @Test
+    @DisplayName("Semanário da semana não enviado: aviso por oficina a partir de terça, some ao enviar")
+    void semanarioPendente() {
+        Oficina futebol = new Oficina();
+        futebol.setNomeOficina("Futebol");
+        futebol.setOficineiroResponsavel(oficineiro);
+        futebol = oficinaRepository.save(futebol);
+        Turma manha = grupo("SI Manhã");
+        Turma tarde = grupo("SI Tarde");
+        oficinaTurmaRepository.save(new OficinaTurma(futebol, manha));
+        oficinaTurmaRepository.save(new OficinaTurma(futebol, tarde));
+        LocalDate segunda = LocalDate.of(2026, 11, 9);
+        LocalDate quarta = segunda.plusDays(2);
+
+        assertThat(avisoService.semanariosPendentes(segunda)).isEmpty();
+        assertThat(avisoService.semanariosPendentes(quarta))
+                .extracting(AvisoDTO::tipo, AvisoDTO::titulo, AvisoDTO::detalhe)
+                .containsExactly(tuple(TipoAviso.SEMANARIO_PENDENTE, "Futebol — semanário da semana",
+                        "2 grupos sem semanário na semana de 09/11"));
+
+        Semanario enviado = new Semanario();
+        enviado.setOficina(futebol);
+        enviado.setTurma(manha);
+        enviado.setSemanaInicio(segunda);
+        enviado.setConteudoPrevisto("Passes curtos");
+        enviado.setEnviadoPor(oficineiro);
+        semanarioRepository.save(enviado);
+        assertThat(avisoService.semanariosPendentes(quarta)).extracting(AvisoDTO::detalhe)
+                .containsExactly("1 grupo sem semanário na semana de 09/11");
+
+        enviado = new Semanario();
+        enviado.setOficina(futebol);
+        enviado.setTurma(tarde);
+        enviado.setSemanaInicio(segunda);
+        enviado.setConteudoPrevisto("Chute a gol");
+        enviado.setEnviadoPor(oficineiro);
+        semanarioRepository.save(enviado);
+        assertThat(avisoService.semanariosPendentes(quarta)).isEmpty();
+        // A semana seguinte começa sem nada enviado.
+        assertThat(avisoService.semanariosPendentes(quarta.plusWeeks(1))).hasSize(1);
+    }
+
+    private Turma grupo(String nome) {
+        Turma turma = new Turma();
+        turma.setNomeTurma(nome);
+        turma.setTurno(Turno.MANHA);
+        turma.setCapacidade(20);
+        return turmaRepository.save(turma);
     }
 
     private List<AvisoDTO> avisosComo(Usuario usuario) {
