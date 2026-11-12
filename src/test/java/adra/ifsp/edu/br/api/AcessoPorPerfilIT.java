@@ -140,6 +140,7 @@ class AcessoPorPerfilIT {
                 arguments(HttpMethod.PATCH, "/api/disciplinar/" + INEXISTENTE + "/documento-devolvido", Set.of(COORDENADOR)),
 
                 arguments(HttpMethod.GET, "/api/turmas", Set.of(COORDENADOR, ASSISTENTE_SOCIAL)),
+                arguments(HttpMethod.GET, "/api/listas/evento?turmaIds=" + INEXISTENTE, Set.of(COORDENADOR)),
                 arguments(HttpMethod.GET, "/api/oficinas", Set.of(COORDENADOR, ASSISTENTE_SOCIAL)),
                 arguments(HttpMethod.PATCH, "/api/oficinas/" + INEXISTENTE + "/inativar", Set.of(COORDENADOR)),
 
