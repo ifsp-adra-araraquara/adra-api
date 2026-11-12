@@ -150,7 +150,7 @@ public class PainelRepository {
     }
 
     public record AssistidosResumo(long ativos, long ativosAntes, long entradas, long saidas,
-                                   long ate5, long de6a9, long de10a13, long de14a17, long de18, long semData) {
+                                   long ate5, long de6a10, long de11a13, long de14a17, long de18, long semData) {
     }
 
     /**
@@ -177,8 +177,8 @@ public class PainelRepository {
                                COUNT(*) FILTER (WHERE entrada BETWEEN :inicio AND :fim) AS entradas,
                                COUNT(*) FILTER (WHERE data_saida BETWEEN :inicio AND :fim) AS saidas,
                                COUNT(*) FILTER (WHERE ativo_ref AND idade <= 5) AS ate5,
-                               COUNT(*) FILTER (WHERE ativo_ref AND idade BETWEEN 6 AND 9) AS de6a9,
-                               COUNT(*) FILTER (WHERE ativo_ref AND idade BETWEEN 10 AND 13) AS de10a13,
+                               COUNT(*) FILTER (WHERE ativo_ref AND idade BETWEEN 6 AND 10) AS de6a10,
+                               COUNT(*) FILTER (WHERE ativo_ref AND idade BETWEEN 11 AND 13) AS de11a13,
                                COUNT(*) FILTER (WHERE ativo_ref AND idade BETWEEN 14 AND 17) AS de14a17,
                                COUNT(*) FILTER (WHERE ativo_ref AND idade >= 18) AS de18,
                                COUNT(*) FILTER (WHERE ativo_ref AND idade IS NULL) AS sem_data
@@ -192,7 +192,7 @@ public class PainelRepository {
                 .query((rs, i) -> new AssistidosResumo(
                         rs.getLong("ativos"), rs.getLong("ativos_antes"),
                         rs.getLong("entradas"), rs.getLong("saidas"),
-                        rs.getLong("ate5"), rs.getLong("de6a9"), rs.getLong("de10a13"),
+                        rs.getLong("ate5"), rs.getLong("de6a10"), rs.getLong("de11a13"),
                         rs.getLong("de14a17"), rs.getLong("de18"), rs.getLong("sem_data")))
                 .single();
     }

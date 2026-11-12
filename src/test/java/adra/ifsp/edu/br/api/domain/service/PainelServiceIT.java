@@ -141,6 +141,21 @@ class PainelServiceIT {
     }
 
     @Test
+    @DisplayName("Faixas etárias da ADRA: 6 a 10, 11 a 13 e 14 a 17 (idade no fim do mês)")
+    void faixasEtarias() {
+        LocalDate referencia = MES.atEndOfMonth();
+        matricular("Davi Dez", referencia.minusYears(10), MES.atDay(1), null);
+        matricular("Elis Catorze", referencia.minusYears(14), MES.atDay(1), null);
+
+        // Ana faz 11 no ano; Bruno ainda tem 9; Davi completa 10 no último dia do mês
+        assertThat(mensal().faixasEtarias())
+                .extracting(PainelMensalDTO.FaixaEtaria::rotulo, PainelMensalDTO.FaixaEtaria::total)
+                .containsExactly(
+                        tuple("Até 5", 0L), tuple("6–10", 2L), tuple("11–13", 1L),
+                        tuple("14–17", 1L), tuple("18+", 0L), tuple("Sem data", 0L));
+    }
+
+    @Test
     @DisplayName("Frequência do mês: presença esparsa, FJ como ausência e desligado fora")
     void frequenciaDoMes() {
         Chamada c1 = chamada(MES.atDay(5));
