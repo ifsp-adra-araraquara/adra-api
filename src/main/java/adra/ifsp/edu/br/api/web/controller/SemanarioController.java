@@ -38,7 +38,7 @@ public class SemanarioController {
         return ResponseEntity.ok(semanarioService.listarDoOficineiroAtual());
     }
 
-    @PreAuthorize("hasAnyRole('EDUCADOR_SOCIAL', 'ASSISTENTE_SOCIAL', 'COORDENADOR')")
+    @PreAuthorize("hasAnyRole('ASSISTENTE_SOCIAL', 'COORDENADOR')")
     @GetMapping("/oficina/{oficinaId}")
     public ResponseEntity<List<SemanarioResponseDTO>> listarPorOficina(@PathVariable Long oficinaId) {
         return ResponseEntity.ok(semanarioService.listarPorOficina(oficinaId));

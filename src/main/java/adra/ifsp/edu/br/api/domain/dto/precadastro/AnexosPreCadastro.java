@@ -4,7 +4,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
-/** Anexos do link público (partes do multipart): comprovante obrigatório, o resto opcional. Vazios já vêm filtrados. */
+/** Anexos do link público (partes do multipart): comprovante, foto e documentos obrigatórios. Vazios já vêm filtrados. */
 public record AnexosPreCadastro(
         MultipartFile foto,
         List<MultipartFile> documentosCrianca,

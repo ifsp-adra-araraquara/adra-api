@@ -145,6 +145,15 @@ public class PreCadastroService {
         if (anexos.comprovanteEndereco() == null) {
             throw new ArquivoInvalidoException("Envie o comprovante de endereço.");
         }
+        if (anexos.foto() == null) {
+            throw new ArquivoInvalidoException("Envie a foto do atendido.");
+        }
+        if (anexos.documentosCrianca().isEmpty()) {
+            throw new ArquivoInvalidoException("Envie o documento do atendido (RG ou CPF).");
+        }
+        if (anexos.documentosResponsavel().isEmpty()) {
+            throw new ArquivoInvalidoException("Envie o documento do responsável (RG ou CPF).");
+        }
         if (anexos.documentosCrianca().size() > MAXIMO_DOCUMENTOS || anexos.documentosResponsavel().size() > MAXIMO_DOCUMENTOS) {
             throw new ArquivoInvalidoException("Envie no máximo 2 arquivos por documento (frente e verso).");
         }

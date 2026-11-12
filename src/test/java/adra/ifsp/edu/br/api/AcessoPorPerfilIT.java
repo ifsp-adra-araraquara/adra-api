@@ -114,12 +114,12 @@ class AcessoPorPerfilIT {
 
     static Stream<Arguments> matriz() {
         return Stream.of(
-                arguments(HttpMethod.GET, "/api/assistidos", Set.of(COORDENADOR, ASSISTENTE_SOCIAL, EDUCADOR_SOCIAL)),
-                arguments(HttpMethod.GET, "/api/assistidos/contagem", Set.of(COORDENADOR, ASSISTENTE_SOCIAL, EDUCADOR_SOCIAL)),
+                arguments(HttpMethod.GET, "/api/assistidos", Set.of(COORDENADOR, ASSISTENTE_SOCIAL)),
+                arguments(HttpMethod.GET, "/api/assistidos/contagem", Set.of(COORDENADOR, ASSISTENTE_SOCIAL)),
                 arguments(HttpMethod.GET, "/api/arquivos/fotos-perfil?entidadeTipo=ASSISTIDO&entidadeIds=" + INEXISTENTE, Set.of(COORDENADOR, ASSISTENTE_SOCIAL, EDUCADOR_SOCIAL)),
                 arguments(HttpMethod.GET, "/api/arquivos/fotos-perfil?entidadeTipo=PRE_CADASTRO&entidadeIds=" + INEXISTENTE, Set.of()),
-                arguments(HttpMethod.GET, "/api/assistidos/" + INEXISTENTE, Set.of(COORDENADOR, ASSISTENTE_SOCIAL, EDUCADOR_SOCIAL)),
-                arguments(HttpMethod.GET, "/api/responsaveis", Set.of(COORDENADOR, ASSISTENTE_SOCIAL, EDUCADOR_SOCIAL)),
+                arguments(HttpMethod.GET, "/api/assistidos/" + INEXISTENTE, Set.of(COORDENADOR, ASSISTENTE_SOCIAL)),
+                arguments(HttpMethod.GET, "/api/responsaveis", Set.of(COORDENADOR, ASSISTENTE_SOCIAL)),
                 arguments(HttpMethod.DELETE, "/api/assistidos/" + INEXISTENTE + "/responsaveis/1", Set.of()),
 
                 // aprovar e reprovar têm corpo obrigatório: o 403 deles está no PreCadastroIT.
@@ -135,14 +135,15 @@ class AcessoPorPerfilIT {
 
                 arguments(HttpMethod.GET, "/api/avisos", Set.of(COORDENADOR, ASSISTENTE_SOCIAL, EDUCADOR_SOCIAL, OFICINEIRO)),
 
-                arguments(HttpMethod.GET, "/api/disciplinar/registros", Set.of(COORDENADOR, ASSISTENTE_SOCIAL, EDUCADOR_SOCIAL)),
+                arguments(HttpMethod.GET, "/api/disciplinar/registros", Set.of(COORDENADOR, ASSISTENTE_SOCIAL)),
+                arguments(HttpMethod.GET, "/api/disciplinar/sinalizacoes?assistidoIds=" + INEXISTENTE, Set.of(COORDENADOR, ASSISTENTE_SOCIAL, EDUCADOR_SOCIAL)),
                 arguments(HttpMethod.PATCH, "/api/disciplinar/" + INEXISTENTE + "/documento-devolvido", Set.of(COORDENADOR)),
 
-                arguments(HttpMethod.GET, "/api/turmas", Set.of(COORDENADOR, ASSISTENTE_SOCIAL, EDUCADOR_SOCIAL)),
-                arguments(HttpMethod.GET, "/api/oficinas", Set.of(COORDENADOR, ASSISTENTE_SOCIAL, EDUCADOR_SOCIAL)),
+                arguments(HttpMethod.GET, "/api/turmas", Set.of(COORDENADOR, ASSISTENTE_SOCIAL)),
+                arguments(HttpMethod.GET, "/api/oficinas", Set.of(COORDENADOR, ASSISTENTE_SOCIAL)),
                 arguments(HttpMethod.PATCH, "/api/oficinas/" + INEXISTENTE + "/inativar", Set.of(COORDENADOR)),
 
-                arguments(HttpMethod.GET, "/api/semanarios/oficina/" + INEXISTENTE, Set.of(COORDENADOR, ASSISTENTE_SOCIAL, EDUCADOR_SOCIAL)),
+                arguments(HttpMethod.GET, "/api/semanarios/oficina/" + INEXISTENTE, Set.of(COORDENADOR, ASSISTENTE_SOCIAL)),
                 arguments(HttpMethod.GET, "/api/semanarios/meus", Set.of(OFICINEIRO)),
                 arguments(HttpMethod.GET, "/api/excecoes-calendario", Set.of(COORDENADOR, ASSISTENTE_SOCIAL, EDUCADOR_SOCIAL, OFICINEIRO)),
                 arguments(HttpMethod.GET, "/api/notas-calendario", Set.of(COORDENADOR, ASSISTENTE_SOCIAL, EDUCADOR_SOCIAL, OFICINEIRO)),
@@ -284,6 +285,9 @@ class AcessoPorPerfilIT {
         mvc.perform(multipart("/api/pre-cadastro")
                         .file(new MockMultipartFile("dados", "", MediaType.APPLICATION_JSON_VALUE, corpo.getBytes()))
                         .file(new MockMultipartFile("comprovanteEndereco", "comprovante.pdf", MediaType.APPLICATION_PDF_VALUE, pdfMinimo()))
+                        .file(new MockMultipartFile("foto", "foto.png", MediaType.IMAGE_PNG_VALUE, pngMinimo()))
+                        .file(new MockMultipartFile("documentosCrianca", "rg.pdf", MediaType.APPLICATION_PDF_VALUE, pdfMinimo()))
+                        .file(new MockMultipartFile("documentosResponsavel", "rg-mae.pdf", MediaType.APPLICATION_PDF_VALUE, pdfMinimo()))
                         .param("captcha", "token-valido")
                         .header("X-Forwarded-For", "acesso-" + UUID.randomUUID()))
                 .andExpect(status().isCreated());

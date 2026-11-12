@@ -41,7 +41,7 @@ public class VinculoFamiliarController {
         return ResponseEntity.created(local).body(criado);
     }
 
-    @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL', 'EDUCADOR_SOCIAL')")
+    @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL')")
     @GetMapping
     public ResponseEntity<List<VinculoFamiliarResponseDTO>> listar(@PathVariable Long assistidoId) {
         return ResponseEntity.ok(vinculoFamiliarService.listarPorAssistido(assistidoId));

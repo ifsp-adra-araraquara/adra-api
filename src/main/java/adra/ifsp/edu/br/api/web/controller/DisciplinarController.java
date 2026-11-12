@@ -38,7 +38,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api")
 @RequiredArgsConstructor
-@PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL', 'EDUCADOR_SOCIAL')")
+@PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL')")
 public class DisciplinarController {
 
     private final DisciplinarService disciplinarService;
@@ -84,7 +84,7 @@ public class DisciplinarController {
     }
 
     /** FT-22: um fato com vários atendidos — um registro por atendido, tudo ou nada. */
-    @PreAuthorize("hasAnyRole('COORDENADOR', 'EDUCADOR_SOCIAL')")
+    @PreAuthorize("hasRole('COORDENADOR')")
     @PostMapping("/disciplinar/registros")
     public ResponseEntity<List<RegistroCriadoDTO>> registrarVarios(@Valid @RequestBody RegistroVariosRequestDTO dto) {
         return ResponseEntity.status(HttpStatus.CREATED).body(disciplinarService.registrarVarios(dto));
@@ -103,7 +103,7 @@ public class DisciplinarController {
     }
 
     /** Devolve o registro lançado e a recomendação pendente do assistido, se houver. */
-    @PreAuthorize("hasAnyRole('COORDENADOR', 'EDUCADOR_SOCIAL')")
+    @PreAuthorize("hasRole('COORDENADOR')")
     @PostMapping("/assistidos/{assistidoId}/disciplinar")
     public ResponseEntity<RegistroCriadoDTO> registrar(
             @PathVariable Long assistidoId,
@@ -190,7 +190,11 @@ public class DisciplinarController {
 
     // ---- Sinalizações (chamada e listagem) ----
 
-    /** Ex.: GET /api/disciplinar/sinalizacoes?assistidoIds=1,2,3&data=2026-10-24 (sem data = hoje). */
+    /**
+     * Ex.: GET /api/disciplinar/sinalizacoes?assistidoIds=1,2,3&data=2026-10-24 (sem data = hoje).
+     * Único endpoint do disciplinar aberto ao Educador Social: o selo "Suspenso" dentro da chamada.
+     */
+    @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL', 'EDUCADOR_SOCIAL')")
     @GetMapping("/disciplinar/sinalizacoes")
     public ResponseEntity<List<SinalizacaoDisciplinarDTO>> buscarSinalizacoes(
             @RequestParam List<Long> assistidoIds,

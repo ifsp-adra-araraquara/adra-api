@@ -47,7 +47,7 @@ public class AssistidoController {
         return ResponseEntity.ok(assistidoLoteService.validar(itens));
     }
 
-    @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL', 'EDUCADOR_SOCIAL') "
+    @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL') "
             + "or (hasRole('OFICINEIRO') and @acessoTurma.oficineiroPodeListarAssistidos(#turmaId, #busca))")
     @GetMapping
     public ResponseEntity<PaginaDTO<AssistidoResponseDTO>> listar(
@@ -64,7 +64,7 @@ public class AssistidoController {
     }
 
     /** Totais das abas da listagem (Todos / Ativos / Inativos / Em acompanhamento). */
-    @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL', 'EDUCADOR_SOCIAL') "
+    @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL') "
             + "or (hasRole('OFICINEIRO') and @acessoTurma.oficineiroPodeListarAssistidos(#turmaId, #busca))")
     @GetMapping("/contagem")
     public ResponseEntity<AssistidoContagemDTO> contar(
@@ -93,13 +93,13 @@ public class AssistidoController {
         return ResponseEntity.ok(assistidoService.verificarDuplicidade(nomeCompleto, dataNascimento));
     }
 
-    @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL', 'EDUCADOR_SOCIAL')")
+    @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL')")
     @GetMapping("/cpf/{cpf}")
     public ResponseEntity<AssistidoResponseDTO> buscarPorCpf(@PathVariable String cpf) {
         return ResponseEntity.ok(assistidoService.buscarPorCpf(cpf));
     }
 
-    @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL', 'EDUCADOR_SOCIAL')")
+    @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL')")
     @GetMapping("/{id}")
     public ResponseEntity<AssistidoResponseDTO> buscarPorId(@PathVariable Long id) {
         return ResponseEntity.ok(assistidoService.buscarPorId(id));
@@ -120,7 +120,7 @@ public class AssistidoController {
     }
 
     /** Aba "Turmas" do modal do assistido — histórico de vínculos (turma_aluno), só pro coordenador. */
-    @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL', 'EDUCADOR_SOCIAL')")
+    @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL')")
     @GetMapping("/{id}/turmas")
     public ResponseEntity<List<VinculoTurmaAssistidoResponseDTO>> listarHistoricoTurmas(@PathVariable Long id) {
         return ResponseEntity.ok(assistidoService.listarHistoricoTurmas(id));

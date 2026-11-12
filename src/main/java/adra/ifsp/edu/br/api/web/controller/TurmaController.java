@@ -25,7 +25,7 @@ public class TurmaController {
 
     private final TurmaService turmaService;
 
-    @PreAuthorize("hasAnyRole('EDUCADOR_SOCIAL', 'ASSISTENTE_SOCIAL', 'COORDENADOR')")
+    @PreAuthorize("hasAnyRole('ASSISTENTE_SOCIAL', 'COORDENADOR')")
     @GetMapping
     public ResponseEntity<List<TurmaResponseDTO>> listar(
             @RequestParam(required = false) String nome,
@@ -79,7 +79,7 @@ public class TurmaController {
         return ResponseEntity.ok(turmaCriada);
     }
 
-    @PreAuthorize("hasAnyRole('EDUCADOR_SOCIAL', 'ASSISTENTE_SOCIAL', 'COORDENADOR')")
+    @PreAuthorize("hasAnyRole('ASSISTENTE_SOCIAL', 'COORDENADOR')")
     @GetMapping("/{id}")
     public ResponseEntity<TurmaResponseDTO> buscarPorId(
             @PathVariable Long id
@@ -105,7 +105,7 @@ public class TurmaController {
         return ResponseEntity.ok(turmaService.alterarStatus(id, statusRequestDTO));
     }
 
-    @PreAuthorize("hasAnyRole('OFICINEIRO', 'EDUCADOR_SOCIAL', 'ASSISTENTE_SOCIAL', 'COORDENADOR')")
+    @PreAuthorize("hasAnyRole('OFICINEIRO', 'ASSISTENTE_SOCIAL', 'COORDENADOR')")
     @GetMapping("/minhas-turmas/{idOficineiro}")
     public ResponseEntity<List<TurmaComAlunosResponseDTO>> minhasTurmas(
             @PathVariable Long idOficineiro
@@ -113,7 +113,7 @@ public class TurmaController {
         return ResponseEntity.ok(turmaService.minhasTurmas(idOficineiro));
     }
 
-    @PreAuthorize("hasAnyRole('OFICINEIRO', 'EDUCADOR_SOCIAL', 'ASSISTENTE_SOCIAL', 'COORDENADOR')")
+    @PreAuthorize("hasAnyRole('OFICINEIRO', 'ASSISTENTE_SOCIAL', 'COORDENADOR')")
     @GetMapping("/oficina/{idOficina}")
     public ResponseEntity<List<TurmaResponseDTO>> minhasTurmasPorOficina(
             @PathVariable Long idOficina
@@ -132,7 +132,7 @@ public class TurmaController {
         return ResponseEntity.ok(turmaService.vincularAlunos(id, dto));
     }
 
-    @PreAuthorize("hasAnyRole('EDUCADOR_SOCIAL', 'ASSISTENTE_SOCIAL', 'COORDENADOR')")
+    @PreAuthorize("hasAnyRole('ASSISTENTE_SOCIAL', 'COORDENADOR')")
     @GetMapping("/{id}/alunos")
     public ResponseEntity<List<AssistidoResponseDTO>> listarAlunosVinculados(@PathVariable Long id) {
         return ResponseEntity.ok(turmaService.listarAlunosVinculados(id));

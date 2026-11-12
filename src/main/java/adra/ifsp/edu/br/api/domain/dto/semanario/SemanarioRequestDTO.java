@@ -17,7 +17,7 @@ public record SemanarioRequestDTO(
         @NotNull(message = "Informe a semana.")
         LocalDate semana,
 
-        @NotBlank(message = "Descreva o plano da semana.")
+        @NotBlank(message = "Descreva os conteúdos da semana.")
         String conteudoPrevisto,
 
         String objetivos,
