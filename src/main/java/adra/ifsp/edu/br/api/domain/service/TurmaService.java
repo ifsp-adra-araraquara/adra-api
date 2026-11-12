@@ -2,6 +2,8 @@ package adra.ifsp.edu.br.api.domain.service;
 
 import adra.ifsp.edu.br.api.config.CacheConfig;
 import adra.ifsp.edu.br.api.domain.dto.assistido.AssistidoResponseDTO;
+import adra.ifsp.edu.br.api.domain.dto.turma.CorrecaoDataEntradaRequestDTO;
+import adra.ifsp.edu.br.api.domain.dto.turma.CorrecaoDataEntradaResponseDTO;
 import adra.ifsp.edu.br.api.domain.dto.turma.TurmaComAlunosResponseDTO;
 import adra.ifsp.edu.br.api.domain.dto.turma.TurmaRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.turma.TurmaResponseDTO;
@@ -18,6 +20,7 @@ import adra.ifsp.edu.br.api.domain.model.Assistido;
 import adra.ifsp.edu.br.api.domain.model.Oficina;
 import adra.ifsp.edu.br.api.domain.model.OficinaTurma;
 import adra.ifsp.edu.br.api.domain.model.Turma;
+import adra.ifsp.edu.br.api.domain.repository.ChamadaRepository;
 import adra.ifsp.edu.br.api.domain.repository.AssistidoRepository;
 import adra.ifsp.edu.br.api.domain.repository.OficinaRepository;
 import adra.ifsp.edu.br.api.domain.repository.OficinaTurmaRepository;
@@ -33,6 +36,7 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -52,6 +56,7 @@ public class TurmaService {
     private final VinculoTurmaService vinculoTurmaService;
     private final OficinaTurmaRepository oficinaTurmaRepository;
     private final OficinaRepository oficinaRepository;
+    private final ChamadaRepository chamadaRepository;
 
     /**
      * Grupos atendidos pelas oficinas do oficineiro, já com o nome da oficina
@@ -297,6 +302,30 @@ public class TurmaService {
                 .stream()
                 .map(vinculo -> assistidoMapper.paraDTO(vinculo.getAssistido()))
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * Pedido da ADRA (11/11): chamada de todo o mês. Corrige quando os atendidos entraram no grupo,
+     * para a chamada dos dias anteriores ao vínculo mostrar todos. Devolve quantos mudaram e
+     * quantas chamadas já lançadas há no período: nelas os corrigidos passam a contar como
+     * presentes (a presença é esparsa), e o Coordenador precisa conferir.
+     */
+    @CacheEvict(cacheNames = {CacheConfig.ESTRUTURA, CacheConfig.PAINEL}, allEntries = true)
+    public CorrecaoDataEntradaResponseDTO corrigirDataEntrada(Long turmaId, CorrecaoDataEntradaRequestDTO dto) {
+        Turma turma = buscarEntidadePorId(turmaId);
+        int corrigidos = vinculoTurmaService.corrigirDataEntrada(turma, dto.dataEntrada(), dto.assistidoIds());
+        auditoriaService.registrar(
+                ModuloSistema.TURMAS,
+                "turma_aluno",
+                turmaId,
+                AcaoSistema.EDITAR,
+                null,
+                Map.of("dataEntrada", dto.dataEntrada().toString(), "vinculosCorrigidos", String.valueOf(corrigidos)),
+                "Correção da data de entrada no grupo"
+        );
+        long chamadasLancadas = corrigidos == 0 ? 0
+                : chamadaRepository.countByTurmaAndDataChamadaBetween(turma, dto.dataEntrada(), LocalDate.now().minusDays(1));
+        return new CorrecaoDataEntradaResponseDTO(corrigidos, chamadasLancadas);
     }
 
     Turma buscarEntidadePorId(Long id) {

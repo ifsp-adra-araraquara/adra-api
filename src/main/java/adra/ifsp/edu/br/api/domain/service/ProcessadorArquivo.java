@@ -7,6 +7,8 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.Iterator;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
 
 import javax.imageio.ImageIO;
 import javax.imageio.ImageReader;
@@ -32,6 +34,15 @@ public class ProcessadorArquivo {
     /** Acima disso nem decodifica (proteção contra "image bomb" estourando a memória): ~64 MB decodificada. */
     private static final long PIXELS_MAXIMOS_ENTRADA = 4096L * 4096;
     private static final float QUALIDADE_JPEG = 0.8f;
+    /**
+     * Imagens decodificadas ao mesmo tempo. Uma foto de celular aberta ocupa ~50-65 MB e o
+     * container tem 1 GB (heap ~650 MB): sem limite, uns pré-cadastros juntos (até 5 fotos
+     * cada) estouram a memória e o -XX:+ExitOnOutOfMemoryError derruba a API.
+     */
+    private static final int IMAGENS_SIMULTANEAS = 2;
+    private static final long ESPERA_MAXIMA_SEGUNDOS = 30;
+
+    private final Semaphore vagas = new Semaphore(IMAGENS_SIMULTANEAS, true);
 
     public record ArquivoProcessado(byte[] conteudo, String mimeType, String extensao) {
     }
@@ -53,13 +64,29 @@ public class ProcessadorArquivo {
 
         ArquivoProcessado processado = "application/pdf".equals(tipoReal)
                 ? new ArquivoProcessado(original, tipoReal, "pdf") // PDF já é compactado por dentro
-                : processarImagem(original, categoria);
+                : processarImagemNaVez(original, categoria);
 
         if (processado.conteudo().length > categoria.getTamanhoMaximoBytes()) {
             throw ArquivoMuitoGrandeException.de(processado.conteudo().length, categoria.getTamanhoMaximoBytes(),
                     "application/pdf".equals(processado.mimeType()));
         }
         return processado;
+    }
+
+    private ArquivoProcessado processarImagemNaVez(byte[] original, CategoriaArquivo categoria) {
+        try {
+            if (!vagas.tryAcquire(ESPERA_MAXIMA_SEGUNDOS, TimeUnit.SECONDS)) {
+                throw new ArquivoInvalidoException("Muitas imagens sendo enviadas agora. Tente de novo em instantes.");
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new ArquivoInvalidoException("Envio interrompido. Tente de novo.");
+        }
+        try {
+            return processarImagem(original, categoria);
+        } finally {
+            vagas.release();
+        }
     }
 
     private ArquivoProcessado processarImagem(byte[] original, CategoriaArquivo categoria) {

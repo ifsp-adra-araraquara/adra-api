@@ -12,5 +12,7 @@ public enum TipoAviso {
     CHAMADA_DE_HOJE,
     FALTAS_SEGUIDAS,
     PRE_CADASTRO_PENDENTE,
-    CADASTRO_SEM_NASCIMENTO
+    CADASTRO_SEM_NASCIMENTO,
+    /** Grupo atendido por uma oficina sem o semanário da semana (a partir de terça). */
+    SEMANARIO_PENDENTE
 }

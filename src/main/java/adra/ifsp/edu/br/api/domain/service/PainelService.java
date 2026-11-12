@@ -128,8 +128,8 @@ public class PainelService {
                 turmas,
                 List.of(
                         new PainelMensalDTO.FaixaEtaria("Até 5", assistidos.ate5()),
-                        new PainelMensalDTO.FaixaEtaria("6–9", assistidos.de6a9()),
-                        new PainelMensalDTO.FaixaEtaria("10–13", assistidos.de10a13()),
+                        new PainelMensalDTO.FaixaEtaria("6–10", assistidos.de6a10()),
+                        new PainelMensalDTO.FaixaEtaria("11–13", assistidos.de11a13()),
                         new PainelMensalDTO.FaixaEtaria("14–17", assistidos.de14a17()),
                         new PainelMensalDTO.FaixaEtaria("18+", assistidos.de18()),
                         new PainelMensalDTO.FaixaEtaria("Sem data", assistidos.semData())));

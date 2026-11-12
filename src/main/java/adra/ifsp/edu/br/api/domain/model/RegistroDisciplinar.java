@@ -43,6 +43,10 @@ public class RegistroDisciplinar {
     @JoinColumn(name = "motivo_id", updatable = false)
     private MotivoDisciplinar motivo;
 
+    /** Motivo escrito à mão (registros novos); os antigos usam {@link #motivo}. */
+    @Column(name = "motivo_texto", length = 200, updatable = false)
+    private String motivoTexto;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "nivel", length = 20, nullable = false, updatable = false)
     private NivelDisciplinar nivel;

@@ -36,6 +36,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -269,7 +270,7 @@ public class ChamadaService {
                 "Chamada do grupo no dia");
     }
 
-    /** Coordenador grava qualquer dia passado, até fora da grade; Educador Social só o dia de hoje, se o grupo tem chamada nele. */
+    /** Coordenador grava qualquer dia passado, até fora da grade; Educador Social, os dias do mês atual em que o grupo tem chamada. */
     private void validarGravacao(Turma turma, LocalDate data, Usuario usuario) {
         if (data.isAfter(LocalDate.now())) {
             throw new RegraNegocioException("Não é possível lançar a chamada de um dia futuro.");
@@ -281,8 +282,8 @@ public class ChamadaService {
         if (ehCoordenador(usuario)) {
             return;
         }
-        if (!data.isEqual(LocalDate.now())) {
-            throw new AcessoNegadoException("O Educador Social só pode lançar a chamada do dia de hoje.");
+        if (!noMesAtual(data)) {
+            throw new AcessoNegadoException("O Educador Social só lança e corrige a chamada do mês atual.");
         }
         if (!diasDeChamadaService.temChamadaNoDia(turma, data)) {
             throw new RegraNegocioException("O grupo " + turma.getNomeTurma() + " não tem chamada neste dia da semana.");
@@ -319,8 +320,14 @@ public class ChamadaService {
             return true;
         }
         return perfil == NomeNivelPermissao.EDUCADOR_SOCIAL
-                && data.isEqual(LocalDate.now())
+                && noMesAtual(data)
                 && diasDeChamadaService.temChamadaNoDia(turma, data);
+    }
+
+    /** Pedido da ADRA (11/11): o Educador Social lança e corrige qualquer dia do mês vigente, até hoje. */
+    private static boolean noMesAtual(LocalDate data) {
+        LocalDate hoje = LocalDate.now();
+        return !data.isAfter(hoje) && YearMonth.from(data).equals(YearMonth.from(hoje));
     }
 
     private boolean ehCoordenador(Usuario usuario) {
