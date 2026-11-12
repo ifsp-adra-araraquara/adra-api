@@ -124,7 +124,7 @@ class AvisoServiceIT {
         // Período informado: sem ele, a suspensão começa no próximo dia de atividade, não hoje.
         autenticarComo(coordenador);
         disciplinarService.registrar(assistido.getAssistidoId(), new RegistroDisciplinarRequestDTO(
-                bullying.getMotivoId(), HOJE, "Descrição do fato", null, HOJE, HOJE.plusDays(2)));
+                null, null, bullying.getMotivoId(), HOJE, "Descrição do fato", null, HOJE, HOJE.plusDays(2)));
 
         assertThat(avisosComo(coordenador)).extracting(AvisoDTO::tipo).contains(TipoAviso.SUSPENSO_HOJE);
         assertThat(avisosComo(educadorSocial)).extracting(AvisoDTO::tipo).contains(TipoAviso.SUSPENSO_HOJE)
@@ -155,7 +155,7 @@ class AvisoServiceIT {
     private Long registrar(MotivoDisciplinar motivo) {
         autenticarComo(coordenador);
         return disciplinarService.registrar(assistido.getAssistidoId(),
-                new RegistroDisciplinarRequestDTO(motivo.getMotivoId(), HOJE, "Descrição do fato", null, null, null))
+                new RegistroDisciplinarRequestDTO(null, null, motivo.getMotivoId(), HOJE, "Descrição do fato", null, null, null))
                 .registro().registroId();
     }
 

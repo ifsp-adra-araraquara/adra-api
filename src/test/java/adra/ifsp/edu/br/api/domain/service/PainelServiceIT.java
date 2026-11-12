@@ -246,7 +246,7 @@ class PainelServiceIT {
                 MotivoDisciplinar.builder().nome("Palavrão").nivel(NivelDisciplinar.OCORRENCIA).build());
         for (int i = 0; i < 2; i++) {
             disciplinarService.registrar(ana.getAssistidoId(),
-                    new RegistroDisciplinarRequestDTO(palavrao.getMotivoId(), HOJE, "Fato", null, null, null));
+                    new RegistroDisciplinarRequestDTO(null, null, palavrao.getMotivoId(), HOJE, "Fato", null, null, null));
         }
         entityManager.flush();
 
@@ -276,9 +276,9 @@ class PainelServiceIT {
         MotivoDisciplinar agressao = motivoRepository.save(
                 MotivoDisciplinar.builder().nome("Agressão").nivel(NivelDisciplinar.ADVERTENCIA).build());
         disciplinarService.registrar(bruno.getAssistidoId(),
-                new RegistroDisciplinarRequestDTO(agressao.getMotivoId(), MES.atDay(10), "Fato", null, null, null));
+                new RegistroDisciplinarRequestDTO(null, null, agressao.getMotivoId(), MES.atDay(10), "Fato", null, null, null));
         disciplinarService.registrar(bruno.getAssistidoId(),
-                new RegistroDisciplinarRequestDTO(agressao.getMotivoId(), MES.atDay(1).minusDays(3), "Fato", null, null, null));
+                new RegistroDisciplinarRequestDTO(null, null, agressao.getMotivoId(), MES.atDay(1).minusDays(3), "Fato", null, null, null));
 
         PainelMensalDTO painel = mensal();
 

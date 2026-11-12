@@ -413,7 +413,7 @@ class ChamadaServiceIT {
         MotivoDisciplinar motivo = motivoDisciplinarRepository.save(
                 MotivoDisciplinar.builder().nome("Bullying FT-13").nivel(NivelDisciplinar.SUSPENSAO).build());
         return disciplinarService.registrar(assistido.getAssistidoId(), new RegistroDisciplinarRequestDTO(
-                motivo.getMotivoId(), inicio, "Suspensão de teste", null, inicio, fim)).registro().registroId();
+                null, null, motivo.getMotivoId(), inicio, "Suspensão de teste", null, inicio, fim)).registro().registroId();
     }
 
     /** Dias do intervalo que têm chamada (sem feriado nacional). */

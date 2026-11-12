@@ -154,14 +154,33 @@ public class DisciplinarService {
     public RegistroCriadoDTO registrar(Long assistidoId, RegistroDisciplinarRequestDTO dto) {
         Assistido assistido = buscarAssistidoAtivo(assistidoId);
 
-        MotivoDisciplinar motivo = buscarMotivo(dto.motivoId());
-        if (!motivo.isAtivo()) {
-            throw new RegraNegocioException("O motivo \"" + motivo.getNome() + "\" está inativo.");
+        MotivoDisciplinar motivo = null;
+        String motivoTexto = null;
+        NivelDisciplinar nivel;
+        if (dto.motivoId() != null) {
+            motivo = buscarMotivo(dto.motivoId());
+            if (!motivo.isAtivo()) {
+                throw new RegraNegocioException("O motivo \"" + motivo.getNome() + "\" está inativo.");
+            }
+            nivel = motivo.getNivel();
+        } else {
+            // E-mail da ADRA de 11/11: só os 3 níveis, com o motivo escrito à mão.
+            if (dto.nivel() == null) {
+                throw new RegraNegocioException("Informe se é ocorrência, advertência ou suspensão.");
+            }
+            if (dto.nivel() == NivelDisciplinar.UNIFORME) {
+                throw new RegraNegocioException("Escolha ocorrência, advertência ou suspensão.");
+            }
+            if (dto.motivo() == null || dto.motivo().isBlank()) {
+                throw new RegraNegocioException("Informe o motivo.");
+            }
+            nivel = dto.nivel();
+            motivoTexto = dto.motivo().trim();
         }
 
         Usuario usuario = usuarioAutenticadoService.getUsuarioAtual();
         if (usuario.getNivelPermissao().getNome() == NomeNivelPermissao.EDUCADOR_SOCIAL
-                && motivo.getNivel() != NivelDisciplinar.OCORRENCIA) {
+                && nivel != NivelDisciplinar.OCORRENCIA) {
             throw new AcessoNegadoException("O Educador Social só registra ocorrência.");
         }
 
@@ -170,16 +189,16 @@ public class DisciplinarService {
 
         LocalDate inicio = null;
         LocalDate fim = null;
-        if (motivo.getNivel() == NivelDisciplinar.SUSPENSAO) {
+        if (nivel == NivelDisciplinar.SUSPENSAO) {
             inicio = dto.suspensaoInicio() != null ? dto.suspensaoInicio()
                     : periodoSuspensaoService.sugerir(assistido, dto.data()).inicio();
             fim = dto.suspensaoFim() != null ? dto.suspensaoFim() : periodoSuspensaoService.fimContandoDe(assistido, inicio);
             validarPeriodo(inicio, fim);
         }
 
-        RegistroDisciplinar registro = salvarRegistro(assistido, motivo, motivo.getNivel(),
+        RegistroDisciplinar registro = salvarRegistro(assistido, motivo, motivoTexto, nivel,
                 OrigemRegistroDisciplinar.MANUAL, null, dto.data(), dto.descricao().trim(), turma, inicio, fim,
-                usuario);
+                usuario);
         marcarRecomendacao(registro);
         if (inicio != null) {
             faltaPorSuspensaoService.sincronizar(assistido, inicio, fim, usuario); // FT-13: suspensão retroativa
@@ -195,7 +214,7 @@ public class DisciplinarService {
         }
         dto.assistidoIds().forEach(this::buscarAssistidoAtivo);
         RegistroDisciplinarRequestDTO registro = new RegistroDisciplinarRequestDTO(
-                dto.motivoId(), dto.data(), dto.descricao(), null, null, null);
+                dto.nivel(), dto.motivo(), dto.motivoId(), dto.data(), dto.descricao(), null, null, null);
         return dto.assistidoIds().stream().map(assistidoId -> registrar(assistidoId, registro)).toList();
     }
 
@@ -225,7 +244,7 @@ public class DisciplinarService {
         }
 
         Usuario usuario = usuarioAutenticadoService.getUsuarioAtual();
-        RegistroDisciplinar registro = salvarRegistro(origem.getAssistido(), null, nivel,
+        RegistroDisciplinar registro = salvarRegistro(origem.getAssistido(), null, null, nivel,
                 OrigemRegistroDisciplinar.RECOMENDACAO, origem, dto.data(), dto.descricao().trim(), null,
                 inicio, fim, usuario);
         marcarRecomendacao(registro);
@@ -255,7 +274,8 @@ public class DisciplinarService {
         return resposta;
     }
 
-    private RegistroDisciplinar salvarRegistro(Assistido assistido, MotivoDisciplinar motivo, NivelDisciplinar nivel,
+    private RegistroDisciplinar salvarRegistro(Assistido assistido, MotivoDisciplinar motivo, String motivoTexto,
+                                               NivelDisciplinar nivel,
                                                OrigemRegistroDisciplinar origem, RegistroDisciplinar registroOrigem,
                                                LocalDate data, String descricao, Turma turma,
                                                LocalDate suspensaoInicio, LocalDate suspensaoFim,
@@ -265,6 +285,7 @@ public class DisciplinarService {
         RegistroDisciplinar registro = RegistroDisciplinar.builder()
                 .assistido(assistido)
                 .motivo(motivo)
+                .motivoTexto(motivoTexto)
                 .nivel(nivel)
                 .origem(origem)
                 .registroOrigem(registroOrigem)
