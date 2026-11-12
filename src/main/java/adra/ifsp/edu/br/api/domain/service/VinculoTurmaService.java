@@ -10,8 +10,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
+import java.util.Collection;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
+import java.util.stream.Stream;
 
 /**
  * Centraliza a criação/encerramento de vínculos em TurmaAlunos. Usado tanto
@@ -105,6 +108,48 @@ public class VinculoTurmaService {
         }
         LocalDate inicioDoAno = LocalDate.of(matricula.getAno(), 1, 1);
         return hoje.isBefore(inicioDoAno) ? inicioDoAno : hoje;
+    }
+
+    /**
+     * Corrige a entrada no grupo dos vínculos ativos que começaram depois de `dataEntrada`
+     * (ex.: atendidos ligados ao grupo em 10/11 que frequentam desde 01/11), para a chamada
+     * do mês mostrar todos. Nunca antes do início do ano da matrícula nem antes da saída do
+     * grupo anterior do atendido. Sem `assistidoIds`, vale para todo o grupo. Devolve quantos mudaram.
+     */
+    public int corrigirDataEntrada(Turma turma, LocalDate dataEntrada, Collection<Long> assistidoIds) {
+        int corrigidos = 0;
+        for (TurmaAlunos vinculo : turmaAlunosRepository.findByTurmaAndStatusAndDataSaidaIsNull(turma, StatusGeral.ATIVO)) {
+            Assistido assistido = vinculo.getAssistido();
+            boolean escolhido = assistidoIds == null || assistidoIds.isEmpty()
+                    || assistidoIds.contains(assistido.getAssistidoId());
+            if (!escolhido || !vinculo.getDataEntrada().isAfter(dataEntrada)) {
+                continue;
+            }
+            LocalDate inicioDoAno = LocalDate.of(
+                    vinculo.getMatricula() != null ? vinculo.getMatricula().getAno() : vinculo.getDataEntrada().getYear(), 1, 1);
+            LocalDate nova = Stream.of(dataEntrada, inicioDoAno, saidaDoGrupoAnterior(assistido, vinculo))
+                    .filter(Objects::nonNull)
+                    .max(Comparator.naturalOrder())
+                    .orElse(dataEntrada);
+            if (!nova.isBefore(vinculo.getDataEntrada())) {
+                continue;
+            }
+            vinculo.setDataEntrada(nova);
+            if (assistido.getDataEntrada() == null || assistido.getDataEntrada().isAfter(nova)) {
+                assistido.setDataEntrada(nova);
+            }
+            corrigidos++;
+        }
+        return corrigidos;
+    }
+
+    private LocalDate saidaDoGrupoAnterior(Assistido assistido, TurmaAlunos atual) {
+        return turmaAlunosRepository.findByAssistidoOrderByDataEntradaDesc(assistido).stream()
+                .filter(v -> !Objects.equals(v.getTurmaAlunoId(), atual.getTurmaAlunoId()) && v.getDataSaida() != null)
+                .filter(v -> !v.getDataSaida().isAfter(atual.getDataEntrada()))
+                .map(TurmaAlunos::getDataSaida)
+                .max(Comparator.naturalOrder())
+                .orElse(null);
     }
 
     /** Vínculo sem matrícula (anterior à matrícula anual) conta como da matrícula atual. */

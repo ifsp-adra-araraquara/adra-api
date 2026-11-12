@@ -6,6 +6,7 @@ import adra.ifsp.edu.br.api.domain.dto.chamada.AtendidoChamadaDTO;
 import adra.ifsp.edu.br.api.domain.dto.presenca.FrequenciaDiaDTO;
 import adra.ifsp.edu.br.api.domain.dto.chamada.ChamadaGrupoDTO;
 import adra.ifsp.edu.br.api.domain.dto.chamada.PresencaChamadaRequestDTO;
+import adra.ifsp.edu.br.api.domain.dto.turma.CorrecaoDataEntradaRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.disciplinar.ArquivarRegistroRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.disciplinar.PeriodoSuspensaoRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.disciplinar.RegistroDisciplinarRequestDTO;
@@ -93,6 +94,7 @@ class ChamadaServiceIT {
     @Autowired private AssistidoService assistidoService;
     @Autowired private VinculoTurmaService vinculoTurmaService;
     @Autowired private DataSource dataSource;
+    @Autowired private TurmaService turmaService;
     @Autowired private DisciplinarService disciplinarService;
     @Autowired private MotivoDisciplinarRepository motivoDisciplinarRepository;
     @Autowired private FaltaJustificadaRepository faltaJustificadaRepository;
@@ -226,19 +228,58 @@ class ChamadaServiceIT {
     }
 
     @Test
-    @DisplayName("CA-FT12.4: Educador Social grava só hoje; Coordenador grava qualquer dia passado")
+    @DisplayName("Educador Social lança e corrige qualquer dia do mês atual; mês anterior, só o Coordenador")
     void edicaoPorPerfilEData() {
-        assumeFalse(FeriadosNacionais.ehFeriado(HOJE), "hoje é feriado: não há chamada");
-        LocalDate ontem = diaSemFeriado(1);
+        LocalDate mesPassado = diaSemFeriadoAntesDe(HOJE.withDayOfMonth(1));
 
         autenticarComo(educador);
-        assertThat(chamadaService.buscar(turma.getTurmaId(), ontem).podeEditar()).isFalse();
-        assertThatThrownBy(() -> chamadaService.gravar(turma.getTurmaId(), ontem, List.of(falta(ana))))
-                .isInstanceOf(AcessoNegadoException.class);
-        assertThat(chamadaService.gravar(turma.getTurmaId(), HOJE, List.of(falta(ana))).lancada()).isTrue();
+        if (HOJE.getDayOfMonth() > 1) {
+            LocalDate doMes = diaSemFeriadoAntesDe(HOJE);
+            assumeFalse(doMes.getMonthValue() != HOJE.getMonthValue(), "sem dia útil anterior neste mês");
+            assertThat(chamadaService.buscar(turma.getTurmaId(), doMes).podeEditar()).isTrue();
+            assertThat(chamadaService.gravar(turma.getTurmaId(), doMes, List.of(falta(ana))).lancada()).isTrue();
+        }
+        assertThat(chamadaService.buscar(turma.getTurmaId(), mesPassado).podeEditar()).isFalse();
+        assertThatThrownBy(() -> chamadaService.gravar(turma.getTurmaId(), mesPassado, List.of(falta(ana))))
+                .isInstanceOf(AcessoNegadoException.class)
+                .hasMessageContaining("mês atual");
 
         autenticarComo(coordenador);
-        assertThat(chamadaService.gravar(turma.getTurmaId(), ontem, List.of(falta(ana))).lancada()).isTrue();
+        assertThat(chamadaService.gravar(turma.getTurmaId(), mesPassado, List.of(falta(ana))).lancada()).isTrue();
+    }
+
+    @Test
+    @DisplayName("Corrigir a entrada no grupo faz o atendido aparecer na chamada dos dias anteriores ao vínculo")
+    void corrigirEntradaNoGrupo() {
+        Assistido ligadoHoje = matricular("Lia Ligada Hoje", turma, HOJE, null);
+        LocalDate antes = diaSemFeriado(5);
+        assertThat(idsNaChamada(antes)).doesNotContain(ligadoHoje.getAssistidoId());
+
+        int corrigidos = turmaService.corrigirDataEntrada(turma.getTurmaId(),
+                new CorrecaoDataEntradaRequestDTO(antes.minusDays(1), List.of(ligadoHoje.getAssistidoId())));
+
+        assertThat(corrigidos).isEqualTo(1);
+        assertThat(idsNaChamada(antes)).contains(ligadoHoje.getAssistidoId());
+    }
+
+    @Test
+    @DisplayName("A correção não passa da saída do grupo anterior nem do início do ano")
+    void correcaoRespeitaGrupoAnteriorEAno() {
+        Turma anterior = criarGrupo("SI Tarde", DayOfWeek.values());
+        LocalDate saidaAnterior = HOJE.minusDays(3);
+        Assistido trocou = matricular("Téo Trocou", anterior, HOJE.minusMonths(1), saidaAnterior);
+        TurmaAlunos atual = new TurmaAlunos();
+        atual.setTurma(turma);
+        atual.setAssistido(trocou);
+        atual.setDataEntrada(HOJE);
+        atual.setStatus(StatusGeral.ATIVO);
+        turmaAlunosRepository.save(atual);
+
+        turmaService.corrigirDataEntrada(turma.getTurmaId(),
+                new CorrecaoDataEntradaRequestDTO(LocalDate.of(HOJE.getYear() - 1, 6, 1), List.of(trocou.getAssistidoId())));
+
+        assertThat(turmaAlunosRepository.findByAssistidoAndStatusAndDataSaidaIsNull(trocou, StatusGeral.ATIVO))
+                .singleElement().extracting(TurmaAlunos::getDataEntrada).isEqualTo(saidaAnterior);
     }
 
     @Test
@@ -419,6 +460,15 @@ class ChamadaServiceIT {
     }
 
     /** `diasAtras` dias antes de hoje, recuando mais se cair em feriado nacional (feriado não tem chamada). */
+    /** Último dia antes de `limite` que não é feriado nacional. */
+    private static LocalDate diaSemFeriadoAntesDe(LocalDate limite) {
+        LocalDate dia = limite.minusDays(1);
+        while (FeriadosNacionais.ehFeriado(dia)) {
+            dia = dia.minusDays(1);
+        }
+        return dia;
+    }
+
     private static LocalDate diaSemFeriado(int diasAtras) {
         LocalDate dia = HOJE.minusDays(diasAtras);
         while (FeriadosNacionais.ehFeriado(dia)) {

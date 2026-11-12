@@ -2,6 +2,7 @@ package adra.ifsp.edu.br.api.domain.service;
 
 import adra.ifsp.edu.br.api.config.CacheConfig;
 import adra.ifsp.edu.br.api.domain.dto.assistido.AssistidoResponseDTO;
+import adra.ifsp.edu.br.api.domain.dto.turma.CorrecaoDataEntradaRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.turma.TurmaComAlunosResponseDTO;
 import adra.ifsp.edu.br.api.domain.dto.turma.TurmaRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.turma.TurmaResponseDTO;
@@ -297,6 +298,26 @@ public class TurmaService {
                 .stream()
                 .map(vinculo -> assistidoMapper.paraDTO(vinculo.getAssistido()))
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * Pedido da ADRA (11/11): chamada de todo o mês. Corrige quando os atendidos entraram no grupo,
+     * para a chamada dos dias anteriores ao vínculo mostrar todos. Devolve quantos mudaram.
+     */
+    @CacheEvict(cacheNames = {CacheConfig.ESTRUTURA, CacheConfig.PAINEL}, allEntries = true)
+    public int corrigirDataEntrada(Long turmaId, CorrecaoDataEntradaRequestDTO dto) {
+        Turma turma = buscarEntidadePorId(turmaId);
+        int corrigidos = vinculoTurmaService.corrigirDataEntrada(turma, dto.dataEntrada(), dto.assistidoIds());
+        auditoriaService.registrar(
+                ModuloSistema.TURMAS,
+                "turma_aluno",
+                turmaId,
+                AcaoSistema.EDITAR,
+                null,
+                Map.of("dataEntrada", dto.dataEntrada().toString(), "vinculosCorrigidos", String.valueOf(corrigidos)),
+                "Correção da data de entrada no grupo"
+        );
+        return corrigidos;
     }
 
     Turma buscarEntidadePorId(Long id) {
