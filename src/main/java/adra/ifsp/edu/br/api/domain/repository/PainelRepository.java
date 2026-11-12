@@ -149,13 +149,12 @@ public class PainelRepository {
                 .list();
     }
 
-    public record AssistidosResumo(long ativos, long ativosAntes, long entradas, long saidas,
-                                   long ate5, long de6a9, long de10a13, long de14a17, long de18, long semData) {
+    public record AssistidosResumo(long ativos, long ativosAntes, long entradas, long saidas) {
     }
 
     /**
-     * Ativos na referência e no fim do mês anterior, entradas/saídas do mês e
-     * faixa etária na referência — tudo num único passe com FILTER.
+     * Ativos na referência e no fim do mês anterior e entradas/saídas do mês —
+     * tudo num único passe com FILTER.
      * Sem data de entrada, vale a data de cadastro.
      */
     public AssistidosResumo assistidos(LocalDate inicio, LocalDate fim, LocalDate referencia, LocalDate fimMesAnterior,
@@ -164,7 +163,6 @@ public class PainelRepository {
                         WITH base AS (
                             SELECT COALESCE(data_entrada, criado_em::date) AS entrada,
                                    status, data_saida,
-                                   EXTRACT(YEAR FROM age(:referencia, data_nascimento))::int AS idade,
                                    (COALESCE(data_entrada, criado_em::date) <= :referencia
                                        AND (status = 'ATIVO' OR data_saida > :referencia)) AS ativo_ref,
                                    (COALESCE(data_entrada, criado_em::date) <= :fimAnterior
@@ -175,13 +173,7 @@ public class PainelRepository {
                         SELECT COUNT(*) FILTER (WHERE ativo_ref) AS ativos,
                                COUNT(*) FILTER (WHERE ativo_antes) AS ativos_antes,
                                COUNT(*) FILTER (WHERE entrada BETWEEN :inicio AND :fim) AS entradas,
-                               COUNT(*) FILTER (WHERE data_saida BETWEEN :inicio AND :fim) AS saidas,
-                               COUNT(*) FILTER (WHERE ativo_ref AND idade <= 5) AS ate5,
-                               COUNT(*) FILTER (WHERE ativo_ref AND idade BETWEEN 6 AND 9) AS de6a9,
-                               COUNT(*) FILTER (WHERE ativo_ref AND idade BETWEEN 10 AND 13) AS de10a13,
-                               COUNT(*) FILTER (WHERE ativo_ref AND idade BETWEEN 14 AND 17) AS de14a17,
-                               COUNT(*) FILTER (WHERE ativo_ref AND idade >= 18) AS de18,
-                               COUNT(*) FILTER (WHERE ativo_ref AND idade IS NULL) AS sem_data
+                               COUNT(*) FILTER (WHERE data_saida BETWEEN :inicio AND :fim) AS saidas
                           FROM base
                         """)
                 .param("inicio", inicio)
@@ -191,10 +183,37 @@ public class PainelRepository {
                 .param("oficinaId", oficinaId)
                 .query((rs, i) -> new AssistidosResumo(
                         rs.getLong("ativos"), rs.getLong("ativos_antes"),
-                        rs.getLong("entradas"), rs.getLong("saidas"),
-                        rs.getLong("ate5"), rs.getLong("de6a9"), rs.getLong("de10a13"),
-                        rs.getLong("de14a17"), rs.getLong("de18"), rs.getLong("sem_data")))
+                        rs.getLong("entradas"), rs.getLong("saidas")))
                 .single();
+    }
+
+    /** Intervalo nulo = sem grupo ou grupo sem faixa. */
+    public record FaixaEtariaTotal(Integer idadeMinima, Integer idadeMaxima, long total) {
+    }
+
+    /**
+     * Ativos na referência por faixa do grupo atual: cada um conta uma vez,
+     * mesmo com faixas sobrepostas.
+     */
+    public List<FaixaEtariaTotal> ativosPorFaixaEtaria(LocalDate referencia, Long oficinaId) {
+        return jdbc.sql("""
+                        SELECT f.idade_minima, f.idade_maxima, COUNT(*) AS total
+                          FROM adra.assistido s
+                          LEFT JOIN adra.turma t ON t.turma_id = s.turma_id
+                          LEFT JOIN adra.faixa_etaria f ON f.faixa_etaria_id = t.faixa_etaria_id
+                         WHERE COALESCE(s.data_entrada, s.criado_em::date) <= :referencia
+                           AND (s.status = 'ATIVO' OR s.data_saida > :referencia)
+                           AND """ + ASSISTIDO_NA_OFICINA.formatted("s.assistido_id") + """
+                         GROUP BY f.idade_minima, f.idade_maxima
+                         ORDER BY f.idade_minima NULLS LAST, f.idade_maxima
+                        """)
+                .param("referencia", referencia)
+                .param("oficinaId", oficinaId)
+                .query((rs, i) -> new FaixaEtariaTotal(
+                        rs.getObject("idade_minima", Integer.class),
+                        rs.getObject("idade_maxima", Integer.class),
+                        rs.getLong("total")))
+                .list();
     }
 
     public record DisciplinaNivel(String nivel, long noMes, long noMesAnterior) {

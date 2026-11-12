@@ -25,8 +25,9 @@ public class Turma {
     @Column(name = "turno", nullable = false, length = 20)
     private Turno turno;
 
-    @Column(name = "faixa_etaria", length = 50)
-    private String faixaEtaria;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "faixa_etaria_id")
+    private FaixaEtaria faixaEtaria;
 
     @Column(name = "capacidade", nullable = false)
     private Integer capacidade;

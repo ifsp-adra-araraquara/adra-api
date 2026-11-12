@@ -52,6 +52,7 @@ public class TurmaService {
     private final VinculoTurmaService vinculoTurmaService;
     private final OficinaTurmaRepository oficinaTurmaRepository;
     private final OficinaRepository oficinaRepository;
+    private final FaixaEtariaService faixaEtariaService;
 
     /**
      * Grupos atendidos pelas oficinas do oficineiro, já com o nome da oficina
@@ -75,7 +76,7 @@ public class TurmaService {
 
     @CacheEvict(cacheNames = {CacheConfig.ESTRUTURA, CacheConfig.PAINEL}, allEntries = true)
     public TurmaResponseDTO cadastrar(TurmaRequestDTO dto) {
-        Turma turma = turmaMapper.paraNovaEntidade(dto);
+        Turma turma = turmaMapper.paraNovaEntidade(dto, faixaEtariaService.buscarParaGrupo(dto.faixaEtariaId(), null));
         turma = turmaRepository.save(turma);
         atualizarOficinas(turma, dto.oficinaIds());
 
@@ -208,7 +209,8 @@ public class TurmaService {
                 "capacidade", turma.getCapacidade().toString()
         );
 
-        turmaMapper.atualizarEntidade(turma, dto);
+        turmaMapper.atualizarEntidade(turma, dto,
+                faixaEtariaService.buscarParaGrupo(dto.faixaEtariaId(), turma.getFaixaEtaria()));
         turma = turmaRepository.save(turma);
         atualizarOficinas(turma, dto.oficinaIds());
 
