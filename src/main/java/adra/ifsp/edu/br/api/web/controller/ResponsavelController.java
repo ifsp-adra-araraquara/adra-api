@@ -28,26 +28,26 @@ public class ResponsavelController {
         return ResponseEntity.created(URI.create("/api/responsaveis/" + criado.responsavelId())).body(criado);
     }
 
-    @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL', 'EDUCADOR_SOCIAL')")
+    @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL')")
     @GetMapping
     public ResponseEntity<List<ResponsavelResponseDTO>> listar() {
         return ResponseEntity.ok(responsavelService.listar());
     }
 
     /** Assistidos ligados a este responsável (ficha do responsável). */
-    @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL', 'EDUCADOR_SOCIAL')")
+    @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL')")
     @GetMapping("/{id}/assistidos")
     public ResponseEntity<List<AssistidoVinculadoDTO>> listarAssistidos(@PathVariable Long id) {
         return ResponseEntity.ok(responsavelService.listarAssistidos(id));
     }
 
-    @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL', 'EDUCADOR_SOCIAL')")
+    @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL')")
     @GetMapping("/{id}")
     public ResponseEntity<ResponsavelResponseDTO> buscarPorId(@PathVariable Long id) {
         return ResponseEntity.ok(responsavelService.buscarPorId(id));
     }
 
-    @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL', 'EDUCADOR_SOCIAL')")
+    @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL')")
     @GetMapping("/cpf/{cpf}")
     public ResponseEntity<ResponsavelResponseDTO> buscarPorCpf(@PathVariable String cpf) {
         return ResponseEntity.ok(responsavelService.buscarPorCpf(cpf));
