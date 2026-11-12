@@ -255,10 +255,11 @@ class ChamadaServiceIT {
         LocalDate antes = diaSemFeriado(5);
         assertThat(idsNaChamada(antes)).doesNotContain(ligadoHoje.getAssistidoId());
 
-        int corrigidos = turmaService.corrigirDataEntrada(turma.getTurmaId(),
+        var resultado = turmaService.corrigirDataEntrada(turma.getTurmaId(),
                 new CorrecaoDataEntradaRequestDTO(antes.minusDays(1), List.of(ligadoHoje.getAssistidoId())));
 
-        assertThat(corrigidos).isEqualTo(1);
+        assertThat(resultado.corrigidos()).isEqualTo(1);
+        assertThat(resultado.chamadasLancadas()).isZero();
         assertThat(idsNaChamada(antes)).contains(ligadoHoje.getAssistidoId());
     }
 

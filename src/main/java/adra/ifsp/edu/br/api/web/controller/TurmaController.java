@@ -3,6 +3,7 @@ package adra.ifsp.edu.br.api.web.controller;
 
 import adra.ifsp.edu.br.api.domain.dto.assistido.AssistidoResponseDTO;
 import adra.ifsp.edu.br.api.domain.dto.turma.CorrecaoDataEntradaRequestDTO;
+import adra.ifsp.edu.br.api.domain.dto.turma.CorrecaoDataEntradaResponseDTO;
 import adra.ifsp.edu.br.api.domain.dto.turma.TurmaComAlunosResponseDTO;
 import adra.ifsp.edu.br.api.domain.dto.turma.TurmaRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.turma.TurmaResponseDTO;
@@ -18,7 +19,6 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/turmas")
@@ -137,11 +137,11 @@ public class TurmaController {
     /** Corrige quando os atendidos entraram no grupo (chamada de dias anteriores ao vínculo). */
     @PreAuthorize("hasRole('COORDENADOR')")
     @PatchMapping("/{id}/vinculos/data-entrada")
-    public ResponseEntity<Map<String, Integer>> corrigirDataEntrada(
+    public ResponseEntity<CorrecaoDataEntradaResponseDTO> corrigirDataEntrada(
             @PathVariable Long id,
             @Valid @RequestBody CorrecaoDataEntradaRequestDTO dto
     ) {
-        return ResponseEntity.ok(Map.of("corrigidos", turmaService.corrigirDataEntrada(id, dto)));
+        return ResponseEntity.ok(turmaService.corrigirDataEntrada(id, dto));
     }
 
     @PreAuthorize("hasAnyRole('ASSISTENTE_SOCIAL', 'COORDENADOR')")

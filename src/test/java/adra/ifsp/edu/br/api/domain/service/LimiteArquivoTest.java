@@ -3,8 +3,18 @@ package adra.ifsp.edu.br.api.domain.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.stream.IntStream;
+
+import javax.imageio.ImageIO;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -64,5 +74,30 @@ class LimiteArquivoTest {
 
         assertThat(resposta.getStatusCode()).isEqualTo(HttpStatus.CONTENT_TOO_LARGE);
         assertThat(resposta.getBody().mensagem()).isEqualTo("Arquivo muito grande. O limite é 2 MB por arquivo.");
+    }
+
+    @Test
+    @DisplayName("Várias imagens ao mesmo tempo: processa na vez de cada uma e libera as vagas")
+    void imagensSimultaneas() throws Exception {
+        byte[] png = pngDe(1200, 900);
+        ExecutorService pool = Executors.newFixedThreadPool(6);
+        try {
+            List<Future<ProcessadorArquivo.ArquivoProcessado>> envios = IntStream.range(0, 6)
+                    .mapToObj(i -> pool.submit(() -> processador.processar(png, CategoriaArquivo.DOCUMENTO_IDENTIDADE)))
+                    .toList();
+            for (Future<ProcessadorArquivo.ArquivoProcessado> envio : envios) {
+                assertThat(envio.get().mimeType()).isEqualTo("image/jpeg");
+            }
+        } finally {
+            pool.shutdown();
+        }
+        // As vagas voltaram: mais uma passa direto.
+        assertThat(processador.processar(png, CategoriaArquivo.DOCUMENTO_IDENTIDADE).extensao()).isEqualTo("jpg");
+    }
+
+    private static byte[] pngDe(int largura, int altura) throws IOException {
+        ByteArrayOutputStream saida = new ByteArrayOutputStream();
+        ImageIO.write(new BufferedImage(largura, altura, BufferedImage.TYPE_INT_RGB), "png", saida);
+        return saida.toByteArray();
     }
 }
