@@ -305,17 +305,20 @@ class PreCadastroIT {
 
         mvc.perform(multipart("/api/pre-cadastro")
                         .file(partDados(requisicao(CPF_CRIANCA, comTransferencia(base, new Transferencia(false, Set.of(), null, null)))))
-                        .file(imagem("comprovanteEndereco")).param("captcha", TOKEN_VALIDO).header("X-Forwarded-For", ipNovo()))
+                        .file(imagem("comprovanteEndereco")).file(imagem("foto")).file(imagem("documentosCrianca"))
+                        .file(imagem("documentosResponsavel")).param("captcha", TOKEN_VALIDO).header("X-Forwarded-For", ipNovo()))
                 .andExpect(status().isBadRequest());
         PreCadastroDadosDTO semCiencia = new PreCadastroDadosDTO(new Termos(true, false, false), base.crianca(), base.mae(),
                 base.pai(), base.responsavelLegal(), base.enderecoFamilia(), base.transferencia(), base.saude(), base.autorizacoes());
         mvc.perform(multipart("/api/pre-cadastro")
                         .file(partDados(requisicao(CPF_CRIANCA, semCiencia)))
-                        .file(imagem("comprovanteEndereco")).param("captcha", TOKEN_VALIDO).header("X-Forwarded-For", ipNovo()))
+                        .file(imagem("comprovanteEndereco")).file(imagem("foto")).file(imagem("documentosCrianca"))
+                        .file(imagem("documentosResponsavel")).param("captcha", TOKEN_VALIDO).header("X-Forwarded-For", ipNovo()))
                 .andExpect(status().isBadRequest());
         mvc.perform(multipart("/api/pre-cadastro")
                         .file(partDados(requisicao(CPF_CRIANCA, dados(null))))
-                        .file(imagem("comprovanteEndereco")).param("captcha", TOKEN_VALIDO).header("X-Forwarded-For", ipNovo()))
+                        .file(imagem("comprovanteEndereco")).file(imagem("foto")).file(imagem("documentosCrianca"))
+                        .file(imagem("documentosResponsavel")).param("captcha", TOKEN_VALIDO).header("X-Forwarded-For", ipNovo()))
                 .andExpect(status().isBadRequest());
         mvc.perform(multipart("/api/pre-cadastro")
                         .file(partDados(requisicao(CPF_CRIANCA, base)))
@@ -333,7 +336,8 @@ class PreCadastroIT {
         long antes = preCadastroRepository.count();
 
         mvc.perform(multipart("/api/pre-cadastro").file(partDados(requisicao(CPF_CRIANCA, dados(CPF_MAE))))
-                        .file(imagem("comprovanteEndereco"))
+                        .file(imagem("comprovanteEndereco")).file(imagem("foto")).file(imagem("documentosCrianca"))
+                        .file(imagem("documentosResponsavel"))
                         .param("captcha", "token-falso")
                         .header("X-Forwarded-For", ipNovo()))
                 .andExpect(status().isConflict());
@@ -348,7 +352,8 @@ class PreCadastroIT {
         doReturn(180L).when(preCadastroRepository).countByCriadoEmGreaterThanEqual(any());
 
         mvc.perform(multipart("/api/pre-cadastro").file(partDados(requisicao(CPF_CRIANCA, dados(CPF_MAE))))
-                        .file(imagem("comprovanteEndereco"))
+                        .file(imagem("comprovanteEndereco")).file(imagem("foto")).file(imagem("documentosCrianca"))
+                        .file(imagem("documentosResponsavel"))
                         .param("captcha", TOKEN_VALIDO)
                         .header("X-Forwarded-For", ipNovo()))
                 .andExpect(status().isConflict());
@@ -374,11 +379,13 @@ class PreCadastroIT {
     }
 
     @Test
-    @DisplayName("Foto e documentos sao opcionais; o que falta vira alerta e a aprovacao leva os arquivos para o atendido")
-    void anexosOpcionaisComAlertaETransferidosNaAprovacao() throws Exception {
-        Long semAnexos = enviarPublico(requisicao(CPF_CRIANCA_SEM_ANEXOS, dados(CPF_MAE)));
-        mvc.perform(get("/api/pre-cadastro/" + semAnexos).with(comPerfil(ASSISTENTE_SOCIAL)))
-                .andExpect(jsonPath("$.anexosFaltando.length()").value(3));
+    @DisplayName("Foto e documentos sao obrigatorios no link publico e a aprovacao leva os arquivos para o atendido")
+    void anexosObrigatoriosETransferidosNaAprovacao() throws Exception {
+        long antes = preCadastroRepository.count();
+        semAnexo("foto", "Envie a foto do atendido.");
+        semAnexo("documentosCrianca", "Envie o documento do atendido (RG ou CPF).");
+        semAnexo("documentosResponsavel", "Envie o documento do responsável (RG ou CPF).");
+        assertThat(preCadastroRepository.count()).isEqualTo(antes);
 
         Long id = enviarPublico(requisicao(CPF_CRIANCA_COM_ANEXOS, dados(CPF_MAE_COM_ANEXOS)),
                 imagem("foto"), imagem("documentosCrianca"), imagem("documentosResponsavel"));
@@ -569,11 +576,30 @@ class PreCadastroIT {
         return JsonPath.read(lista, "$[*].preCadastroId");
     }
 
-    private Long enviarPublico(PreCadastroRequestDTO requisicao, MockMultipartFile... anexos) throws Exception {
-        var envio = multipart("/api/pre-cadastro").file(partDados(requisicao)).file(imagem("comprovanteEndereco")).param("captcha", TOKEN_VALIDO);
-        for (MockMultipartFile anexo : anexos) {
-            envio.file(anexo);
+    private void semAnexo(String faltando, String mensagem) throws Exception {
+        var envio = multipart("/api/pre-cadastro").file(partDados(requisicao(CPF_CRIANCA_SEM_ANEXOS, dados(CPF_MAE))))
+                .param("captcha", TOKEN_VALIDO);
+        for (String parte : List.of("comprovanteEndereco", "foto", "documentosCrianca", "documentosResponsavel")) {
+            if (!parte.equals(faltando)) {
+                envio.file(imagem(parte));
+            }
         }
+        mvc.perform(envio.header("X-Forwarded-For", ipNovo()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.mensagem").value(mensagem));
+    }
+
+    /** Envio com todos os anexos obrigatórios; os passados substituem o padrão da mesma parte. */
+    private Long enviarPublico(PreCadastroRequestDTO requisicao, MockMultipartFile... anexos) throws Exception {
+        var envio = multipart("/api/pre-cadastro").file(partDados(requisicao)).param("captcha", TOKEN_VALIDO);
+        java.util.Map<String, MockMultipartFile> partes = new java.util.LinkedHashMap<>();
+        for (String parte : List.of("comprovanteEndereco", "foto", "documentosCrianca", "documentosResponsavel")) {
+            partes.put(parte, imagem(parte));
+        }
+        for (MockMultipartFile anexo : anexos) {
+            partes.put(anexo.getName(), anexo);
+        }
+        partes.values().forEach(envio::file);
         String resposta = mvc.perform(envio.header("X-Forwarded-For", ipNovo()))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();

@@ -423,10 +423,9 @@ class RematriculaIT {
         var envio = multipart("/api/pre-cadastro")
                 .file(new MockMultipartFile("dados", "", MediaType.APPLICATION_JSON_VALUE, jsonMapper.writeValueAsBytes(requisicao)))
                 .file(imagem("comprovanteEndereco", 1))
+                // Foto e documentos são obrigatórios no link público.
+                .file(imagem("foto", 2)).file(imagem("documentosCrianca", 3)).file(imagem("documentosResponsavel", 4))
                 .param("captcha", TOKEN);
-        if (comAnexos) {
-            envio.file(imagem("foto", 2)).file(imagem("documentosCrianca", 3)).file(imagem("documentosResponsavel", 4));
-        }
         String resposta = mvc.perform(envio.header("X-Forwarded-For", "teste-" + UUID.randomUUID()))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();

@@ -284,6 +284,9 @@ class AcessoPorPerfilIT {
         mvc.perform(multipart("/api/pre-cadastro")
                         .file(new MockMultipartFile("dados", "", MediaType.APPLICATION_JSON_VALUE, corpo.getBytes()))
                         .file(new MockMultipartFile("comprovanteEndereco", "comprovante.pdf", MediaType.APPLICATION_PDF_VALUE, pdfMinimo()))
+                        .file(new MockMultipartFile("foto", "foto.png", MediaType.IMAGE_PNG_VALUE, pngMinimo()))
+                        .file(new MockMultipartFile("documentosCrianca", "rg.pdf", MediaType.APPLICATION_PDF_VALUE, pdfMinimo()))
+                        .file(new MockMultipartFile("documentosResponsavel", "rg-mae.pdf", MediaType.APPLICATION_PDF_VALUE, pdfMinimo()))
                         .param("captcha", "token-valido")
                         .header("X-Forwarded-For", "acesso-" + UUID.randomUUID()))
                 .andExpect(status().isCreated());
