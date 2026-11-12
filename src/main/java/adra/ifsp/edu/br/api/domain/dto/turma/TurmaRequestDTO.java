@@ -17,8 +17,7 @@ public record TurmaRequestDTO(
         @NotNull(message = "Selecione o turno.")
         Turno turno,
 
-        @Size(max = 50, message = "A faixa etária deve ter no máximo 50 caracteres.")
-        String faixaEtaria,
+        Long faixaEtariaId,
 
         @NotNull(message = "Informe a capacidade do grupo.")
         @Positive(message = "A capacidade deve ser maior que zero.")

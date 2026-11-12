@@ -4,6 +4,7 @@ import adra.ifsp.edu.br.api.config.CacheConfig;
 import adra.ifsp.edu.br.api.domain.dto.chamada.StatusChamadaDiaDTO;
 import adra.ifsp.edu.br.api.domain.dto.painel.PainelHojeDTO;
 import adra.ifsp.edu.br.api.domain.dto.painel.PainelMensalDTO;
+import adra.ifsp.edu.br.api.domain.model.FaixaEtaria;
 import adra.ifsp.edu.br.api.domain.repository.PainelRepository;
 import adra.ifsp.edu.br.api.domain.repository.PainelRepository.FrequenciaTurmaMes;
 import lombok.RequiredArgsConstructor;
@@ -27,7 +28,7 @@ import java.util.stream.Collectors;
 
 /**
  * FT-05 — Painel do Coordenador. Monta os DTOs a partir das agregações do
- * {@link PainelRepository}: 4 consultas para o mês ({@link #mensal}) e 4 +
+ * {@link PainelRepository}: 6 consultas para o mês ({@link #mensal}) e 4 +
  * as pendências da FT-04 para o bloco de hoje ({@link #hoje}). Aqui só há
  * contas sobre dezenas de linhas já somadas no banco.
  */
@@ -45,6 +46,8 @@ public class PainelService {
     static final int DIAS_FALTAS_SEGUIDAS = 45;
     static final int DIAS_ANIVERSARIO = 7;
     static final int LIMITE_ATIVIDADES = 8;
+
+    static final String SEM_FAIXA = "Sem faixa";
 
     private static final DateTimeFormatter MES = DateTimeFormatter.ofPattern("yyyy-MM");
     private static final DateTimeFormatter MES_DIA = DateTimeFormatter.ofPattern("MM-dd");
@@ -126,13 +129,11 @@ public class PainelService {
                 disciplina(disciplina),
                 tendencia,
                 turmas,
-                List.of(
-                        new PainelMensalDTO.FaixaEtaria("Até 5", assistidos.ate5()),
-                        new PainelMensalDTO.FaixaEtaria("6–10", assistidos.de6a10()),
-                        new PainelMensalDTO.FaixaEtaria("11–13", assistidos.de11a13()),
-                        new PainelMensalDTO.FaixaEtaria("14–17", assistidos.de14a17()),
-                        new PainelMensalDTO.FaixaEtaria("18+", assistidos.de18()),
-                        new PainelMensalDTO.FaixaEtaria("Sem data", assistidos.semData())));
+                repository.ativosPorFaixaEtaria(referencia, oficinaId).stream()
+                        .map(f -> new PainelMensalDTO.FaixaEtaria(f.idadeMinima() == null
+                                ? SEM_FAIXA
+                                : FaixaEtaria.rotulo(f.idadeMinima(), f.idadeMaxima()), f.total()))
+                        .toList());
     }
 
     @Cacheable(CacheConfig.PAINEL)

@@ -11,6 +11,7 @@ import adra.ifsp.edu.br.api.domain.enums.StatusPresenca;
 import adra.ifsp.edu.br.api.domain.enums.Turno;
 import adra.ifsp.edu.br.api.domain.model.Assistido;
 import adra.ifsp.edu.br.api.domain.model.Chamada;
+import adra.ifsp.edu.br.api.domain.model.FaixaEtaria;
 import adra.ifsp.edu.br.api.domain.model.MotivoDisciplinar;
 import adra.ifsp.edu.br.api.domain.model.NivelPermissao;
 import adra.ifsp.edu.br.api.domain.model.Oficina;
@@ -21,6 +22,7 @@ import adra.ifsp.edu.br.api.domain.model.TurmaAlunos;
 import adra.ifsp.edu.br.api.domain.model.Usuario;
 import adra.ifsp.edu.br.api.domain.repository.AssistidoRepository;
 import adra.ifsp.edu.br.api.domain.repository.ChamadaRepository;
+import adra.ifsp.edu.br.api.domain.repository.FaixaEtariaRepository;
 import adra.ifsp.edu.br.api.domain.repository.MotivoDisciplinarRepository;
 import adra.ifsp.edu.br.api.domain.repository.NivelPermissaoRepository;
 import adra.ifsp.edu.br.api.domain.repository.OficinaRepository;
@@ -85,6 +87,7 @@ class PainelServiceIT {
     @Autowired private TurmaRepository turmaRepository;
     @Autowired private TurmaAlunosRepository turmaAlunosRepository;
     @Autowired private ChamadaRepository chamadaRepository;
+    @Autowired private FaixaEtariaRepository faixaEtariaRepository;
     @Autowired private MotivoDisciplinarRepository motivoRepository;
     @Autowired private PresencaRepository presencaRepository;
     @Autowired private DisciplinarService disciplinarService;
@@ -141,21 +144,6 @@ class PainelServiceIT {
     }
 
     @Test
-    @DisplayName("Faixas etárias da ADRA: 6 a 10, 11 a 13 e 14 a 17 (idade no fim do mês)")
-    void faixasEtarias() {
-        LocalDate referencia = MES.atEndOfMonth();
-        matricular("Davi Dez", referencia.minusYears(10), MES.atDay(1), null);
-        matricular("Elis Catorze", referencia.minusYears(14), MES.atDay(1), null);
-
-        // Ana faz 11 no ano; Bruno ainda tem 9; Davi completa 10 no último dia do mês
-        assertThat(mensal().faixasEtarias())
-                .extracting(PainelMensalDTO.FaixaEtaria::rotulo, PainelMensalDTO.FaixaEtaria::total)
-                .containsExactly(
-                        tuple("Até 5", 0L), tuple("6–10", 2L), tuple("11–13", 1L),
-                        tuple("14–17", 1L), tuple("18+", 0L), tuple("Sem data", 0L));
-    }
-
-    @Test
     @DisplayName("Frequência do mês: presença esparsa, FJ como ausência e desligado fora")
     void frequenciaDoMes() {
         Chamada c1 = chamada(MES.atDay(5));
@@ -181,6 +169,25 @@ class PainelServiceIT {
         assertThat(painel.tendencia()).hasSize(PainelService.MESES_TENDENCIA);
         assertThat(painel.tendencia().getLast()).extracting(PainelMensalDTO.FrequenciaMes::percentual).isEqualTo(67);
         assertThat(painel.frequencia().percentualMesAnterior()).isNull();
+    }
+
+    @Test
+    @DisplayName("Faixa etária: cada ativo conta uma vez, pela faixa do grupo; sem grupo cai em Sem faixa")
+    void faixaEtariaPeloGrupo() {
+        turma.setFaixaEtaria(faixaEtariaRepository.save(
+                FaixaEtaria.builder().idadeMinima((short) 6).idadeMaxima((short) 10).build()));
+        faixaEtariaRepository.save(FaixaEtaria.builder().idadeMinima((short) 8).idadeMaxima((short) 12).build());
+        turmaRepository.save(turma);
+        assistidoRepository.save(Assistido.builder()
+                .nomeCompleto("Davi Sem Grupo")
+                .dataNascimento(LocalDate.of(2016, 5, 5))
+                .dataEntrada(MES.atDay(1).minusMonths(1))
+                .status(StatusGeral.ATIVO)
+                .build());
+
+        assertThat(mensal().faixasEtarias())
+                .extracting(PainelMensalDTO.FaixaEtaria::rotulo, PainelMensalDTO.FaixaEtaria::total)
+                .containsExactly(tuple("6–10 anos", 2L), tuple(PainelService.SEM_FAIXA, 1L));
     }
 
     @Test

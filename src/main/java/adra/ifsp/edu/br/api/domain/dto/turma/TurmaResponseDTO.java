@@ -1,6 +1,7 @@
 package adra.ifsp.edu.br.api.domain.dto.turma;
 
 import adra.ifsp.edu.br.api.domain.enums.Turno;
+import adra.ifsp.edu.br.api.domain.model.FaixaEtaria;
 import adra.ifsp.edu.br.api.domain.model.Turma;
 
 import java.time.DayOfWeek;
@@ -10,6 +11,7 @@ public record TurmaResponseDTO(
         Long turmaId,
         String nomeTurma,
         Turno turno,
+        Long faixaEtariaId,
         String faixaEtaria,
         Integer capacidade,
         Boolean ativo,
@@ -25,11 +27,13 @@ public record TurmaResponseDTO(
      * query por turma). Quantidade nula nos endpoints que não precisam dela.
      */
     public static TurmaResponseDTO fromEntity(Turma turma, Integer quantidadeAlunos, List<Long> oficinaIds) {
+        FaixaEtaria faixa = turma.getFaixaEtaria();
         return new TurmaResponseDTO(
                 turma.getTurmaId(),
                 turma.getNomeTurma(),
                 turma.getTurno(),
-                turma.getFaixaEtaria(),
+                faixa != null ? faixa.getFaixaEtariaId() : null,
+                faixa != null ? faixa.getRotulo() : null,
                 turma.getCapacidade(),
                 turma.getAtivo(),
                 turma.getObservacoes(),
