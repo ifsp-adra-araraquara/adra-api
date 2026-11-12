@@ -18,7 +18,7 @@ public record RegistroDisciplinarResponseDTO(
         /** Para o pronome do documento ("o atendido" / "a atendida"); pode ser null. */
         Sexo sexoAssistido,
         Long motivoId,
-        /** Nome do motivo, ou o texto da progressão ("Gerada pela 3ª ocorrência"). */
+        /** Motivo escrito, o nome do motivo cadastrado ou o texto da progressão ("Gerada pela 3ª ocorrência"). */
         String motivo,
         NivelDisciplinar nivel,
         OrigemRegistroDisciplinar origem,
@@ -62,7 +62,7 @@ public record RegistroDisciplinarResponseDTO(
                 r.getAssistido().getNomeCompleto(),
                 r.getAssistido().getSexo(),
                 motivo != null ? motivo.getMotivoId() : null,
-                motivo != null ? motivo.getNome() : textoProgressao(r),
+                motivo != null ? motivo.getNome() : r.getMotivoTexto() != null ? r.getMotivoTexto() : textoProgressao(r),
                 r.getNivel(),
                 r.getOrigem(),
                 origem != null ? origem.getRegistroId() : null,

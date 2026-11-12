@@ -287,7 +287,7 @@ class DisciplinarServiceIT {
     @DisplayName("Registrar sem período usa os dias de atividade, e o registro traz dias e retorno para a carta")
     void registroDeSuspensaoTrazDiasERetorno() {
         Long registroId = disciplinarService.registrar(assistido.getAssistidoId(),
-                new RegistroDisciplinarRequestDTO(bullying.getMotivoId(), QUINTA, "Fato", null, null, null))
+                new RegistroDisciplinarRequestDTO(null, null, bullying.getMotivoId(), QUINTA, "Fato", null, null, null))
                 .registro().registroId();
 
         RegistroDisciplinarResponseDTO registro = disciplinarService.buscarRegistro(registroId);
@@ -319,6 +319,40 @@ class DisciplinarServiceIT {
     }
 
     @Test
+    @DisplayName("Registro com o nível e o motivo escrito à mão (e-mail da ADRA de 11/11)")
+    void registrarComMotivoEscrito() {
+        RegistroCriadoDTO criado = disciplinarService.registrar(assistido.getAssistidoId(),
+                new RegistroDisciplinarRequestDTO(NivelDisciplinar.ADVERTENCIA, "  Agressão a colega no intervalo ",
+                        null, HOJE, "Deu um tapa no colega.", null, null, null));
+
+        assertThat(criado.registro())
+                .extracting(RegistroDisciplinarResponseDTO::nivel, RegistroDisciplinarResponseDTO::motivo,
+                        RegistroDisciplinarResponseDTO::motivoId)
+                .containsExactly(NivelDisciplinar.ADVERTENCIA, "Agressão a colega no intervalo", null);
+        assertThat(disciplinarService.buscarFicha(assistido.getAssistidoId()).registros())
+                .extracting(RegistroDisciplinarResponseDTO::motivo)
+                .containsExactly("Agressão a colega no intervalo");
+    }
+
+    @Test
+    @DisplayName("Registro novo: uniforme recusado, e nível e motivo são obrigatórios sem motivo cadastrado")
+    void registroNovoSoComOsTresNiveis() {
+        Long id = assistido.getAssistidoId();
+        assertThatThrownBy(() -> disciplinarService.registrar(id, new RegistroDisciplinarRequestDTO(
+                NivelDisciplinar.UNIFORME, "Sem camiseta", null, HOJE, "Fato", null, null, null)))
+                .isInstanceOf(RegraNegocioException.class)
+                .hasMessageContaining("ocorrência, advertência ou suspensão");
+        assertThatThrownBy(() -> disciplinarService.registrar(id, new RegistroDisciplinarRequestDTO(
+                NivelDisciplinar.OCORRENCIA, "  ", null, HOJE, "Fato", null, null, null)))
+                .isInstanceOf(RegraNegocioException.class)
+                .hasMessageContaining("motivo");
+        assertThatThrownBy(() -> disciplinarService.registrar(id, new RegistroDisciplinarRequestDTO(
+                null, "Briga", null, HOJE, "Fato", null, null, null)))
+                .isInstanceOf(RegraNegocioException.class);
+        assertThat(disciplinarService.buscarFicha(id).registros()).isEmpty();
+    }
+
+    @Test
     @DisplayName("Uma ocorrência com 3 atendidos cria 3 registros, cada um com a sua sequência")
     void registrarVarios() {
         registrar(palavrao);
@@ -327,7 +361,7 @@ class DisciplinarServiceIT {
 
         List<RegistroCriadoDTO> criados = disciplinarController.registrarVarios(new RegistroVariosRequestDTO(
                 List.of(assistido.getAssistidoId(), segundo.getAssistidoId(), terceiro.getAssistidoId()),
-                palavrao.getMotivoId(), HOJE, "Briga no intervalo")).getBody();
+                NivelDisciplinar.OCORRENCIA, "Briga no intervalo", null, HOJE, "Empurrões na fila")).getBody();
 
         assertThat(criados).extracting(c -> c.registro().assistidoId(), c -> c.registro().sequencia())
                 .containsExactly(
@@ -343,7 +377,7 @@ class DisciplinarServiceIT {
         Assistido inativo = criarAssistido("Inativo FT-22", StatusGeral.INATIVO);
         RegistroVariosRequestDTO dto = new RegistroVariosRequestDTO(
                 List.of(assistido.getAssistidoId(), segundo.getAssistidoId(), inativo.getAssistidoId()),
-                palavrao.getMotivoId(), HOJE, "Briga no intervalo");
+                null, null, palavrao.getMotivoId(), HOJE, "Briga no intervalo");
 
         assertThatThrownBy(() -> disciplinarService.registrarVarios(dto))
                 .isInstanceOf(RegraNegocioException.class)
@@ -353,7 +387,7 @@ class DisciplinarServiceIT {
 
         assertThatThrownBy(() -> disciplinarService.registrarVarios(new RegistroVariosRequestDTO(
                 List.of(assistido.getAssistidoId(), assistido.getAssistidoId()),
-                palavrao.getMotivoId(), HOJE, "Repetido")))
+                null, null, palavrao.getMotivoId(), HOJE, "Repetido")))
                 .isInstanceOf(RegraNegocioException.class);
     }
 
@@ -523,7 +557,7 @@ class DisciplinarServiceIT {
 
     private RegistroCriadoDTO registrar(MotivoDisciplinar motivo) {
         return disciplinarService.registrar(assistido.getAssistidoId(),
-                new RegistroDisciplinarRequestDTO(motivo.getMotivoId(), HOJE, "Descrição do fato", null, null, null));
+                new RegistroDisciplinarRequestDTO(null, null, motivo.getMotivoId(), HOJE, "Descrição do fato", null, null, null));
     }
 
     private Assistido criarAssistido(String nome, StatusGeral status) {

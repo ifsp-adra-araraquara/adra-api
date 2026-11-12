@@ -2,6 +2,8 @@
 package adra.ifsp.edu.br.api.web.controller;
 
 import adra.ifsp.edu.br.api.domain.dto.assistido.AssistidoResponseDTO;
+import adra.ifsp.edu.br.api.domain.dto.turma.CorrecaoDataEntradaRequestDTO;
+import adra.ifsp.edu.br.api.domain.dto.turma.CorrecaoDataEntradaResponseDTO;
 import adra.ifsp.edu.br.api.domain.dto.turma.TurmaComAlunosResponseDTO;
 import adra.ifsp.edu.br.api.domain.dto.turma.TurmaRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.turma.TurmaResponseDTO;
@@ -130,6 +132,16 @@ public class TurmaController {
             @Valid @RequestBody VincularAlunosTurmaDTO dto
     ) {
         return ResponseEntity.ok(turmaService.vincularAlunos(id, dto));
+    }
+
+    /** Corrige quando os atendidos entraram no grupo (chamada de dias anteriores ao vínculo). */
+    @PreAuthorize("hasRole('COORDENADOR')")
+    @PatchMapping("/{id}/vinculos/data-entrada")
+    public ResponseEntity<CorrecaoDataEntradaResponseDTO> corrigirDataEntrada(
+            @PathVariable Long id,
+            @Valid @RequestBody CorrecaoDataEntradaRequestDTO dto
+    ) {
+        return ResponseEntity.ok(turmaService.corrigirDataEntrada(id, dto));
     }
 
     @PreAuthorize("hasAnyRole('ASSISTENTE_SOCIAL', 'COORDENADOR')")

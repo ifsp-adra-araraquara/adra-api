@@ -21,6 +21,8 @@ public interface ChamadaRepository extends JpaRepository<Chamada, Long> {
 
     List<Chamada> findByTurmaAndDataChamadaBetween(Turma turma, LocalDate inicio, LocalDate fim);
 
+    long countByTurmaAndDataChamadaBetween(Turma turma, LocalDate inicio, LocalDate fim);
+
     @EntityGraph(attributePaths = {"turma", "criadoPor"})
     List<Chamada> findByDataChamadaBetween(LocalDate inicio, LocalDate fim);
 }
