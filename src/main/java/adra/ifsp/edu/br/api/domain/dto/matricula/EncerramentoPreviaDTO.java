@@ -16,7 +16,13 @@ public record EncerramentoPreviaDTO(
         List<AtendidoNaoRenovouDTO> quemNaoRenovou,
         boolean podeEncerrar,
         /** Por que ainda não dá para encerrar (null quando pode). */
-        String motivoBloqueio
+        String motivoBloqueio,
+        /** Registros disciplinares ativos que serão arquivados (a contagem recomeça no ano seguinte). */
+        int disciplinarArquivados,
+        /** Desses, advertências/suspensões com documento ainda sem assinatura. */
+        int disciplinarDocumentosPendentes,
+        /** Desses, consequências ainda não resolvidas (retorno com responsável, passeio...). */
+        int disciplinarConsequenciasPendentes
 ) {
     public record AtendidoNaoRenovouDTO(Long assistidoId, String nomeCompleto, String nomeTurma) {
     }

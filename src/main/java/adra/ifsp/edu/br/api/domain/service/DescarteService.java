@@ -123,6 +123,7 @@ public class DescarteService {
             atualizar("delete from adra.assistido_responsavel where assistido_id in (:ids)", ids);
             atualizar("delete from adra.assistido_programa_transferencia where assistido_id in (:ids)", ids);
             atualizar("delete from adra.assistido_turma_historico where assistido_id in (:ids)", ids);
+            atualizar("delete from adra.solicitacao_desligamento where assistido_id in (:ids)", ids);
             atualizar("delete from adra.assistido where assistido_id in (:ids)", ids);
         }
         // 6. Responsáveis que ficaram sem nenhum atendido.

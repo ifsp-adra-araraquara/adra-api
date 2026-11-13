@@ -17,6 +17,8 @@ import adra.ifsp.edu.br.api.domain.repository.PainelRepository;
 import adra.ifsp.edu.br.api.domain.repository.PreCadastroRepository;
 import adra.ifsp.edu.br.api.domain.repository.RegistroDisciplinarRepository;
 import adra.ifsp.edu.br.api.domain.repository.SemanarioRepository;
+import adra.ifsp.edu.br.api.domain.repository.SolicitacaoDesligamentoRepository;
+import adra.ifsp.edu.br.api.domain.enums.StatusSolicitacaoDesligamento;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
@@ -52,6 +54,7 @@ public class AvisoService {
     private final PreCadastroRepository preCadastroRepository;
     private final AssistidoRepository assistidoRepository;
     private final SemanarioRepository semanarioRepository;
+    private final SolicitacaoDesligamentoRepository solicitacaoDesligamentoRepository;
 
     @Cacheable(CacheConfig.PAINEL)
     public List<AvisoDTO> doPerfil(NomeNivelPermissao perfil) {
@@ -64,6 +67,7 @@ public class AvisoService {
                 avisos.addAll(faltasSeguidas(hoje));
                 avisos.addAll(semanariosPendentes(hoje));
                 avisos.addAll(cadastro());
+                avisos.addAll(desligamentosPendentes());
             }
             case ASSISTENTE_SOCIAL -> {
                 avisos.addAll(faltasSeguidas(hoje));
@@ -197,6 +201,15 @@ public class AvisoService {
                                 + " na semana de " + segunda.format(DIA_MES),
                         null, null, segunda))
                 .toList();
+    }
+
+    /** Pedidos de desligamento da Assistente Social esperando o Coordenador. */
+    private List<AvisoDTO> desligamentosPendentes() {
+        long pendentes = solicitacaoDesligamentoRepository.countByStatus(StatusSolicitacaoDesligamento.PENDENTE);
+        return pendentes == 0 ? List.of()
+                : List.of(new AvisoDTO(TipoAviso.DESLIGAMENTO_SOLICITADO,
+                        pendentes + " pedido(s) de desligamento aguardando", "Solicitados pela Assistente Social",
+                        null, null, null));
     }
 
     private List<AvisoDTO> cadastro() {

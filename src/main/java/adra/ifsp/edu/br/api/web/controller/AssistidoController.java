@@ -114,7 +114,8 @@ public class AssistidoController {
         return ResponseEntity.ok(assistidoService.atualizar(id, dto));
     }
 
-    @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL')")
+    // Desligar e reativar é só do Coordenador; a Assistente Social pede (SolicitacaoDesligamentoController).
+    @PreAuthorize("hasRole('COORDENADOR')")
     @PatchMapping("/{id}/status")
     public ResponseEntity<AssistidoResponseDTO> alterarStatus(@PathVariable Long id,
                                                                 @Valid @RequestBody AssistidoStatusRequestDTO dto) {

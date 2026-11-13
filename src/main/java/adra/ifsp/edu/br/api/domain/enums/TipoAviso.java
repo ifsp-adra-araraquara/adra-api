@@ -14,5 +14,7 @@ public enum TipoAviso {
     PRE_CADASTRO_PENDENTE,
     CADASTRO_SEM_NASCIMENTO,
     /** Grupo atendido por uma oficina sem o semanário da semana (a partir de terça). */
-    SEMANARIO_PENDENTE
+    SEMANARIO_PENDENTE,
+    /** A Assistente Social pediu o desligamento de um atendido: o Coordenador decide. */
+    DESLIGAMENTO_SOLICITADO
 }

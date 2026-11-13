@@ -80,6 +80,8 @@ class EncerramentoAnoIT {
     @Autowired private TurmaRepository turmaRepository;
     @Autowired private JdbcTemplate jdbc;
     @Autowired private EntityManager entityManager;
+    @Autowired private adra.ifsp.edu.br.api.domain.repository.UsuarioRepository usuarioRepository;
+    @Autowired private adra.ifsp.edu.br.api.domain.repository.NivelPermissaoRepository nivelPermissaoRepository;
 
     @MockitoBean private ArmazenamentoArquivos storage;
     @MockitoBean private UsuarioAutenticadoService usuarioAutenticadoService;
@@ -190,6 +192,69 @@ class EncerramentoAnoIT {
         mvc.perform(post("/api/matriculas/" + ano + "/encerrar").with(perfil(COORDENADOR)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.ano").value(ano));
+    }
+
+    @Test
+    @DisplayName("Encerrar arquiva o disciplinar do ano (sem mexer nas faltas), mantém suspensão que passa de 31/12 e cancela pedido de desligamento de quem saiu")
+    void encerrarArquivaDisciplinarECancelaPedidos() {
+        jdbc.execute("alter table adra.usuario alter column criado_em set default now()");
+        jdbc.execute("alter table adra.usuario alter column atualizado_em set default now()");
+        var nivel = nivelPermissaoRepository.findByNome(NomeNivelPermissao.COORDENADOR)
+                .orElseGet(() -> nivelPermissaoRepository.save(
+                        adra.ifsp.edu.br.api.domain.model.NivelPermissao.builder().nome(NomeNivelPermissao.COORDENADOR).build()));
+        var autor = usuarioRepository.save(adra.ifsp.edu.br.api.domain.model.Usuario.builder()
+                .nivelPermissao(nivel).nomeCompleto("Coordenação Encerramento").email("encerramento@teste.local").build());
+
+        Long renovou = cadastrar("Davi Renovou", grupoDoAno);
+        Long naoRenovou = cadastrar("Elisa Não Renovou", grupoDoAno);
+        abrirPeriodoDoProximoAno();
+        rematricular(renovou, grupoDoProximo);
+        sincronizar();
+
+        // O banco dos testes é compartilhado entre classes: compara com o que já havia.
+        EncerramentoPreviaDTO antes = encerramentoAnoService.previa(ano);
+        long ocorrencia = registro(renovou, "OCORRENCIA", LocalDate.of(ano, 3, 10), null, null, null, autor.getUsuarioId());
+        long advertencia = registro(renovou, "ADVERTENCIA", LocalDate.of(ano, 4, 2), null, null, "PENDENTE_ASSINATURA", autor.getUsuarioId());
+        long suspensaoQuePassa = registro(naoRenovou, "SUSPENSAO", ultimoDia.minusDays(2), ultimoDia.minusDays(2),
+                LocalDate.of(ano + 1, 1, 5), null, autor.getUsuarioId());
+        jdbc.update("update adra.assistido set total_ocorrencias_ativas = 1, total_advertencias_ativas = 1 where assistido_id = ?", renovou);
+        jdbc.update("""
+                insert into adra.solicitacao_desligamento (assistido_id, solicitado_por_id, data_saida, motivo, status, criado_em)
+                values (?, ?, ?, 'Pediu para sair', 'PENDENTE', now())""", naoRenovou, autor.getUsuarioId(), LocalDate.now());
+
+        EncerramentoPreviaDTO previa = encerramentoAnoService.previa(ano);
+        assertThat(previa.disciplinarArquivados() - antes.disciplinarArquivados()).isEqualTo(2);
+        assertThat(previa.disciplinarDocumentosPendentes() - antes.disciplinarDocumentosPendentes()).isEqualTo(1);
+
+        encerramentoAnoService.encerrar(ano);
+        sincronizar();
+
+        assertThat(arquivado(ocorrencia)).isTrue();
+        assertThat(arquivado(advertencia)).isTrue();
+        assertThat(jdbc.queryForObject("select arquivado_motivo from adra.registro_disciplinar where registro_id = ?",
+                String.class, ocorrencia)).isEqualTo("Encerramento do ano de " + ano);
+        assertThat(arquivado(suspensaoQuePassa)).isFalse();
+        Map<String, Object> contadores = jdbc.queryForMap(
+                "select total_ocorrencias_ativas, total_advertencias_ativas from adra.assistido where assistido_id = ?", renovou);
+        assertThat(((Number) contadores.get("total_ocorrencias_ativas")).intValue()).isZero();
+        assertThat(((Number) contadores.get("total_advertencias_ativas")).intValue()).isZero();
+        assertThat(jdbc.queryForObject("select status from adra.solicitacao_desligamento where assistido_id = ?",
+                String.class, naoRenovou)).isEqualTo("CANCELADA");
+    }
+
+    private long registro(Long assistidoId, String nivel, LocalDate data, LocalDate suspensaoInicio, LocalDate suspensaoFim,
+                          String documentoStatus, Long autorId) {
+        return jdbc.queryForObject("""
+                insert into adra.registro_disciplinar (assistido_id, nivel, origem, sequencia, data_registro, descricao,
+                    suspensao_inicio, suspensao_fim, documento_status, arquivado, registrado_por_id, criado_em)
+                values (?, ?, 'MANUAL', 1, ?, 'Fato inventado', ?, ?, ?, false, ?, now())
+                returning registro_id""", Long.class,
+                assistidoId, nivel, data, suspensaoInicio, suspensaoFim, documentoStatus, autorId);
+    }
+
+    private boolean arquivado(long registroId) {
+        return Boolean.TRUE.equals(jdbc.queryForObject("select arquivado from adra.registro_disciplinar where registro_id = ?",
+                Boolean.class, registroId));
     }
 
     // ---------------------------------------------------------------
