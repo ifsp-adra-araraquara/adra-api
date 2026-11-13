@@ -1,5 +1,8 @@
 package adra.ifsp.edu.br.api.web.controller;
 
+import adra.ifsp.edu.br.api.domain.dto.PaginaDTO;
+import org.springframework.format.annotation.DateTimeFormat;
+import java.time.LocalDate;
 import adra.ifsp.edu.br.api.domain.dto.semanario.SemanarioRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.semanario.SemanarioResponseDTO;
 import adra.ifsp.edu.br.api.domain.service.SemanarioService;
@@ -32,11 +35,22 @@ public class SemanarioController {
         return ResponseEntity.noContent().build();
     }
 
-    /** Tela Semanários: a coordenação vê os semanários de todas as oficinas (os filtros ficam no front). */
+    /**
+     * Tela Semanários: a coordenação vê os semanários de todas as oficinas, paginados.
+     * {@code semana}: qualquer dia da semana (vale a segunda); sem ela, todas as semanas.
+     */
     @PreAuthorize("hasRole('COORDENADOR')")
     @GetMapping
-    public ResponseEntity<List<SemanarioResponseDTO>> listarTodos() {
-        return ResponseEntity.ok(semanarioService.listarTodos());
+    public ResponseEntity<PaginaDTO<SemanarioResponseDTO>> listar(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate semana,
+            @RequestParam(required = false) Long turmaId,
+            @RequestParam(required = false) Long oficinaId,
+            @RequestParam(required = false) String busca,
+            @RequestParam(defaultValue = "0") int pagina,
+            @RequestParam(defaultValue = "20") int tamanho
+    ) {
+        return ResponseEntity.ok(semanarioService.listar(semana, turmaId, oficinaId, busca,
+                Math.max(pagina, 0), Math.min(Math.max(tamanho, 1), 100)));
     }
 
     @PreAuthorize("hasRole('OFICINEIRO')")
