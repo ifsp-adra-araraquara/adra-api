@@ -87,6 +87,13 @@ public class SemanarioService {
     }
 
     @Transactional(readOnly = true)
+    public List<SemanarioResponseDTO> listarTodos() {
+        return semanarioRepository.findAllByOrderBySemanaInicioDescAtualizadoEmDesc().stream()
+                .map(SemanarioResponseDTO::de)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
     public List<SemanarioResponseDTO> listarPorOficina(Long oficinaId) {
         return semanarioRepository.findByOficina_OficinaIdOrderBySemanaInicioDesc(oficinaId).stream()
                 .map(SemanarioResponseDTO::de)

@@ -1,6 +1,7 @@
 package adra.ifsp.edu.br.api.domain.repository;
 
 import adra.ifsp.edu.br.api.domain.model.Semanario;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -14,6 +15,10 @@ public interface SemanarioRepository extends JpaRepository<Semanario, Long> {
     Optional<Semanario> findByOficina_OficinaIdAndTurma_TurmaIdAndSemanaInicio(Long oficinaId, Long turmaId, LocalDate semanaInicio);
 
     List<Semanario> findByOficina_OficinaIdOrderBySemanaInicioDesc(Long oficinaId);
+
+    /** Todos os semanários (tela Semanários da coordenação), já com oficina, grupo e autor — sem N+1. */
+    @EntityGraph(attributePaths = {"oficina", "turma", "enviadoPor"})
+    List<Semanario> findAllByOrderBySemanaInicioDescAtualizadoEmDesc();
 
     List<Semanario> findByOficina_OficineiroResponsavel_UsuarioIdOrderBySemanaInicioDesc(Long oficineiroId);
 

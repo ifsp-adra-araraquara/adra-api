@@ -31,14 +31,18 @@ import java.time.LocalDate;
 import java.util.List;
 
 /**
- * FT-04: sistema disciplinar. Coordenador e Sociopedagógico registram e
- * consultam; arquivar e cadastrar motivos é só do Coordenador. O Oficineiro
- * não acessa (dado sensível, DT-01).
+ * FT-04: sistema disciplinar. Coordenador, Assistente Social e Educador Social
+ * consultam. Ocorrência é registrada pelo Educador Social (e pelo Coordenador);
+ * de advertência em diante é só o Coordenador — a regra de nível fica no
+ * DisciplinarService. Arquivar e cadastrar motivos é só do Coordenador. O
+ * Oficineiro não acessa (dado sensível, DT-01).
  */
 @RestController
 @RequestMapping("/api")
 @RequiredArgsConstructor
-@PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL')")
+// Leitura liberada para Coordenação, Assistente Social e Educador Social; o que altera registro tem
+// @PreAuthorize próprio no método.
+@PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL', 'EDUCADOR_SOCIAL')")
 public class DisciplinarController {
 
     private final DisciplinarService disciplinarService;
@@ -84,7 +88,7 @@ public class DisciplinarController {
     }
 
     /** FT-22: um fato com vários atendidos — um registro por atendido, tudo ou nada. */
-    @PreAuthorize("hasRole('COORDENADOR')")
+    @PreAuthorize("hasAnyRole('COORDENADOR', 'EDUCADOR_SOCIAL')")
     @PostMapping("/disciplinar/registros")
     public ResponseEntity<List<RegistroCriadoDTO>> registrarVarios(@Valid @RequestBody RegistroVariosRequestDTO dto) {
         return ResponseEntity.status(HttpStatus.CREATED).body(disciplinarService.registrarVarios(dto));
@@ -103,7 +107,7 @@ public class DisciplinarController {
     }
 
     /** Devolve o registro lançado e a recomendação pendente do assistido, se houver. */
-    @PreAuthorize("hasRole('COORDENADOR')")
+    @PreAuthorize("hasAnyRole('COORDENADOR', 'EDUCADOR_SOCIAL')")
     @PostMapping("/assistidos/{assistidoId}/disciplinar")
     public ResponseEntity<RegistroCriadoDTO> registrar(
             @PathVariable Long assistidoId,

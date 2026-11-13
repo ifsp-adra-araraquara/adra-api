@@ -236,11 +236,13 @@ public class AssistidoService {
         }
 
         boolean somenteResumo = usuarioAtualTemPapel("ROLE_OFICINEIRO");
+        boolean resumoDisciplinar = usuarioAtualTemPapel("ROLE_EDUCADOR_SOCIAL");
         return assistidos.stream()
                 .map(a -> {
                     AssistidoResponseDTO dto = assistidoMapper.paraDTO(
                             a, responsaveis.get(a.getAssistidoId()), frequencias.get(a.getAssistidoId()));
                     if (somenteResumo) return dto.resumo();
+                    if (resumoDisciplinar) return dto.resumoDisciplinar();
                     TurmaAlunos periodo = periodoNaTurma.get(a.getAssistidoId());
                     return periodo == null ? dto : dto.comPeriodoNaTurma(periodo.getDataEntrada(), periodo.getDataSaida());
                 })

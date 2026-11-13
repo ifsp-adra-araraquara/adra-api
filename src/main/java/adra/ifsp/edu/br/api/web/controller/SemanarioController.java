@@ -32,6 +32,13 @@ public class SemanarioController {
         return ResponseEntity.noContent().build();
     }
 
+    /** Tela Semanários: a coordenação vê os semanários de todas as oficinas (os filtros ficam no front). */
+    @PreAuthorize("hasRole('COORDENADOR')")
+    @GetMapping
+    public ResponseEntity<List<SemanarioResponseDTO>> listarTodos() {
+        return ResponseEntity.ok(semanarioService.listarTodos());
+    }
+
     @PreAuthorize("hasRole('OFICINEIRO')")
     @GetMapping("/meus")
     public ResponseEntity<List<SemanarioResponseDTO>> meus() {

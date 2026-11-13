@@ -27,7 +27,7 @@ public class TurmaController {
 
     private final TurmaService turmaService;
 
-    @PreAuthorize("hasAnyRole('ASSISTENTE_SOCIAL', 'COORDENADOR')")
+    @PreAuthorize("hasAnyRole('ASSISTENTE_SOCIAL', 'COORDENADOR', 'EDUCADOR_SOCIAL')")
     @GetMapping
     public ResponseEntity<List<TurmaResponseDTO>> listar(
             @RequestParam(required = false) String nome,
