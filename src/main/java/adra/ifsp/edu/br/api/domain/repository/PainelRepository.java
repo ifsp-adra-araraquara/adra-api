@@ -257,7 +257,9 @@ public class PainelRepository {
 
     /* ======================= Precisa de atenção hoje ======================= */
 
-    public record FaltasSeguidas(Long assistidoId, String nome, String turma, long faltas, LocalDate ultimaChamada) {
+    /** {@code primeiraFalta} marca onde a sequência começou: identifica a sequência para avisar uma vez só. */
+    public record FaltasSeguidas(Long assistidoId, String nome, String turma, long faltas, LocalDate ultimaChamada,
+                                 LocalDate primeiraFalta) {
     }
 
     /**
@@ -289,7 +291,7 @@ public class PainelRepository {
                               FROM chamadas_do_atendido
                         )
                         SELECT c.assistido_id, s.nome_completo, t.nome_turma,
-                               COUNT(*) AS faltas, MAX(c.data_chamada) AS ultima
+                               COUNT(*) AS faltas, MAX(c.data_chamada) AS ultima, MIN(c.data_chamada) AS primeira
                           FROM com_quebras c
                           JOIN adra.assistido s ON s.assistido_id = c.assistido_id
                           LEFT JOIN adra.turma t ON t.turma_id = s.turma_id
@@ -303,7 +305,8 @@ public class PainelRepository {
                 .param("limiar", limiar)
                 .query((rs, i) -> new FaltasSeguidas(
                         rs.getLong("assistido_id"), rs.getString("nome_completo"), rs.getString("nome_turma"),
-                        rs.getLong("faltas"), rs.getObject("ultima", LocalDate.class)))
+                        rs.getLong("faltas"), rs.getObject("ultima", LocalDate.class),
+                        rs.getObject("primeira", LocalDate.class)))
                 .list();
     }
 

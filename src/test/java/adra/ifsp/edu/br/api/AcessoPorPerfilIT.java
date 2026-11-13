@@ -135,6 +135,12 @@ class AcessoPorPerfilIT {
 
                 arguments(HttpMethod.GET, "/api/avisos", Set.of(COORDENADOR, ASSISTENTE_SOCIAL, EDUCADOR_SOCIAL, OFICINEIRO)),
 
+                arguments(HttpMethod.GET, "/api/notificacoes", Set.of(COORDENADOR, ASSISTENTE_SOCIAL, EDUCADOR_SOCIAL, OFICINEIRO)),
+                arguments(HttpMethod.GET, "/api/notificacoes/nao-lidas", Set.of(COORDENADOR, ASSISTENTE_SOCIAL, EDUCADOR_SOCIAL, OFICINEIRO)),
+                // Só o Administrador vê e dispara o envio por e-mail.
+                arguments(HttpMethod.GET, "/api/notificacoes/envio", Set.of()),
+                arguments(HttpMethod.POST, "/api/notificacoes/processar", Set.of()),
+
                 arguments(HttpMethod.GET, "/api/disciplinar/registros", Set.of(COORDENADOR, ASSISTENTE_SOCIAL)),
                 arguments(HttpMethod.GET, "/api/disciplinar/sinalizacoes?assistidoIds=" + INEXISTENTE, Set.of(COORDENADOR, ASSISTENTE_SOCIAL, EDUCADOR_SOCIAL)),
                 arguments(HttpMethod.PATCH, "/api/disciplinar/" + INEXISTENTE + "/documento-devolvido", Set.of(COORDENADOR)),
