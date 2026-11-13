@@ -115,6 +115,8 @@ class AcessoPorPerfilIT {
     static Stream<Arguments> matriz() {
         return Stream.of(
                 arguments(HttpMethod.GET, "/api/assistidos", Set.of(COORDENADOR, ASSISTENTE_SOCIAL)),
+                // Educador Social: só ativos (seletor do registro de ocorrência), e em resumo.
+                arguments(HttpMethod.GET, "/api/assistidos?status=ATIVO", Set.of(COORDENADOR, ASSISTENTE_SOCIAL, EDUCADOR_SOCIAL)),
                 arguments(HttpMethod.GET, "/api/assistidos/contagem", Set.of(COORDENADOR, ASSISTENTE_SOCIAL)),
                 arguments(HttpMethod.GET, "/api/arquivos/fotos-perfil?entidadeTipo=ASSISTIDO&entidadeIds=" + INEXISTENTE, Set.of(COORDENADOR, ASSISTENTE_SOCIAL, EDUCADOR_SOCIAL)),
                 arguments(HttpMethod.GET, "/api/arquivos/fotos-perfil?entidadeTipo=PRE_CADASTRO&entidadeIds=" + INEXISTENTE, Set.of()),
@@ -135,17 +137,24 @@ class AcessoPorPerfilIT {
 
                 arguments(HttpMethod.GET, "/api/avisos", Set.of(COORDENADOR, ASSISTENTE_SOCIAL, EDUCADOR_SOCIAL, OFICINEIRO)),
 
-                arguments(HttpMethod.GET, "/api/disciplinar/registros", Set.of(COORDENADOR, ASSISTENTE_SOCIAL)),
+                arguments(HttpMethod.GET, "/api/notificacoes", Set.of(COORDENADOR, ASSISTENTE_SOCIAL, EDUCADOR_SOCIAL, OFICINEIRO)),
+                arguments(HttpMethod.GET, "/api/notificacoes/nao-lidas", Set.of(COORDENADOR, ASSISTENTE_SOCIAL, EDUCADOR_SOCIAL, OFICINEIRO)),
+                // Só o Administrador vê e dispara o envio por e-mail.
+                arguments(HttpMethod.GET, "/api/notificacoes/envio", Set.of()),
+                arguments(HttpMethod.POST, "/api/notificacoes/processar", Set.of()),
+
+                arguments(HttpMethod.GET, "/api/disciplinar/registros", Set.of(COORDENADOR, ASSISTENTE_SOCIAL, EDUCADOR_SOCIAL)),
                 arguments(HttpMethod.GET, "/api/disciplinar/sinalizacoes?assistidoIds=" + INEXISTENTE, Set.of(COORDENADOR, ASSISTENTE_SOCIAL, EDUCADOR_SOCIAL)),
                 arguments(HttpMethod.PATCH, "/api/disciplinar/" + INEXISTENTE + "/documento-devolvido", Set.of(COORDENADOR)),
 
-                arguments(HttpMethod.GET, "/api/turmas", Set.of(COORDENADOR, ASSISTENTE_SOCIAL)),
+                arguments(HttpMethod.GET, "/api/turmas", Set.of(COORDENADOR, ASSISTENTE_SOCIAL, EDUCADOR_SOCIAL)),
                 arguments(HttpMethod.GET, "/api/listas/evento?turmaIds=" + INEXISTENTE, Set.of(COORDENADOR)),
                 arguments(HttpMethod.GET, "/api/oficinas", Set.of(COORDENADOR, ASSISTENTE_SOCIAL)),
                 arguments(HttpMethod.PATCH, "/api/oficinas/" + INEXISTENTE + "/inativar", Set.of(COORDENADOR)),
 
                 arguments(HttpMethod.GET, "/api/semanarios/oficina/" + INEXISTENTE, Set.of(COORDENADOR, ASSISTENTE_SOCIAL)),
                 arguments(HttpMethod.GET, "/api/semanarios/meus", Set.of(OFICINEIRO)),
+                arguments(HttpMethod.GET, "/api/semanarios", Set.of(COORDENADOR)),
                 arguments(HttpMethod.GET, "/api/excecoes-calendario", Set.of(COORDENADOR, ASSISTENTE_SOCIAL, EDUCADOR_SOCIAL, OFICINEIRO)),
                 arguments(HttpMethod.GET, "/api/notas-calendario", Set.of(COORDENADOR, ASSISTENTE_SOCIAL, EDUCADOR_SOCIAL, OFICINEIRO)),
                 arguments(HttpMethod.DELETE, "/api/notas-calendario/" + INEXISTENTE, Set.of(COORDENADOR)),
@@ -322,6 +331,14 @@ class AcessoPorPerfilIT {
     }
 
     @Test
+    void listaDeSemanariosEhPaginadaComLimiteEFiltroPorSemana() throws Exception {
+        mvc.perform(get("/api/semanarios").param("semana", "2026-11-12").param("tamanho", "10000").with(comPerfil(COORDENADOR)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tamanho").value(100))
+                .andExpect(jsonPath("$.conteudo").isArray());
+    }
+
+    @Test
     void tokenDeUsuarioDesativadoEhRecusado() throws Exception {
         Usuario usuario = criarUsuario(COORDENADOR, false);
         String autorizacao = "Bearer " + tokenService.gerarToken(usuario);
@@ -350,8 +367,20 @@ class AcessoPorPerfilIT {
     @Test
     void assistenteSocialEntraComOsModulosDela() throws Exception {
         assertThat(modulosNoLogin(criarUsuario(ASSISTENTE_SOCIAL, false))).containsExactlyInAnyOrder(
-                "DASHBOARD", "ASSISTIDOS", "RESPONSAVEIS", "PRE_CADASTRO", "CHAMADA", "DISCIPLINAR", "OFICINAS", "AULAS");
+                "DASHBOARD", "ASSISTIDOS", "RESPONSAVEIS", "PRE_CADASTRO", "CHAMADA", "DISCIPLINAR", "AULAS");
         assertThat(modulosNoLogin(criarUsuario(EDUCADOR_SOCIAL, false))).doesNotContain("PRE_CADASTRO");
+    }
+
+    @Test
+    void educadorSocialEntraComChamadaCalendarioEDisciplinar() throws Exception {
+        assertThat(modulosNoLogin(criarUsuario(EDUCADOR_SOCIAL, false)))
+                .containsExactlyInAnyOrder("CHAMADA", "DASHBOARD", "DISCIPLINAR");
+    }
+
+    @Test
+    void coordenadorEntraComOModuloSemanarios() throws Exception {
+        assertThat(modulosNoLogin(criarUsuario(COORDENADOR, false))).contains("SEMANARIOS");
+        assertThat(modulosNoLogin(criarUsuario(ASSISTENTE_SOCIAL, false))).doesNotContain("SEMANARIOS");
     }
 
     @Test

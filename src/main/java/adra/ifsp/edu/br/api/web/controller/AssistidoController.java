@@ -47,7 +47,9 @@ public class AssistidoController {
         return ResponseEntity.ok(assistidoLoteService.validar(itens));
     }
 
+    // Educador Social: só atendidos ativos e em resumo (seletor do registro de ocorrência).
     @PreAuthorize("hasAnyRole('COORDENADOR', 'ASSISTENTE_SOCIAL') "
+            + "or (hasRole('EDUCADOR_SOCIAL') and #status != null and #status.name() == 'ATIVO') "
             + "or (hasRole('OFICINEIRO') and @acessoTurma.oficineiroPodeListarAssistidos(#turmaId, #busca))")
     @GetMapping
     public ResponseEntity<PaginaDTO<AssistidoResponseDTO>> listar(

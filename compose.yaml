@@ -13,6 +13,7 @@ services:
       BREVO_SMTP_LOGIN: "${BREVO_SMTP_LOGIN:?defina BREVO_SMTP_LOGIN}"
       BREVO_SMTP_KEY: "${BREVO_SMTP_KEY:?defina BREVO_SMTP_KEY}"
       TURNSTILE_SEGREDO: "${TURNSTILE_SEGREDO:?defina TURNSTILE_SEGREDO}"
+      NOTIFICACAO_EMAIL_LIGADO: "${NOTIFICACAO_EMAIL_LIGADO:-false}"
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:8080/actuator/health/liveness"]
       interval: 30s

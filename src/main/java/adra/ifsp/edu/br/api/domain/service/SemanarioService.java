@@ -1,5 +1,9 @@
 package adra.ifsp.edu.br.api.domain.service;
 
+import adra.ifsp.edu.br.api.domain.dto.PaginaDTO;
+import adra.ifsp.edu.br.api.domain.repository.SemanarioSpecification;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import adra.ifsp.edu.br.api.config.CacheConfig;
 import adra.ifsp.edu.br.api.domain.dto.semanario.SemanarioRequestDTO;
 import adra.ifsp.edu.br.api.domain.dto.semanario.SemanarioResponseDTO;
@@ -84,6 +88,16 @@ public class SemanarioService {
                 null,
                 "Remoção de semanário"
         );
+    }
+
+    /** Semanários de todas as oficinas, a semana mais recente primeiro e, dentro dela, por grupo. */
+    @Transactional(readOnly = true)
+    public PaginaDTO<SemanarioResponseDTO> listar(LocalDate semana, Long turmaId, Long oficinaId, String busca,
+                                                  int pagina, int tamanho) {
+        Sort ordem = Sort.by(Sort.Order.desc("semanaInicio"), Sort.Order.asc("turma.nomeTurma"), Sort.Order.asc("semanarioId"));
+        return PaginaDTO.de(semanarioRepository
+                .findAll(SemanarioSpecification.comFiltros(semana, turmaId, oficinaId, busca), PageRequest.of(pagina, tamanho, ordem))
+                .map(SemanarioResponseDTO::de));
     }
 
     @Transactional(readOnly = true)

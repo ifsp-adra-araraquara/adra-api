@@ -53,6 +53,21 @@ redefinição pedida pelo Administrador, porque precisa devolver o mesmo link
 para ele copiar. Os dois saem pelo SMTP do Brevo e usam os mesmos templates,
 em `src/main/resources/templates`.
 
+### Notificações
+
+`NotificacaoService.notificar(PedidoNotificacao)` é a porta de entrada para avisar alguém:
+tipo, referência do fato, título, mensagem, link, quem está envolvido, destinatários e
+canais. Cada destinatário ganha a própria notificação, e o mesmo `(tipo, referência)` não
+chega duas vezes à mesma pessoa. O sino (`PLATAFORMA`) recebe na hora. O `EMAIL` espera o
+job diário (`adra.notificacao.cron`, 7h), que junta tudo de uma pessoa num e-mail só e para
+em `adra.notificacao.email.limite-diario` (o Brevo libera 300 por dia no total). Para criar
+um canal novo, basta implementar `CanalDeEntrega`. Para avisar sobre algo novo, acrescente
+um método em `GeradorNotificacoes`.
+
+O e-mail fica desligado até `NOTIFICACAO_EMAIL_LIGADO=true` (no perfil local ele vem ligado
+e cai no Mailpit). Na tela de Notificações, o Administrador vê a situação do envio e pode
+rodar o job na hora.
+
 Local, tudo cai no Mailpit: `http://localhost:54324`. Em stage e produção o
 Supabase não lê o `config.toml`: mudou um template, cole o HTML no painel em
 Authentication → Emails → Templates.
