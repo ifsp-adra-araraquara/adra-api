@@ -442,6 +442,36 @@ public class DisciplinarService {
     }
 
     /** FT-13: suspensão arquivada deixa de justificar as faltas do período (voltam a Falta). */
+    /** O que o encerramento do ano vai arquivar e o que ainda está pendente nesses registros. */
+    public record PreviaArquivamentoAno(int registros, int documentosPendentes, int consequenciasPendentes) {
+    }
+
+    @Transactional(readOnly = true)
+    public PreviaArquivamentoAno previaArquivamentoDoAno(int ano) {
+        List<RegistroDisciplinar> registros = registroRepository.findAtivosAteOFimDoAno(LocalDate.of(ano, 12, 31));
+        return new PreviaArquivamentoAno(
+                registros.size(),
+                (int) registros.stream().filter(r -> r.getDocumentoStatus() == StatusDocumentoDisciplinar.PENDENTE_ASSINATURA).count(),
+                (int) registros.stream().filter(RegistroDisciplinar::temConsequenciaPendente).count());
+    }
+
+    /**
+     * Encerramento do ano (pedido da ADRA de 13/11/2026): a contagem recomeça no ano
+     * seguinte. Arquiva — não exclui — e não mexe nas faltas da chamada: o que já
+     * aconteceu no ano continua igual no histórico e na frequência.
+     *
+     * @return quantos registros foram arquivados
+     */
+    public int arquivarNoEncerramentoDoAno(int ano, Usuario usuario) {
+        List<RegistroDisciplinar> registros = registroRepository.findAtivosAteOFimDoAno(LocalDate.of(ano, 12, 31));
+        String motivo = "Encerramento do ano de " + ano;
+        registros.forEach(r -> marcarArquivado(r, motivo, usuario));
+        registroRepository.flush();
+        registros.stream().map(r -> r.getAssistido().getAssistidoId()).distinct()
+                .forEach(assistidoRepository::recalcularContadoresDisciplinares);
+        return registros.size();
+    }
+
     private void sincronizarFaltasSeSuspensao(RegistroDisciplinar registro, Usuario usuario) {
         if (registro.getNivel() == NivelDisciplinar.SUSPENSAO) {
             faltaPorSuspensaoService.sincronizar(registro.getAssistido(),

@@ -92,4 +92,17 @@ public interface RegistroDisciplinarRepository extends JpaRepository<RegistroDis
                    OR (r.consequencia IS NOT NULL AND r.consequenciaResolvidaEm IS NULL))
             """)
     List<RegistroDisciplinar> findCandidatosASinalizacao(@Param("assistidoIds") Collection<Long> assistidoIds);
+
+    /**
+     * Encerramento do ano: registros ainda ativos lançados até o fim do ano, menos a
+     * suspensão que continua depois dele (ela segue valendo na chamada de janeiro).
+     */
+    @Query("""
+            select r from RegistroDisciplinar r
+             where r.arquivado = false
+               and r.dataRegistro <= :fimDoAno
+               and (r.nivel <> adra.ifsp.edu.br.api.domain.enums.NivelDisciplinar.SUSPENSAO
+                    or r.suspensaoFim is null or r.suspensaoFim <= :fimDoAno)
+            """)
+    List<RegistroDisciplinar> findAtivosAteOFimDoAno(@Param("fimDoAno") LocalDate fimDoAno);
 }

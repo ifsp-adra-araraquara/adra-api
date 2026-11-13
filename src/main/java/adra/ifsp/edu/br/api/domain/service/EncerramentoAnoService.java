@@ -19,6 +19,8 @@ import adra.ifsp.edu.br.api.domain.model.EncerramentoAno;
 import adra.ifsp.edu.br.api.domain.repository.EncerramentoAnoRepository;
 import adra.ifsp.edu.br.api.domain.repository.MatriculaRepository;
 import adra.ifsp.edu.br.api.domain.repository.PeriodoMatriculaRepository;
+import adra.ifsp.edu.br.api.domain.repository.SolicitacaoDesligamentoRepository;
+import adra.ifsp.edu.br.api.domain.model.Usuario;
 import adra.ifsp.edu.br.api.exception.RegraNegocioException;
 import lombok.RequiredArgsConstructor;
 
@@ -29,7 +31,8 @@ import lombok.RequiredArgsConstructor;
  *   <li>quem não renovou perde a vaga (desligado no último dia do ano);</li>
  *   <li>quem renovou passa a ter a matrícula e o grupo do ano seguinte;</li>
  *   <li>os vínculos de grupo do ano fecham em 31/12;</li>
- *   <li>as matrículas do ano viram ENCERRADA e o ano fica travado.</li>
+ *   <li>as matrículas do ano viram ENCERRADA e o ano fica travado;</li>
+ *   <li>os registros disciplinares do ano são arquivados (a contagem recomeça).</li>
  * </ol>
  */
 @Service
@@ -42,6 +45,8 @@ public class EncerramentoAnoService {
     private final PeriodoMatriculaRepository periodoRepository;
     private final UsuarioAutenticadoService usuarioAutenticadoService;
     private final AuditoriaService auditoriaService;
+    private final DisciplinarService disciplinarService;
+    private final SolicitacaoDesligamentoRepository solicitacaoDesligamentoRepository;
 
     /**
      * Ano que está esperando encerramento (o mais antigo com matrícula ativa), só quando
@@ -62,6 +67,7 @@ public class EncerramentoAnoService {
                 .map(a -> new AtendidoNaoRenovouDTO(a.getAssistidoId(), a.getNomeCompleto(), a.getNomeTurma()))
                 .toList();
         String bloqueio = motivoBloqueio(ano);
+        DisciplinarService.PreviaArquivamentoAno disciplinar = disciplinarService.previaArquivamentoDoAno(ano);
         return new EncerramentoPreviaDTO(ano,
                 matriculaRepository.contarAtivas(ano),
                 matriculaRepository.contarRenovaram(ano),
@@ -69,7 +75,10 @@ public class EncerramentoAnoService {
                 matriculaRepository.contarNovosNoAnoSeguinte(ano),
                 quemNaoRenovou,
                 bloqueio == null,
-                bloqueio);
+                bloqueio,
+                disciplinar.registros(),
+                disciplinar.documentosPendentes(),
+                disciplinar.consequenciasPendentes());
     }
 
     @CacheEvict(cacheNames = {CacheConfig.ESTRUTURA, CacheConfig.PAINEL}, allEntries = true)
@@ -88,14 +97,20 @@ public class EncerramentoAnoService {
         matriculaRepository.passarParaOAnoSeguinte(ano);
         int vinculosFechados = matriculaRepository.fecharVinculosDoAno(ano, ultimoDia);
         matriculaRepository.encerrarMatriculasDoAno(ano);
+        // Quem perdeu a vaga saiu: pedido de desligamento em aberto não tem mais o que decidir.
+        solicitacaoDesligamentoRepository.cancelarPendentesDeInativos("Desligado no encerramento do ano de " + ano + ".");
+
+        Usuario coordenador = usuarioAutenticadoService.getUsuarioAtual();
+        // A contagem disciplinar recomeça no ano seguinte; o histórico fica (arquivado).
+        int disciplinarArquivados = disciplinarService.arquivarNoEncerramentoDoAno(ano, coordenador);
 
         EncerramentoAno encerramento = encerramentoRepository.save(new EncerramentoAno(ano,
-                usuarioAutenticadoService.getUsuarioAtual(), ativas, renovaram, naoRenovaram));
+                coordenador, ativas, renovaram, naoRenovaram));
 
         auditoriaService.registrar(ModuloSistema.ASSISTIDOS, "encerramento_ano", (long) ano, AcaoSistema.EDITAR,
                 null,
                 Map.of("matriculasEncerradas", ativas, "renovaram", renovaram, "naoRenovaram", naoRenovaram,
-                        "vinculosFechados", vinculosFechados),
+                        "vinculosFechados", vinculosFechados, "disciplinarArquivados", disciplinarArquivados),
                 "Encerramento do ano " + ano);
         return EncerramentoAnoDTO.de(encerramento);
     }
