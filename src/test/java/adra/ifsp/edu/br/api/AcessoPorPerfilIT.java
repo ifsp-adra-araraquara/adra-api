@@ -117,6 +117,8 @@ class AcessoPorPerfilIT {
                 arguments(HttpMethod.GET, "/api/assistidos", Set.of(COORDENADOR, ASSISTENTE_SOCIAL)),
                 // Educador Social: só ativos (seletor do registro de ocorrência), e em resumo.
                 arguments(HttpMethod.GET, "/api/assistidos?status=ATIVO", Set.of(COORDENADOR, ASSISTENTE_SOCIAL, EDUCADOR_SOCIAL)),
+                arguments(HttpMethod.GET, "/api/assistidos/desligamentos", Set.of(COORDENADOR, ASSISTENTE_SOCIAL)),
+                arguments(HttpMethod.PATCH, "/api/assistidos/desligamentos/" + INEXISTENTE + "/aprovar", Set.of(COORDENADOR)),
                 arguments(HttpMethod.GET, "/api/assistidos/contagem", Set.of(COORDENADOR, ASSISTENTE_SOCIAL)),
                 arguments(HttpMethod.GET, "/api/arquivos/fotos-perfil?entidadeTipo=ASSISTIDO&entidadeIds=" + INEXISTENTE, Set.of(COORDENADOR, ASSISTENTE_SOCIAL, EDUCADOR_SOCIAL)),
                 arguments(HttpMethod.GET, "/api/arquivos/fotos-perfil?entidadeTipo=PRE_CADASTRO&entidadeIds=" + INEXISTENTE, Set.of()),

@@ -21,6 +21,8 @@ import adra.ifsp.edu.br.api.domain.model.Responsavel;
 import adra.ifsp.edu.br.api.domain.model.Turma;
 import adra.ifsp.edu.br.api.domain.model.TurmaAlunos;
 import adra.ifsp.edu.br.api.domain.repository.AssistidoRepository;
+import adra.ifsp.edu.br.api.domain.repository.SolicitacaoDesligamentoRepository;
+import adra.ifsp.edu.br.api.domain.enums.StatusSolicitacaoDesligamento;
 import adra.ifsp.edu.br.api.domain.repository.AssistidoSpecification;
 import adra.ifsp.edu.br.api.domain.repository.ResponsavelRepository;
 import adra.ifsp.edu.br.api.domain.repository.TurmaAlunosRepository;
@@ -60,6 +62,8 @@ public class AssistidoService {
 
     private final ArquivoService arquivoService;
     private final AssistidoRepository assistidoRepository;
+    private final UsuarioAutenticadoService usuarioAutenticadoService;
+    private final SolicitacaoDesligamentoRepository solicitacaoDesligamentoRepository;
     private final AssistidoMapper assistidoMapper;
     private final ResponsavelMapper responsavelMapper;
     private final AssistidoIndicadoresService indicadoresService;
@@ -426,6 +430,12 @@ public class AssistidoService {
         assistido.setMotivoSaida(dto.motivoSaida());
         matriculaService.acompanharStatus(assistido);
         assistido = assistidoRepository.save(assistido);
+        if (dto.status() == StatusGeral.INATIVO) {
+            // O Coordenador desligou direto: um pedido da Assistente Social em aberto já está atendido.
+            solicitacaoDesligamentoRepository.findByAssistido_AssistidoIdAndStatus(id, StatusSolicitacaoDesligamento.PENDENTE)
+                    .ifPresent(s -> s.decidir(StatusSolicitacaoDesligamento.APROVADA, "Desligado direto pela coordenação.",
+                            usuarioAutenticadoService.getUsuarioAtual()));
+        }
 
         auditoriaService.registrar(
                 ModuloSistema.ASSISTIDOS,
