@@ -104,6 +104,8 @@ class RematriculaIT {
     private static final String CPF_FICHA_ANTIGA = "23862551156";
     private static final String CPF_NOVO_ENVIO = "84873331170";
     private static final String CPF_MAE_SEM_CPF = "38798113500";
+    private static final String CPF_ATUALIZA = "72234906164";
+    private static final String CPF_MAE_ATUALIZA = "69695946968";
 
     private final int ano = LocalDate.now().getYear();
     private final int proximoAno = ano + 1;
@@ -251,6 +253,42 @@ class RematriculaIT {
                 select count(*) from adra.arquivo a join adra.responsavel r on r.responsavel_id = a.entidade_id
                 where a.entidade_tipo = 'RESPONSAVEL' and r.cpf = ? and a.matricula_id = ?""",
                 Integer.class, CPF_MAE_RENOVA, matriculaNova)).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("Rematrícula com a ficha revisada: leva o endereço enviado e a correção da equipe, sem mexer no CPF")
+    void rematriculaAtualizaAFichaRevisada() throws Exception {
+        Turma turma = grupo("Grupo Atualiza");
+        Long assistidoId = aprovar(enviar(CPF_ATUALIZA, CPF_MAE_ATUALIZA, "Rua Velha", false), turma);
+        abrirPeriodo(proximoAno);
+        Long envio = enviar(CPF_ATUALIZA, CPF_MAE_ATUALIZA, "Rua Nova", false);
+
+        String comparacao = mvc.perform(get("/api/pre-cadastro/" + envio + "/comparacao").with(perfil(ASSISTENTE_SOCIAL)))
+                .andReturn().getResponse().getContentAsString();
+        List<String> chaves = JsonPath.read(comparacao, "$.campos[?(@.diferente == true)].chave");
+        assertThat(chaves).containsExactly("endereco");
+
+        // A tela manda a ficha inteira já revisada: endereço do formulário e o nome corrigido à mão.
+        String ficha = mvc.perform(get("/api/pre-cadastro/" + envio + "/rascunho-assistido").with(perfil(ASSISTENTE_SOCIAL)))
+                .andReturn().getResponse().getContentAsString()
+                .replace("Crianca " + CPF_ATUALIZA, "Criança Corrigida")
+                .replace("\"cpf\":\"" + CPF_ATUALIZA + "\"", "\"cpf\":\"" + CPF_MAE_ATUALIZA + "\"");
+        mvc.perform(post("/api/pre-cadastro/" + envio + "/rematricular").with(perfil(ASSISTENTE_SOCIAL))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"turmaId\":" + turma.getTurmaId() + ",\"ficha\":" + ficha + "}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CONVERTIDO"));
+
+        Map<String, Object> atualizada = jdbc.queryForMap(
+                "select nome_completo, cpf, endereco_logradouro as logradouro, turma_id, data_entrada from adra.assistido where assistido_id = ?",
+                assistidoId);
+        // O rascunho traz entrada em 01/01 do ano seguinte; a ficha mantém a entrada original.
+        assertThat(atualizada.get("data_entrada").toString()).isEqualTo(LocalDate.now().toString());
+        assertThat(atualizada.get("nome_completo")).isEqualTo("Criança Corrigida");
+        assertThat(atualizada.get("logradouro")).isEqualTo("Rua Nova");
+        assertThat(atualizada.get("cpf")).isEqualTo(CPF_ATUALIZA);
+        assertThat(((Number) atualizada.get("turma_id")).longValue()).isEqualTo(turma.getTurmaId());
+        assertThat(matriculaStatus(assistidoId, proximoAno)).isEqualTo("ATIVA");
     }
 
     @Test

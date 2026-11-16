@@ -41,19 +41,19 @@ public class ComparacaoCadastro {
     public List<CampoComparadoDTO> comparar(Assistido ficha, Collection<AssistidoResponsavel> vinculos,
                                             AssistidoRequestDTO enviado) {
         List<CampoComparadoDTO> campos = new ArrayList<>();
-        campos.add(campo("Nome completo", ficha.getNomeCompleto(), enviado.nomeCompleto()));
-        campos.add(campo("Data de nascimento", data(ficha.getDataNascimento()), data(enviado.dataNascimento())));
-        campos.add(campo("Sexo", rotulo(ficha.getSexo()), rotulo(enviado.sexo())));
-        campos.add(campo("Endereço", endereco(ficha.getEndereco()), endereco(enviado.endereco())));
-        campos.add(campo("Problema de saúde",
+        campos.add(campo("nomeCompleto", "Nome completo", ficha.getNomeCompleto(), enviado.nomeCompleto()));
+        campos.add(campo("dataNascimento", "Data de nascimento", data(ficha.getDataNascimento()), data(enviado.dataNascimento())));
+        campos.add(campo("sexo", "Sexo", rotulo(ficha.getSexo()), rotulo(enviado.sexo())));
+        campos.add(campo("endereco", "Endereço", endereco(ficha.getEndereco()), endereco(enviado.endereco())));
+        campos.add(campo("saude", "Problema de saúde",
                 saude(ficha.getPossuiProblemaSaude(), ficha.getProblemaSaude()),
                 saude(enviado.possuiProblemaSaude(), enviado.problemaSaude())));
-        campos.add(campo("Renda familiar", dinheiro(ficha.getRendaFamiliar()), dinheiro(enviado.rendaFamiliar())));
-        campos.add(campo("Programas de transferência de renda",
+        campos.add(campo("renda", "Renda familiar", dinheiro(ficha.getRendaFamiliar()), dinheiro(enviado.rendaFamiliar())));
+        campos.add(campo("programas", "Programas de transferência de renda",
                 programas(ficha.getRecebeProgramaTransferencia(), ficha.getProgramasTransferencia()),
                 programas(enviado.recebeProgramaTransferencia(), enviado.programasTransferencia())));
-        campos.add(campo("NIS", ficha.getNis(), enviado.nis()));
-        campos.add(campo("Observações (contato de emergência, quem busca)", ficha.getObservacoes(), enviado.observacoes()));
+        campos.add(campo("nis", "NIS", ficha.getNis(), enviado.nis()));
+        campos.add(campo("observacoes", "Observações (contato de emergência, quem busca)", ficha.getObservacoes(), enviado.observacoes()));
         campos.addAll(responsaveis(vinculos, enviado.responsaveis()));
         return campos;
     }
@@ -78,11 +78,11 @@ public class ComparacaoCadastro {
                 cpfsEnviados.add(enviado.cpf());
             }
             if (vinculado == null) {
-                campos.add(new CampoComparadoDTO(parentesco, "Não está na ficha", comTelefone(enviado.nomeCompleto(), enviado.telefone()), true));
+                campos.add(new CampoComparadoDTO(parentesco, "Não está na ficha", comTelefone(enviado.nomeCompleto(), enviado.telefone()), true, null));
                 continue;
             }
             Responsavel naFicha = vinculado.getResponsavel();
-            campos.add(campo(parentesco, comTelefone(naFicha.getNomeCompleto(), naFicha.getTelefone()),
+            campos.add(campo(null, parentesco, comTelefone(naFicha.getNomeCompleto(), naFicha.getTelefone()),
                     comTelefone(enviado.nomeCompleto(), enviado.telefone())));
         }
 
@@ -91,14 +91,14 @@ public class ComparacaoCadastro {
                 .forEach(v -> campos.add(new CampoComparadoDTO(
                         StringUtils.hasText(v.getParentesco()) ? v.getParentesco() : "Responsável",
                         comTelefone(v.getResponsavel().getNomeCompleto(), v.getResponsavel().getTelefone()),
-                        "Não informado no formulário", true)));
+                        "Não informado no formulário", true, null)));
         return campos;
     }
 
-    static CampoComparadoDTO campo(String rotulo, String naFicha, String enviado) {
+    static CampoComparadoDTO campo(String chave, String rotulo, String naFicha, String enviado) {
         String ficha = textoOuVazio(naFicha);
         String formulario = textoOuVazio(enviado);
-        return new CampoComparadoDTO(rotulo, ficha, formulario, !normalizar(ficha).equals(normalizar(formulario)));
+        return new CampoComparadoDTO(rotulo, ficha, formulario, !normalizar(ficha).equals(normalizar(formulario)), chave);
     }
 
     /** Diferença só de maiúsculas ou de espaços não conta como mudança. */
