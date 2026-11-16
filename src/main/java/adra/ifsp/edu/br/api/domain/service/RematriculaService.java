@@ -35,7 +35,7 @@ import lombok.RequiredArgsConstructor;
 /**
  * Rematrícula: a família de quem já é atendido preenche o mesmo formulário;
  * a equipe vê o que mudou e abre a matrícula do ano para a ficha existente.
- * A ficha não é sobrescrita — atualizar dados é decisão manual da equipe.
+ * A ficha só muda no que a equipe revisou na tela (RematricularRequestDTO.ficha).
  */
 @Service
 @RequiredArgsConstructor
@@ -52,6 +52,7 @@ public class RematriculaService {
     private final PreCadastroParaAssistido paraAssistido;
     private final ComparacaoCadastro comparacao;
     private final AuditoriaService auditoriaService;
+    private final AssistidoService assistidoService;
     private final UsuarioAutenticadoService usuarioAutenticadoService;
 
     @Transactional(readOnly = true)
@@ -86,6 +87,9 @@ public class RematriculaService {
                     + ". Reprove este envio se for repetido.");
         }
         Turma turma = grupoAtivo(dto.turmaId());
+        if (dto.ficha() != null) {
+            assistidoService.atualizarFichaNaRematricula(assistido, dto.ficha());
+        }
 
         boolean voltou = assistido.getStatus() == StatusGeral.INATIVO;
         LocalDate saidaAnterior = assistido.getDataSaida() != null ? assistido.getDataSaida() : LocalDate.now();

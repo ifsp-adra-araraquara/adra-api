@@ -6,7 +6,7 @@ import adra.ifsp.edu.br.api.domain.enums.StatusGeral;
 
 /**
  * Tela de validação da rematrícula: o que mudou entre a ficha e o formulário.
- * Só leitura — a ficha não é alterada; a equipe edita à mão se quiser.
+ * A tela usa as chaves dos campos para levar o enviado para a ficha.
  */
 public record ComparacaoRematriculaDTO(
         Long assistidoId,

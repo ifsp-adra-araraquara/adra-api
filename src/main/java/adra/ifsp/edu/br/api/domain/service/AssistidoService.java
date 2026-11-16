@@ -311,6 +311,33 @@ public class AssistidoService {
     }
 
     /**
+     * Rematrícula: leva para a ficha os dados revisados na tela de avaliação
+     * (o que a família enviou e o que a equipe corrigiu). Só dados cadastrais:
+     * CPF e data de entrada ficam como estão; grupo, termos e responsáveis
+     * seguem o fluxo da rematrícula e a aba Família.
+     */
+    public void atualizarFichaNaRematricula(Assistido assistido, AssistidoRequestDTO dto) {
+        validarDadosComplementares(dto);
+        verificarDuplicidade(dto, assistido.getAssistidoId());
+
+        String cpf = assistido.getCpf();
+        Map<String, Object> valorAnterior = new java.util.HashMap<>();
+        valorAnterior.put("nomeCompleto", assistido.getNomeCompleto());
+        valorAnterior.put("dataNascimento", assistido.getDataNascimento() == null ? null : assistido.getDataNascimento().toString());
+
+        java.time.LocalDate dataEntrada = assistido.getDataEntrada();
+        assistidoMapper.atualizarEntidade(assistido, dto);
+        assistido.setCpf(cpf);
+        assistido.setDataEntrada(dataEntrada);
+
+        Map<String, Object> valorNovo = new java.util.HashMap<>();
+        valorNovo.put("nomeCompleto", assistido.getNomeCompleto());
+        valorNovo.put("dataNascimento", assistido.getDataNascimento() == null ? null : assistido.getDataNascimento().toString());
+        auditoriaService.registrar(ModuloSistema.ASSISTIDOS, "assistido", assistido.getAssistidoId(), AcaoSistema.EDITAR,
+                valorAnterior, valorNovo, "Ficha atualizada na rematrícula");
+    }
+
+    /**
      * CA-A04.2: so troca se a turma realmente mudou. O historico fica em
      * turma_aluno (VinculoTurmaService), ligado a matricula do ano.
      */
