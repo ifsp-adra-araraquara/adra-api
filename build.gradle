@@ -67,4 +67,8 @@ tasks.named('test') {
 		showCauses = true
 		showStackTraces = true
 	}
+	// Medições de desempenho do ADRAbot (RoboVolumeIT) aparecem no log do CI mesmo com o teste passando.
+	onOutput { descritor, evento ->
+		if (evento.message.contains('ADRAbot')) logger.lifecycle(evento.message.trim())
+	}
 }
