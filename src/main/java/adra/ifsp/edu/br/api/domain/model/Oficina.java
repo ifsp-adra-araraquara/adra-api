@@ -2,8 +2,11 @@ package adra.ifsp.edu.br.api.domain.model;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import org.hibernate.annotations.BatchSize;
 
+import java.time.DayOfWeek;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @Entity
@@ -33,6 +36,13 @@ public class Oficina {
 
     @Column(name = "ativo", nullable = false)
     private Boolean ativo = true;
+
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "oficina_dia_semana", schema = "adra", joinColumns = @JoinColumn(name = "oficina_id"))
+    @Column(name = "dia_semana")
+    @Enumerated(EnumType.STRING)
+    @BatchSize(size = 50)
+    private List<DayOfWeek> diasDaSemana;
 
     @Column(name = "criado_em", nullable = false, updatable = false)
     private LocalDateTime criadoEm;

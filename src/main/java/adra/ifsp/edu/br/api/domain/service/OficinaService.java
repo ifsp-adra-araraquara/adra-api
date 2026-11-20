@@ -74,7 +74,8 @@ public class OficinaService {
                 Map.of(
                         "nomeOficina", oficina.getNomeOficina(),
                         "oficineiroResponsavelId", oficina.getOficineiroResponsavel() != null ? oficina.getOficineiroResponsavel().getUsuarioId().toString() : null,
-                        "ativo", oficina.getAtivo().toString()),
+                        "ativo", oficina.getAtivo().toString(),
+                        "diasDaSemana", List.copyOf(oficina.getDiasDaSemana())),
                 "Cadastro de oficina");
 
         return paraDTO(oficina);
@@ -86,8 +87,8 @@ public class OficinaService {
     }
 
     @Cacheable(CacheConfig.ESTRUTURA)
-    public List<OficinaResponseDTO> listarComFiltros(String nome, Boolean ativo) {
-        Specification<Oficina> spec = OficinaSpecification.comFiltros(nome, ativo);
+    public List<OficinaResponseDTO> listarComFiltros(String nome, Boolean ativo, List<DayOfWeek> dias) {
+        Specification<Oficina> spec = OficinaSpecification.comFiltros(nome, ativo, dias);
         return paraDTOs(oficinaRepository.findAll(spec));
     }
 
@@ -203,6 +204,7 @@ public class OficinaService {
         valorAnterior.put(
                 "oficineiroResponsavelId",
                 oficina.getOficineiroResponsavel() != null ? oficina.getOficineiroResponsavel().getUsuarioId() : null);
+        valorAnterior.put("diasDaSemana", List.copyOf(oficina.getDiasDaSemana()));
 
         // Atualizar usando o mapper
         oficinaMapper.atualizarEntidade(oficina, dto);
@@ -217,6 +219,7 @@ public class OficinaService {
         valorNovo.put(
                 "oficineiroResponsavelId",
                 oficina.getOficineiroResponsavel() != null ? oficina.getOficineiroResponsavel().getUsuarioId() : null);
+        valorNovo.put("diasDaSemana", List.copyOf(oficina.getDiasDaSemana()));
 
         // Auditar
         auditoriaService.registrar(
