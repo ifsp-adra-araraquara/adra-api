@@ -12,6 +12,7 @@ import adra.ifsp.edu.br.api.domain.dto.historico.OficineiroHistoricoDTO;
 import adra.ifsp.edu.br.api.domain.service.HistoricoOficineiroService;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.DayOfWeek;
 import java.util.List;
 import java.util.Map;
 
@@ -38,9 +39,10 @@ public class OficinaController {
     @GetMapping
     public ResponseEntity<List<OficinaResponseDTO>> listar(
             @RequestParam(required = false) String nome,
-            @RequestParam(required = false) Boolean ativo
+            @RequestParam(required = false) Boolean ativo,
+            @RequestParam(required = false) List<DayOfWeek> dias
     ) {
-        return ResponseEntity.ok(oficinaService.listarComFiltros(nome, ativo));
+        return ResponseEntity.ok(oficinaService.listarComFiltros(nome, ativo, dias));
     }
 
     /** Números das turmas de cada oficina (dias, horário, vagas) para os cards. */
