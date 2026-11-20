@@ -60,4 +60,11 @@ tasks.named('test') {
 			excludeTags 'stage'
 		}
 	}
+	// No CI só aparece o log: teste que falha mostra a causa inteira (ex.: a mensagem do Postgres).
+	testLogging {
+		events 'failed'
+		exceptionFormat = 'full'
+		showCauses = true
+		showStackTraces = true
+	}
 }
