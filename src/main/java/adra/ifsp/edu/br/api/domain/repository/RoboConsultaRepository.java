@@ -1,5 +1,6 @@
 package adra.ifsp.edu.br.api.domain.repository;
 
+import adra.ifsp.edu.br.api.domain.service.RoboLimitador;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
@@ -16,6 +17,9 @@ import java.util.List;
  * (sem linha = PRESENTE), atendido esperado = vínculo com o grupo cobrindo a
  * data e assistido elegível, só PRESENTE conta como presença (FJ é ausência).
  *
+ * <p>Cada consulta passa pelo {@link RoboLimitador} e não abre transação: pega
+ * a conexão, roda e devolve.
+ *
  * <p>Escopo do Oficineiro: {@code :oficineiroId} nulo = todos os grupos; com
  * valor, só os grupos ligados (oficina_turma ativo) às oficinas dele — a mesma
  * regra do {@code AcessoTurmaService.podeAcessarTurma}.
@@ -25,6 +29,8 @@ import java.util.List;
 public class RoboConsultaRepository {
 
     private final JdbcClient jdbc;
+    /** Uma consulta do robô por vez na API: o pool (3 conexões) fica livre para a chamada. */
+    private final RoboLimitador limitador;
 
     /** Grupo visível no escopo; %s = coluna com o turma_id. */
     private static final String NO_ESCOPO = """
@@ -56,7 +62,7 @@ public class RoboConsultaRepository {
 
     /** Grupos ativos visíveis no escopo, por nome. */
     public List<Opcao> gruposAtivos(Long oficineiroId) {
-        return jdbc.sql("""
+        return limitador.executar(() -> jdbc.sql("""
                         SELECT t.turma_id, t.nome_turma,
                                (SELECT string_agg(o.nome_oficina, ', ' ORDER BY o.nome_oficina)
                                   FROM adra.oficina_turma ot
@@ -68,12 +74,12 @@ public class RoboConsultaRepository {
                         """)
                 .param("oficineiroId", oficineiroId)
                 .query((rs, i) -> new Opcao(rs.getLong("turma_id"), rs.getString("nome_turma"), rs.getString("oficinas")))
-                .list();
+                .list());
     }
 
     /** Oficinas ativas; para o Oficineiro, só as dele. */
     public List<Opcao> oficinasAtivas(Long oficineiroId) {
-        return jdbc.sql("""
+        return limitador.executar(() -> jdbc.sql("""
                         SELECT o.oficina_id, o.nome_oficina, u.nome_completo AS oficineiro
                           FROM adra.oficina o
                           LEFT JOIN adra.usuario u ON u.usuario_id = o.oficineiro_id
@@ -83,7 +89,7 @@ public class RoboConsultaRepository {
                         """)
                 .param("oficineiroId", oficineiroId)
                 .query((rs, i) -> new Opcao(rs.getLong("oficina_id"), rs.getString("nome_oficina"), rs.getString("oficineiro")))
-                .list();
+                .list());
     }
 
     public record FrequenciaLinha(LocalDate mes, Long turmaId, String nomeTurma, String oficinas,
@@ -92,7 +98,7 @@ public class RoboConsultaRepository {
 
     /** Frequência por (mês, grupo) no intervalo — base de "frequência do grupo", comparações e ranking. */
     public List<FrequenciaLinha> frequenciaPorTurmaEMes(LocalDate inicio, LocalDate fim, Long oficineiroId) {
-        return jdbc.sql("WITH " + ESPERADOS + """
+        return limitador.executar(() -> jdbc.sql("WITH " + ESPERADOS + """
                         SELECT date_trunc('month', e.data_chamada)::date AS mes,
                                e.turma_id, t.nome_turma,
                                (SELECT string_agg(o.nome_oficina, ', ' ORDER BY o.nome_oficina)
@@ -122,7 +128,7 @@ public class RoboConsultaRepository {
                         rs.getLong("esperados"),
                         rs.getLong("faltas"),
                         rs.getLong("justificadas")))
-                .list();
+                .list());
     }
 
     public record FrequenciaDiaSemana(int diaSemana, long chamadas, long esperados, long ausencias) {
@@ -131,7 +137,7 @@ public class RoboConsultaRepository {
     /** Frequência por dia da semana (1 = segunda … 7 = domingo, ISO), opcionalmente de um grupo. */
     public List<FrequenciaDiaSemana> frequenciaPorDiaDaSemana(LocalDate inicio, LocalDate fim, Long turmaId,
                                                               Long oficineiroId) {
-        return jdbc.sql("WITH " + ESPERADOS + """
+        return limitador.executar(() -> jdbc.sql("WITH " + ESPERADOS + """
                         SELECT EXTRACT(ISODOW FROM e.data_chamada)::int AS dia,
                                COUNT(DISTINCT e.chamada_id) AS chamadas,
                                COUNT(*) AS esperados,
@@ -150,7 +156,7 @@ public class RoboConsultaRepository {
                 .param("oficineiroId", oficineiroId)
                 .query((rs, i) -> new FrequenciaDiaSemana(
                         rs.getInt("dia"), rs.getLong("chamadas"), rs.getLong("esperados"), rs.getLong("ausencias")))
-                .list();
+                .list());
     }
 
     public record FaltasSeguidas(Long assistidoId, String nome, Long turmaId, String turma, long faltas,
@@ -163,7 +169,7 @@ public class RoboConsultaRepository {
      * aqui com o grupo de cada chamada e o escopo do Oficineiro.
      */
     public List<FaltasSeguidas> faltasSeguidas(LocalDate desde, LocalDate hoje, int limiar, Long oficineiroId) {
-        return jdbc.sql("""
+        return limitador.executar(() -> jdbc.sql("""
                         WITH chamadas_do_atendido AS (
                             SELECT DISTINCT ta.assistido_id, ch.chamada_id, ch.data_chamada, ch.turma_id,
                                    COALESCE(p.status_presenca::text, 'PRESENTE') AS status,
@@ -207,16 +213,20 @@ public class RoboConsultaRepository {
                         rs.getLong("assistido_id"), rs.getString("nome_completo"),
                         (Long) rs.getObject("turma_id"), rs.getString("nome_turma"),
                         rs.getLong("faltas"), rs.getObject("ultima", LocalDate.class)))
-                .list();
+                .list());
     }
 
     public record Contagem(String rotulo, long total) {
     }
 
-    /** Atendido ativo hoje (mesma regra do Painel: entrou até hoje e não saiu). */
+    /**
+     * Atendido ativo hoje (mesma regra do Painel: entrou até hoje e não saiu).
+     * Entre parênteses porque o text block tira o espaço antes do {@code """}:
+     * "WHERE """ + ATIVO_HOJE" vira "WHERE(...)", que é SQL válido.
+     */
     private static final String ATIVO_HOJE = """
-            COALESCE(s.data_entrada, s.criado_em::date) <= :hoje
-               AND (s.status = 'ATIVO' OR s.data_saida > :hoje)
+            (COALESCE(s.data_entrada, s.criado_em::date) <= :hoje
+               AND (s.status = 'ATIVO' OR s.data_saida > :hoje))
             """;
 
     /**
@@ -224,20 +234,20 @@ public class RoboConsultaRepository {
      * uma constante do serviço (enum), nunca do usuário.
      */
     public List<Contagem> ativosPor(String expressao, String juncao, LocalDate hoje) {
-        return jdbc.sql("SELECT " + expressao + " AS rotulo, COUNT(DISTINCT s.assistido_id) AS total"
+        return limitador.executar(() -> jdbc.sql("SELECT " + expressao + " AS rotulo, COUNT(DISTINCT s.assistido_id) AS total"
                         + " FROM adra.assistido s " + juncao
                         + " WHERE " + ATIVO_HOJE
                         + " GROUP BY 1 ORDER BY total DESC, rotulo NULLS LAST")
                 .param("hoje", hoje)
                 .query((rs, i) -> new Contagem(rs.getString("rotulo"), rs.getLong("total")))
-                .list();
+                .list());
     }
 
     public long ativosHoje(LocalDate hoje) {
-        return jdbc.sql("SELECT COUNT(*) FROM adra.assistido s WHERE " + ATIVO_HOJE)
+        return limitador.executar(() -> jdbc.sql("SELECT COUNT(*) FROM adra.assistido s WHERE " + ATIVO_HOJE)
                 .param("hoje", hoje)
                 .query(Long.class)
-                .single();
+                .single());
     }
 
     public record MovimentoMes(int mes, long entradas, long saidas) {
@@ -245,7 +255,7 @@ public class RoboConsultaRepository {
 
     /** Entradas e saídas de atendidos por mês do ano (sem data de entrada, vale a de cadastro). */
     public List<MovimentoMes> movimentoPorMes(LocalDate inicio, LocalDate fim) {
-        return jdbc.sql("""
+        return limitador.executar(() -> jdbc.sql("""
                         WITH eventos AS (
                             SELECT COALESCE(data_entrada, criado_em::date) AS dia, 1 AS entrada, 0 AS saida
                               FROM adra.assistido
@@ -263,24 +273,24 @@ public class RoboConsultaRepository {
                 .param("inicio", inicio)
                 .param("fim", fim)
                 .query((rs, i) -> new MovimentoMes(rs.getInt("mes"), rs.getLong("entradas"), rs.getLong("saidas")))
-                .list();
+                .list());
     }
 
     /** Ativos numa data (para "ativos no início e no fim do ano"). */
     public long ativosEm(LocalDate data) {
-        return jdbc.sql("""
+        return limitador.executar(() -> jdbc.sql("""
                         SELECT COUNT(*) FROM adra.assistido s
                          WHERE COALESCE(s.data_entrada, s.criado_em::date) <= :data
                            AND (s.status = 'ATIVO' OR s.data_saida > :data)
                         """)
                 .param("data", data)
                 .query(Long.class)
-                .single();
+                .single());
     }
 
     /** Motivos de saída mais comuns no período (texto livre normalizado: minúsculas, sem espaços nas pontas). */
     public List<Contagem> motivosDeSaida(LocalDate inicio, LocalDate fim, int limite) {
-        return jdbc.sql("""
+        return limitador.executar(() -> jdbc.sql("""
                         SELECT COALESCE(NULLIF(lower(btrim(motivo_saida)), ''), 'não informado') AS rotulo,
                                COUNT(*) AS total
                           FROM adra.assistido
@@ -293,7 +303,7 @@ public class RoboConsultaRepository {
                 .param("fim", fim)
                 .param("limite", limite)
                 .query((rs, i) -> new Contagem(rs.getString("rotulo"), rs.getLong("total")))
-                .list();
+                .list());
     }
 
     public record DisciplinaGrupo(Long turmaId, String nomeTurma, long ocorrencias, long advertencias,
@@ -302,7 +312,7 @@ public class RoboConsultaRepository {
 
     /** Registros disciplinares (não arquivados) por grupo, no mês e no anterior. */
     public List<DisciplinaGrupo> disciplinaPorGrupo(LocalDate inicioAnterior, LocalDate inicio, LocalDate fim) {
-        return jdbc.sql("""
+        return limitador.executar(() -> jdbc.sql("""
                         SELECT r.turma_id, COALESCE(t.nome_turma, 'Sem grupo') AS nome_turma,
                                COUNT(*) FILTER (WHERE r.data_registro >= :inicio AND r.nivel = 'OCORRENCIA') AS ocorrencias,
                                COUNT(*) FILTER (WHERE r.data_registro >= :inicio AND r.nivel = 'ADVERTENCIA') AS advertencias,
@@ -322,7 +332,7 @@ public class RoboConsultaRepository {
                         (Long) rs.getObject("turma_id"), rs.getString("nome_turma"),
                         rs.getLong("ocorrencias"), rs.getLong("advertencias"),
                         rs.getLong("suspensoes"), rs.getLong("anterior")))
-                .list();
+                .list());
     }
 
     public record SocialTotais(long ativos, long recebemPrograma, long rendaInformada, long pcd,
@@ -332,7 +342,7 @@ public class RoboConsultaRepository {
 
     /** Totais do perfil social dos ativos hoje — só contagens, nunca o dado de uma pessoa. */
     public SocialTotais socialTotais(LocalDate hoje) {
-        return jdbc.sql("""
+        return limitador.executar(() -> jdbc.sql("""
                         SELECT COUNT(*) AS ativos,
                                COUNT(*) FILTER (WHERE s.recebe_programa_transferencia) AS recebem,
                                COUNT(*) FILTER (WHERE s.renda_familiar IS NOT NULL) AS renda,
@@ -347,12 +357,12 @@ public class RoboConsultaRepository {
                 .query((rs, i) -> new SocialTotais(
                         rs.getLong("ativos"), rs.getLong("recebem"), rs.getLong("renda"), rs.getLong("pcd"),
                         rs.getLong("necessidades"), rs.getLong("saude"), rs.getLong("nis"), rs.getLong("contraturno")))
-                .single();
+                .single());
     }
 
     /** Ativos hoje por programa de transferência de renda (um atendido pode ter vários). */
     public List<Contagem> programasTransferencia(LocalDate hoje) {
-        return jdbc.sql("""
+        return limitador.executar(() -> jdbc.sql("""
                         SELECT apt.programa AS rotulo, COUNT(DISTINCT s.assistido_id) AS total
                           FROM adra.assistido s
                           JOIN adra.assistido_programa_transferencia apt ON apt.assistido_id = s.assistido_id
@@ -362,12 +372,12 @@ public class RoboConsultaRepository {
                         """)
                 .param("hoje", hoje)
                 .query((rs, i) -> new Contagem(rs.getString("rotulo"), rs.getLong("total")))
-                .list();
+                .list());
     }
 
     /** Ativos hoje por faixa de renda familiar (em reais), na ordem das faixas. */
     public List<Contagem> faixasDeRenda(LocalDate hoje) {
-        return jdbc.sql("""
+        return limitador.executar(() -> jdbc.sql("""
                         SELECT CASE
                                  WHEN s.renda_familiar <= 1000 THEN '1|Até R$ 1.000'
                                  WHEN s.renda_familiar <= 2000 THEN '2|De R$ 1.000,01 a R$ 2.000'
@@ -382,7 +392,7 @@ public class RoboConsultaRepository {
                         """)
                 .param("hoje", hoje)
                 .query((rs, i) -> new Contagem(rs.getString("rotulo").substring(2), rs.getLong("total")))
-                .list();
+                .list());
     }
 
     public record AtendidoGrupo(Long assistidoId, String nome, String grupo, LocalDate nascimento) {
@@ -390,11 +400,11 @@ public class RoboConsultaRepository {
 
     /** Sem acento e em minúsculas, igual ao termo que o serviço prepara. */
     private static final String NOME_SEM_ACENTO =
-            "translate(lower(s.nome_completo), 'áàâãäéèêëíìîïóòôõöúùûüçñ', 'aaaaaeeeeiiiiooooouuuucn')";
+            "(translate(lower(s.nome_completo), 'áàâãäéèêëíìîïóòôõöúùûüçñ', 'aaaaaeeeeiiiiooooouuuucn'))";
 
     /** Ativos cujo nome contém o termo (palavras separadas por %), no escopo do grupo atual. */
     public List<AtendidoGrupo> buscarAtivosPorNome(String termo, int limite, Long oficineiroId) {
-        return jdbc.sql("""
+        return limitador.executar(() -> jdbc.sql("""
                         SELECT s.assistido_id, s.nome_completo, t.nome_turma, s.data_nascimento
                           FROM adra.assistido s
                           LEFT JOIN adra.turma t ON t.turma_id = s.turma_id
@@ -411,12 +421,12 @@ public class RoboConsultaRepository {
                 .param("oficineiroId", oficineiroId)
                 .query((rs, i) -> new AtendidoGrupo(rs.getLong("assistido_id"), rs.getString("nome_completo"),
                         rs.getString("nome_turma"), rs.getObject("data_nascimento", LocalDate.class)))
-                .list();
+                .list());
     }
 
     /** Ativos que fazem aniversário no mês (1–12), no escopo do grupo atual, pelo dia. */
     public List<AtendidoGrupo> aniversariantesDoMes(int mes, Long oficineiroId) {
-        return jdbc.sql("""
+        return limitador.executar(() -> jdbc.sql("""
                         SELECT s.assistido_id, s.nome_completo, t.nome_turma, s.data_nascimento
                           FROM adra.assistido s
                           LEFT JOIN adra.turma t ON t.turma_id = s.turma_id
@@ -430,6 +440,6 @@ public class RoboConsultaRepository {
                 .param("oficineiroId", oficineiroId)
                 .query((rs, i) -> new AtendidoGrupo(rs.getLong("assistido_id"), rs.getString("nome_completo"),
                         rs.getString("nome_turma"), rs.getObject("data_nascimento", LocalDate.class)))
-                .list();
+                .list());
     }
 }

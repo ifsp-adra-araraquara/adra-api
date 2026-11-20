@@ -310,9 +310,72 @@ class RoboConsultaIT {
     }
 
     @Test
-    @DisplayName("Período acima de 24 meses ou invertido é recusado")
+    @DisplayName("Contexto: o Oficineiro só vê os grupos e as oficinas dele; oficina traz o responsável")
+    void contexto() {
+        entityManager.flush();
+
+        var todos = roboService.contexto(null);
+        var doOficineiro = roboService.contexto(oficineiro.getUsuarioId());
+
+        assertThat(todos.grupos()).extracting(adra.ifsp.edu.br.api.domain.dto.robo.RoboContextoDTO.Opcao::nome)
+                .containsExactly("Grupo A - Futebol", "Grupo B - Teatro");
+        assertThat(doOficineiro.grupos()).extracting(adra.ifsp.edu.br.api.domain.dto.robo.RoboContextoDTO.Opcao::id)
+                .containsExactly(futebolA.getTurmaId());
+        assertThat(doOficineiro.oficinas()).singleElement()
+                .extracting(adra.ifsp.edu.br.api.domain.dto.robo.RoboContextoDTO.Opcao::nome,
+                        adra.ifsp.edu.br.api.domain.dto.robo.RoboContextoDTO.Opcao::detalhe)
+                .containsExactly("Futebol", oficineiro.getNomeCompleto());
+    }
+
+    @Test
+    @DisplayName("Movimento do ano: 12 meses, entradas, saídas e motivo de saída normalizado")
+    void movimentoDoAno() {
+        LocalDate saida = MES.atDay(10);
+        assistidoRepository.save(Assistido.builder().nomeCompleto("Davi Saiu").dataNascimento(LocalDate.of(2014, 2, 2))
+                .dataEntrada(saida.minusMonths(1)).dataSaida(saida).motivoSaida("  Mudou de Cidade ")
+                .status(StatusGeral.INATIVO).build());
+        entityManager.flush();
+
+        var movimento = roboService.movimento(saida.getYear());
+
+        assertThat(movimento.meses()).hasSize(12);
+        assertThat(movimento.saidas()).isEqualTo(1);
+        assertThat(movimento.motivos()).extracting(ContagemDTO::rotulo, ContagemDTO::total)
+                .containsExactly(tuple("mudou de cidade", 1L));
+        assertThat(movimento.ativosFim()).isGreaterThanOrEqualTo(3);
+    }
+
+    @Test
+    @DisplayName("Toda dimensão de atendidos roda e conta os 3 ativos")
+    void todasAsDimensoes() {
+        entityManager.flush();
+
+        for (DimensaoAtendidos por : DimensaoAtendidos.values()) {
+            DistribuicaoAtendidosDTO d = roboService.distribuicao(por);
+            assertThat(d.ativos()).as(por.name()).isEqualTo(3);
+            assertThat(d.itens()).as(por.name()).isNotEmpty();
+        }
+        assertThat(roboService.distribuicao(DimensaoAtendidos.IDADE).itens())
+                .allSatisfy(c -> assertThat(c.rotulo()).endsWith(" anos"));
+        assertThat(roboService.distribuicao(DimensaoAtendidos.OFICINA).itens()).extracting(ContagemDTO::rotulo)
+                .containsExactlyInAnyOrder("Futebol", "Teatro");
+    }
+
+    @Test
+    @DisplayName("Um passo da próxima medida e dia da semana sem grupo rodam sem erro")
+    void consultasSemFiltro() {
+        entityManager.flush();
+
+        assertThat(roboService.umPassoDaProximaMedida()).isEmpty();
+        assertThat(roboService.frequenciaPorDiaDaSemana(MES, MES, null, null).dias()).isEmpty();
+        assertThat(roboService.faltasSeguidas(null, null).limiar()).isEqualTo(IndicadorFrequencia.LIMIAR_FALTAS_CONSECUTIVAS);
+    }
+
+    @Test
+    @DisplayName("Período acima de 12 meses ou invertido é recusado")
     void limitesDePeriodo() {
-        assertThatThrownBy(() -> roboService.frequencia(MES.minusMonths(24), MES, null))
+        assertThat(roboService.frequencia(MES.minusMonths(11), MES, null).linhas()).isEmpty();
+        assertThatThrownBy(() -> roboService.frequencia(MES.minusMonths(12), MES, null))
                 .isInstanceOf(RegraNegocioException.class);
         assertThatThrownBy(() -> roboService.frequencia(MES, MES.minusMonths(1), null))
                 .isInstanceOf(RegraNegocioException.class);
