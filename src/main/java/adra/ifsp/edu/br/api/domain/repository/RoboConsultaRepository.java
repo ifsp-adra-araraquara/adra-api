@@ -96,9 +96,8 @@ public class RoboConsultaRepository {
                                   long chamadas, long esperados, long faltas, long justificadas) {
     }
 
-    /** Frequência por (mês, grupo) no intervalo — base de "frequência do grupo", comparações e ranking. */
-    public List<FrequenciaLinha> frequenciaPorTurmaEMes(LocalDate inicio, LocalDate fim, Long oficineiroId) {
-        return limitador.executar(() -> jdbc.sql("WITH " + ESPERADOS + """
+    /** Frequência por (mês, grupo): a consulta mais pesada do robô (o EXPLAIN do stage usa esta mesma). */
+    static final String SQL_FREQUENCIA_POR_TURMA_E_MES = "WITH " + ESPERADOS + """
                         SELECT date_trunc('month', e.data_chamada)::date AS mes,
                                e.turma_id, t.nome_turma,
                                (SELECT string_agg(o.nome_oficina, ', ' ORDER BY o.nome_oficina)
@@ -115,7 +114,11 @@ public class RoboConsultaRepository {
                             ON p.chamada_id = e.chamada_id AND p.assistido_id = e.assistido_id
                          GROUP BY 1, 2, 3
                          ORDER BY 1, 3
-                        """)
+                        """;
+
+    /** Frequência por (mês, grupo) no intervalo — base de "frequência do grupo", comparações e ranking. */
+    public List<FrequenciaLinha> frequenciaPorTurmaEMes(LocalDate inicio, LocalDate fim, Long oficineiroId) {
+        return limitador.executar(() -> jdbc.sql(SQL_FREQUENCIA_POR_TURMA_E_MES)
                 .param("inicio", inicio)
                 .param("fim", fim)
                 .param("oficineiroId", oficineiroId)
