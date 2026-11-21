@@ -31,6 +31,8 @@ public class CacheConfig implements CachingConfigurer {
     public static final String ESTRUTURA = "estrutura";
     public static final String PAINEL = "painel";
     public static final String USUARIOS_ATIVOS = "usuarios-ativos";
+    /** ADRAbot: mesma validade do Painel (5 min); "comparar" e "gerar PDF" não refazem a consulta. */
+    public static final String ROBO = "robo";
 
     private static final int MAXIMO_POR_CACHE = 2_000;
 
@@ -47,6 +49,7 @@ public class CacheConfig implements CachingConfigurer {
         caffeine.registerCustomCache(ESTRUTURA, limitado(Duration.ofMinutes(30)));
         caffeine.registerCustomCache(PAINEL, limitado(Duration.ofMinutes(5)));
         caffeine.registerCustomCache(USUARIOS_ATIVOS, limitado(Duration.ofMinutes(1)));
+        caffeine.registerCustomCache(ROBO, limitado(Duration.ofMinutes(5)));
         // Limpa só após o commit: antes, outra request poderia guardar o dado antigo.
         return new TransactionAwareCacheManagerProxy(caffeine);
     }

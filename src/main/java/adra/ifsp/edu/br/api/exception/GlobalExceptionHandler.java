@@ -56,6 +56,14 @@ public class GlobalExceptionHandler {
                 ErroRespostaDTO.de(401, "Nao autenticado", ex.getMessage(), request.getRequestURI()));
     }
 
+    /** ADRAbot ocupado: 503 com Retry-After, para o front oferecer "tentar de novo". */
+    @ExceptionHandler(RoboOcupadoException.class)
+    public ResponseEntity<ErroRespostaDTO> tratarRoboOcupado(RoboOcupadoException ex, HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .header("Retry-After", "5")
+                .body(ErroRespostaDTO.de(503, "Robo ocupado", ex.getMessage(), request.getRequestURI()));
+    }
+
     @ExceptionHandler(RegraNegocioException.class)
     public ResponseEntity<ErroRespostaDTO> tratarRegraNegocio(RegraNegocioException ex, HttpServletRequest request) {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(

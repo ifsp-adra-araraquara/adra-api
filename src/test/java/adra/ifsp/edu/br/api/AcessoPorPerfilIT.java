@@ -139,6 +139,21 @@ class AcessoPorPerfilIT {
 
                 arguments(HttpMethod.GET, "/api/avisos", Set.of(COORDENADOR, ASSISTENTE_SOCIAL, EDUCADOR_SOCIAL, OFICINEIRO)),
 
+                // Robozinho ADRA: frequência para quem vê chamada (Oficineiro só nos grupos dele);
+                // atendidos e perfil social só Coordenação e Assistente Social.
+                arguments(HttpMethod.GET, "/api/robo/contexto", Set.of(COORDENADOR, ASSISTENTE_SOCIAL, EDUCADOR_SOCIAL, OFICINEIRO)),
+                arguments(HttpMethod.GET, "/api/robo/frequencia?de=2026-09&ate=2026-10", Set.of(COORDENADOR, ASSISTENTE_SOCIAL, EDUCADOR_SOCIAL, OFICINEIRO)),
+                arguments(HttpMethod.GET, "/api/robo/frequencia/dia-semana", Set.of(COORDENADOR, ASSISTENTE_SOCIAL, EDUCADOR_SOCIAL, OFICINEIRO)),
+                arguments(HttpMethod.GET, "/api/robo/frequencia/dia-semana?turmaId=" + INEXISTENTE, Set.of(COORDENADOR, ASSISTENTE_SOCIAL, EDUCADOR_SOCIAL)),
+                arguments(HttpMethod.GET, "/api/robo/frequencia/faltas-seguidas", Set.of(COORDENADOR, ASSISTENTE_SOCIAL, EDUCADOR_SOCIAL, OFICINEIRO)),
+                arguments(HttpMethod.GET, "/api/robo/atendidos/distribuicao?por=BAIRRO", Set.of(COORDENADOR, ASSISTENTE_SOCIAL)),
+                arguments(HttpMethod.GET, "/api/robo/atendidos/movimento", Set.of(COORDENADOR, ASSISTENTE_SOCIAL)),
+                arguments(HttpMethod.GET, "/api/robo/disciplinar/resumo", Set.of(COORDENADOR, ASSISTENTE_SOCIAL, EDUCADOR_SOCIAL)),
+                arguments(HttpMethod.GET, "/api/robo/atendidos/busca?nome=ana", Set.of(COORDENADOR, ASSISTENTE_SOCIAL, EDUCADOR_SOCIAL, OFICINEIRO)),
+                arguments(HttpMethod.GET, "/api/robo/atendidos/aniversariantes", Set.of(COORDENADOR, ASSISTENTE_SOCIAL, EDUCADOR_SOCIAL, OFICINEIRO)),
+                arguments(HttpMethod.GET, "/api/robo/disciplinar/um-passo", Set.of(COORDENADOR, ASSISTENTE_SOCIAL, EDUCADOR_SOCIAL)),
+                arguments(HttpMethod.GET, "/api/robo/social/resumo", Set.of(COORDENADOR, ASSISTENTE_SOCIAL)),
+
                 arguments(HttpMethod.GET, "/api/notificacoes", Set.of(COORDENADOR, ASSISTENTE_SOCIAL, EDUCADOR_SOCIAL, OFICINEIRO)),
                 arguments(HttpMethod.GET, "/api/notificacoes/nao-lidas", Set.of(COORDENADOR, ASSISTENTE_SOCIAL, EDUCADOR_SOCIAL, OFICINEIRO)),
                 // Só o Administrador vê e dispara o envio por e-mail.
