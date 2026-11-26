@@ -8,6 +8,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Past;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.PositiveOrZero;
@@ -47,6 +48,7 @@ public record ResponsavelRequestDTO(
         @Size(max = 120, message = "Profissao deve ter no maximo 120 caracteres")
         String profissao,
 
+        @NotNull(message = "Renda e' obrigatoria")
         @PositiveOrZero(message = "Renda nao pode ser negativa")
         @Digits(integer = 10, fraction = 2, message = "Renda invalida")
         BigDecimal renda

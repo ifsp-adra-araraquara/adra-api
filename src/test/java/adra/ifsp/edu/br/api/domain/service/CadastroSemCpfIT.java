@@ -160,7 +160,7 @@ class CadastroSemCpfIT {
     }
 
     private static ResponsavelRequestDTO responsavel(String nome, String cpf) {
-        return new ResponsavelRequestDTO(nome, null, cpf, null, null, null, null, null, null, null, null);
+        return new ResponsavelRequestDTO(nome, null, cpf, null, null, null, null, null, null, null, java.math.BigDecimal.ZERO);
     }
 
     private static RequestPostProcessor comPerfilAssistenteSocial() {
